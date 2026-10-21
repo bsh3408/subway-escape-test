@@ -58,23 +58,29 @@
   "weapons/w5.png"
  ],
  "mons": {
-  "trilobite": [
-   "mons/trilobite_0.png",
-   "mons/trilobite_1.png",
-   "mons/trilobite_2.png",
-   "mons/trilobite_3.png"
-  ],
   "germ": [
    "mons/germ_0.png",
    "mons/germ_1.png",
    "mons/germ_2.png",
    "mons/germ_3.png"
   ],
-  "shadow": [
-   "mons/shadow_0.png",
-   "mons/shadow_1.png",
-   "mons/shadow_2.png",
-   "mons/shadow_3.png"
+  "trilobite": [
+   "mons/trilobite_0.png",
+   "mons/trilobite_1.png",
+   "mons/trilobite_2.png",
+   "mons/trilobite_3.png"
+  ],
+  "ammonite": [
+   "mons/ammonite_0.png",
+   "mons/ammonite_1.png",
+   "mons/ammonite_2.png",
+   "mons/ammonite_3.png"
+  ],
+  "fossilrex": [
+   "mons/fossilrex_0.png",
+   "mons/fossilrex_1.png",
+   "mons/fossilrex_2.png",
+   "mons/fossilrex_3.png"
   ]
  }
 }

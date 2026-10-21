@@ -69,13 +69,12 @@ function updateRooms(w, rng) {
 
 function spawnWave(w, rng, rid) {
   const r = w.floor.rooms[rid], st = w.rooms[rid], wave = WAVES[r.type][st.wave++], p = w.player;
-  const [id, count] = wave;
-  for (let i = 0; i < count; i++) {
+  for (const [id, count] of wave) for (let i = 0; i < count; i++) {
     let x, y, k = 0;
     do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 30 && Math.hypot(x - p.x, y - p.y) < 90);
-    if (id === 'shadow') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
+    if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
     const M = MONSTERS[id];
-    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp: M.hp, maxHp: M.hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
+    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp: M.hp, maxHp: M.hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
   }
   w.events.push({ type: 'wave', room: rid, index: st.wave });
 }
@@ -148,7 +147,12 @@ function updateMons(w, rng) {
       else { if (M.kind === 'ranged' && d < M.range * 0.6) { vx = -vx; vy = -vy; } else if (M.kind === 'ranged' && d < M.range) sp = 0;
         if (m.cd <= 0 && d < 320) { m.windT = 0.45; w.events.push({ type: 'aim', uid: m.uid }); } }
     }
-    if (d < 14 + m.r * 0.5) sp = 0;
+    if (M.kind === 'roller') {   // 암모나이트: 웅크렸다가(예고) 정한 방향으로 빠르게 굴러온다
+      if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = M.dashSpeed; }
+      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { m.dash = 0.6; m.cd = 2; } }
+      else if (m.cd <= 0 && d < 220) { m.windT = 0.45; m.dashA = Math.atan2(dy, dx); w.events.push({ type: 'aim', uid: m.uid }); }
+    }
+    if (d < 14 + m.r * 0.5 && !(m.dash > 0)) sp = 0;
     moveBody(w, m, vx * sp * DT + m.kx, vy * sp * DT + m.ky, Math.min(6, m.r * 0.6)); m.kx *= 0.75; m.ky *= 0.75;
     if (Math.abs(dx) > 2) m.face = dx > 0 ? 1 : -1;
     if (d < 14 + m.r * 0.6 && m.touch <= 0 && M.kind !== 'ranged') { m.touch = 1; hurtPlayer(w, M.atk); }

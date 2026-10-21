@@ -55,14 +55,14 @@ function bakeFloor(f) {
   return c;
 }
 
-// ---------- 몬스터: 구역 1 그림(삼엽충, 내성균 덩어리, 대멸종의 그림자). 그림은 오른쪽을 보고 있다 ----------
+// ---------- 몬스터: 구역 1 그림(삼엽충, 암모나이트, 내성균 덩어리, 화석 짜깁기 공룡). 그림은 오른쪽을 보고 있다 ----------
 function drawMon(m, t) {
   const fr = A.mons[m.id], X = Math.round(m.x), Y = Math.round(m.y);
-  const img = m.id === 'shadow' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * 8) % fr.length];
+  const img = m.id === 'fossilrex' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
   x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
-  if (m.id === 'shadow') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
+  if (m.id === 'fossilrex') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
   if (m.windT > 0) { x.font = 'bold 14px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; x.strokeText('!', X, top - 10); x.fillStyle = '#ff3a2a'; x.fillText('!', X, top - 10); }
 }
 
@@ -160,7 +160,7 @@ function endStation(w) {
   const r = game.run, p = w.player;
   if (w.done === 'dead') { game.w = null; return menu(`<h1>💀 쓰러졌다</h1><p>지층 터널 ${r.station + 1}번째 역에서 쓰러졌다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect); }
   r.keep = { hp: p.hp, shield: p.shield, energy: p.energy }; r.station++;
-  if (r.station > 3) { game.w = null; return menu(`<h1>🎉 지층 터널 통과!</h1><p>대멸종의 그림자를 물리치고 구역 1을 빠져나왔다. 다음 구역(지하 텃밭 마을)은 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect); }
+  if (r.station > 3) { game.w = null; return menu(`<h1>🎉 지층 터널 통과!</h1><p>화석 짜깁기 공룡을 물리치고 구역 1을 빠져나왔다. 다음 구역(지하 텃밭 마을)은 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect); }
   startStation();
 }
 

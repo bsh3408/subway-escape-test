@@ -18,10 +18,12 @@ export const WEAPONS = {
   medpistol: { name: '구급 권총', sprite: 5, dmg: 4, rate: 4.5, count: 1, spread: 0.05, speed: 480, range: 280, energy: 0, kick: 0.5 },
 };
 // cy: 발밑에서 몸 가운데까지 높이(총알이 맞는 곳)
-// 구역 1 몬스터: 근접(삼엽충), 원거리(내성균 덩어리), 보스(대멸종의 그림자)
+// 구역 1 몬스터: 근접(삼엽충, 고생대 표준화석), 돌진(암모나이트, 중생대 표준화석), 원거리(내성균 덩어리), 보스(화석 짜깁기 공룡)
 export const MONSTERS = {
   trilobite: { name: '삼엽충', hp: 10, speed: 70, r: 9, cy: 6, kind: 'melee', atk: 1 },
   germ:      { name: '내성균 덩어리', hp: 12, speed: 40, r: 9, cy: 8, kind: 'ranged', atk: 1, range: 170, shotSpeed: 150 },
-  shadow:    { name: '대멸종의 그림자', hp: 220, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140 },
+  ammonite:  { name: '암모나이트', hp: 9, speed: 50, r: 9, cy: 10, kind: 'roller', atk: 1, dashSpeed: 260 },
+  fossilrex: { name: '화석 짜깁기 공룡', hp: 240, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140 },
 };
-export const WAVES = { battle: [['trilobite', 3], ['germ', 2]], elite: [['trilobite', 4], ['germ', 3]], boss: [['shadow', 1]] };
+// 방마다 물결 목록, 물결은 [몬스터, 마리 수] 묶음 목록
+export const WAVES = { battle: [[['trilobite', 3]], [['ammonite', 2], ['germ', 1]]], elite: [[['trilobite', 4], ['ammonite', 1]], [['germ', 3], ['ammonite', 2]]], boss: [[['fossilrex', 1]]] };
