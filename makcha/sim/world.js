@@ -90,7 +90,7 @@ function updatePlayer(w, input, rng) {
   const p = w.player, W = WEAPONS[p.weapon];
   if (p.cool > 0) p.cool--; if (p.invuln > 0) p.invuln--; p.kick = Math.max(0, p.kick - DT * 7);
   const t = nearestMon(w, AIM_RANGE);
-  p.aim = t ? Math.atan2(t.y - 8 - (p.y - 10), t.x - p.x) : p.lastDir;
+  p.aim = t ? Math.atan2(t.y - MONSTERS[t.id].cy - (p.y - 10), t.x - p.x) : p.lastDir;
   p.face = Math.cos(p.aim) >= 0 ? 1 : -1;
   if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= W.energy) {
     p.cool = Math.max(1, Math.round(TICK_HZ / W.rate)); p.energy -= W.energy; p.kick = W.kick;
@@ -117,7 +117,7 @@ function updateShots(w) {
   for (const s of w.shots) {
     s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
     if (solidAt(w, s.x, s.y)) { s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
-    for (const m of w.mons) if (Math.hypot(m.x - s.x, m.y - 8 - s.y) < m.r + 3) {
+    for (const m of w.mons) if (Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
       m.hp -= s.dmg; m.flash = 3; const k = MONSTERS[m.id].kind === 'boss' ? 0.1 : 1; m.kx += s.vx * 0.01 * k; m.ky += s.vy * 0.01 * k;
       w.events.push({ type: 'hit', uid: m.uid, amount: s.dmg, x: m.x, y: m.y }); s.life = 0; break;
     }
@@ -131,7 +131,7 @@ function updateShots(w) {
   w.eshots = w.eshots.filter(e => e.life > 0);
 }
 
-function enemyShot(w, m, a, sp, dmg) { w.eshots.push({ x: m.x, y: m.y - 8, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg }); }
+function enemyShot(w, m, a, sp, dmg) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg }); }
 
 function updateMons(w, rng) {
   const p = w.player;

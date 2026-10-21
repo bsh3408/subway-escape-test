@@ -17,10 +17,11 @@ export const WEAPONS = {
   beam:      { name: '손전등 광선총', sprite: 4, dmg: 4, rate: 5, count: 1, spread: 0, speed: 700, range: 340, energy: 1, kick: 0.5 },
   medpistol: { name: '구급 권총', sprite: 5, dmg: 4, rate: 4.5, count: 1, spread: 0.05, speed: 480, range: 280, energy: 0, kick: 0.5 },
 };
+// cy: 발밑에서 몸 가운데까지 높이(총알이 맞는 곳)
 // 구역 1 몬스터: 근접(삼엽충), 원거리(내성균 덩어리), 보스(대멸종의 그림자)
 export const MONSTERS = {
-  trilobite: { name: '삼엽충', hp: 10, speed: 70, r: 8, kind: 'melee', atk: 1 },
-  germ:      { name: '내성균 덩어리', hp: 12, speed: 40, r: 9, kind: 'ranged', atk: 1, range: 170, shotSpeed: 150 },
-  shadow:    { name: '대멸종의 그림자', hp: 220, speed: 45, r: 22, kind: 'boss', atk: 2, shotSpeed: 140 },
+  trilobite: { name: '삼엽충', hp: 10, speed: 70, r: 9, cy: 6, kind: 'melee', atk: 1 },
+  germ:      { name: '내성균 덩어리', hp: 12, speed: 40, r: 9, cy: 8, kind: 'ranged', atk: 1, range: 170, shotSpeed: 150 },
+  shadow:    { name: '대멸종의 그림자', hp: 220, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140 },
 };
 export const WAVES = { battle: [['trilobite', 3], ['germ', 2]], elite: [['trilobite', 4], ['germ', 3]], boss: [['shadow', 1]] };

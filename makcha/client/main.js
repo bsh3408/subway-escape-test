@@ -6,7 +6,7 @@ import { JOBS, JOB_ORDER, WEAPONS, MONSTERS } from '../sim/data.js';
 
 const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
-const A = { chars: [], weapons: [] };
+const A = { chars: [], weapons: [], mons: {} };
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
 
 // ---------- 입력: WASD·방향키, 마우스 왼쪽 공격, 왼쪽 Shift 달리기 ----------
@@ -55,16 +55,15 @@ function bakeFloor(f) {
   return c;
 }
 
-// ---------- 몬스터(코드 도트, 임시): 삼엽충, 내성균 덩어리, 대멸종의 그림자 ----------
+// ---------- 몬스터: 구역 1 그림(삼엽충, 내성균 덩어리, 대멸종의 그림자). 그림은 오른쪽을 보고 있다 ----------
 function drawMon(m, t) {
-  const X = Math.round(m.x), Y = Math.round(m.y), f = m.flash > 0;
-  x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, m.r, 3, 0, 0, 7); x.fill();
-  const P = (c, a, b, w, h) => { x.fillStyle = f ? '#fff' : c; x.fillRect(X + a, Y + b, w, h); };
-  if (m.id === 'trilobite') { const s = Math.floor(t * 10) % 2; P('#1c1a16', -9, -10, 18, 10); P('#8a7a5a', -8, -9, 16, 8); P('#b8a47a', -8, -9, 16, 2); for (let i = -6; i <= 6; i += 4) P('#5a4a3a', i, -8, 1, 7); P('#1c1a16', -10 + s, -2, 3, 2); P('#1c1a16', 7 - s, -2, 3, 2); P('#ff4a3a', m.face > 0 ? 5 : -7, -7, 2, 2); }
-  else if (m.id === 'germ') { const b = Math.round(Math.sin(t * 5) * 1); P('#1a2410', -9, -16 + b, 18, 16 - b); P('#6aa83a', -8, -15 + b, 16, 14 - b); P('#9ad05a', -6, -13 + b, 5, 4); P('#2a3a1a', 1, -9, 3, 3); P('#2a3a1a', -4, -6, 2, 2); P('#ff4a3a', m.face > 0 ? 2 : -5, -12 + b, 3, 3); }
-  else { const b = Math.round(Math.sin(t * 3) * 2); P('#0c0a10', -22, -44 + b, 44, 44); P('#3a2a4a', -20, -42 + b, 40, 40); P('#5a3a6a', -16, -38 + b, 32, 10); P('#ff3a2a', -10, -30 + b, 6, 6); P('#ff3a2a', 4, -30 + b, 6, 6); P('#1c1020', -14, -16 + b, 28, 4);
-    const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, Y - 56, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, Y - 55, (W - 2) * m.hp / m.maxHp, 3); }
-  if (m.windT > 0) { x.font = 'bold 14px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; const top = m.id === 'shadow' ? Y - 62 : Y - 22; x.strokeText('!', X, top); x.fillStyle = '#ff3a2a'; x.fillText('!', X, top); }
+  const fr = A.mons[m.id], X = Math.round(m.x), Y = Math.round(m.y);
+  const img = m.id === 'shadow' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * 8) % fr.length];
+  x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  const top = Y - img.height;
+  if (m.id === 'shadow') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
+  if (m.windT > 0) { x.font = 'bold 14px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; x.strokeText('!', X, top - 10); x.fillStyle = '#ff3a2a'; x.fillText('!', X, top - 10); }
 }
 
 // ---------- 플레이어: 팔 없는 몸 + 떠서 흔들리는 총(반동) ----------
@@ -184,6 +183,7 @@ function frame(now) {
   const m = await fetch('assets/manifest.json').then(r => r.json());
   A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s)))));
   A.weapons = await Promise.all(m.weapons.map(s => load('assets/' + s)));
-  window.__game = game;
+  A.mons = Object.fromEntries(await Promise.all(Object.entries(m.mons).map(async ([k, f]) => [k, await Promise.all(f.map(s => load('assets/' + s)))])));
+  window.__game = game; window.__jump = st => { game.run.station = st; startStation(); };   // 개발용: 원하는 역으로 바로 가기
   jobSelect(); requestAnimationFrame(frame);
 })();

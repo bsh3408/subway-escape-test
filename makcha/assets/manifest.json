@@ -56,5 +56,25 @@
   "weapons/w3.png",
   "weapons/w4.png",
   "weapons/w5.png"
- ]
+ ],
+ "mons": {
+  "trilobite": [
+   "mons/trilobite_0.png",
+   "mons/trilobite_1.png",
+   "mons/trilobite_2.png",
+   "mons/trilobite_3.png"
+  ],
+  "germ": [
+   "mons/germ_0.png",
+   "mons/germ_1.png",
+   "mons/germ_2.png",
+   "mons/germ_3.png"
+  ],
+  "shadow": [
+   "mons/shadow_0.png",
+   "mons/shadow_1.png",
+   "mons/shadow_2.png",
+   "mons/shadow_3.png"
+  ]
+ }
 }
