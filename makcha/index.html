@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>막차: 지하 생존기</title>
+<style>
+:root{--bg:#0d0f12;--panel:rgba(12,14,18,.78);--ink:#ece6d6;--sub:#a59f90;--acc:#e0b04a}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Malgun Gothic",sans-serif;overflow:hidden;user-select:none}
+#stage{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+canvas{image-rendering:pixelated;display:block}
+#hud{position:fixed;left:0;right:0;top:0;padding:14px;display:flex;justify-content:space-between;pointer-events:none}
+.bars{background:var(--panel);border:2px solid rgba(255,255,255,.15);border-radius:12px;padding:8px 10px;display:grid;gap:5px;width:clamp(200px,22vw,320px)}
+.bar{height:clamp(14px,1.7vw,22px);background:rgba(0,0,0,.6);border-radius:5px;position:relative;overflow:hidden}
+.bar i{display:block;height:100%}.bar span{position:absolute;inset:0;text-align:center;font-size:clamp(11px,1.2vw,15px);font-weight:800;line-height:clamp(14px,1.7vw,22px);text-shadow:0 0 3px #000}
+#hp i{background:#d84a3a}#sh i{background:#8aa8c8}#en i{background:#5ab0e0}
+#where{background:var(--panel);border-radius:10px;padding:4px 10px;font-size:14px;align-self:flex-start}
+#tip{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
+#tip.on{opacity:1}
+#menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,9,12,.88)}
+#menu[hidden]{display:none}
+.card{background:#1c1f26;border:1px solid #333842;border-radius:12px;padding:20px;max-width:900px;width:92vw}
+.card h1{margin:0 0 6px;font-size:26px}.card p{color:var(--sub);margin:4px 0 12px;line-height:1.5}
+.jobs{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.job{background:#262a33;border:2px solid transparent;border-radius:10px;padding:10px;color:var(--ink);font:inherit;cursor:pointer;text-align:center}
+.job:hover,.job:focus{border-color:var(--acc);outline:none}
+.job canvas{width:76px;height:96px;margin:0 auto 6px}
+</style>
+</head>
+<body>
+<div id="stage"><canvas id="cv" width="640" height="360"></canvas></div>
+<div id="hud" hidden>
+  <div class="bars"><div class="bar" id="hp"><i></i><span></span></div><div class="bar" id="sh"><i></i><span></span></div><div class="bar" id="en"><i></i><span></span></div></div>
+  <div id="where"></div>
+</div>
+<div id="tip"></div>
+<div id="menu"><div class="card" id="card"></div></div>
+<script type="module" src="client/main.js"></script>
+</body>
+</html>
