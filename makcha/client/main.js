@@ -1,8 +1,9 @@
 // 막차: 화면(입력·그리기·미니맵·직업 고르기). 게임 규칙은 sim/에만 있고, 여기서는 그리기만 한다
-import { createWorld, step } from '../sim/world.js';
+import { step } from '../sim/world.js';
+import { createRun, offerLines, enterLine, finishLine, RUN_LINES } from '../sim/run.js';
 import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
-import { JOBS, JOB_ORDER, WEAPONS, MONSTERS } from '../sim/data.js';
+import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES } from '../sim/data.js';
 
 const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
@@ -25,7 +26,9 @@ addEventListener('resize', fit); fit();
 
 // ---------- 배경: 구역 1 지층 터널. 방 바닥은 자갈, 통로는 선로, 벽 앞면은 지층 단면 ----------
 const STRATA = ['#c8b48a', '#9a7a5a', '#b8a070', '#7a6a5a', '#a88a6a'];
+// 1호선은 지층 벽, 다른 호선은 콘크리트 벽에 호선 색 띠(호선별 실내 그림은 차례로 채운다)
 function bakeFloor(f) {
+  const L = LINES[f.line], strata = f.line === 1;
   const c = document.createElement('canvas'); c.width = f.w * TILE; c.height = f.h * TILE; const g = c.getContext('2d');
   const inRoom = (tx, ty) => f.rooms.some(r => tx >= r.x0 && tx < r.x0 + r.w && ty >= r.y0 && ty < r.y0 + r.h);
   let seed = 7; const rnd = () => ((seed = (seed * 1103515245 + 12345) >>> 0) / 4294967296);
@@ -41,9 +44,10 @@ function bakeFloor(f) {
         else { g.fillStyle = '#4a3a2a'; g.fillRect(X + 2, Y, 4, TILE); g.fillRect(X + 10, Y, 4, TILE); g.fillStyle = '#8a8a90'; g.fillRect(X, Y + 4, TILE, 2); g.fillRect(X, Y + 11, TILE, 2); } }
     } else if (tileAt(f, tx, ty + 1) !== T.WALL || tileAt(f, tx, ty + 2) !== T.WALL) {
       // 카메라 쪽을 보는 벽(두 칸 높이): 지층 단면과 가끔 화석. 위 칸 꼭대기에 벽 윗면 테두리
-      for (let k = 0; k < 5; k++) { g.fillStyle = STRATA[(k + ty * 5) % 5]; g.fillRect(X, Y + k * 3, TILE, 3 + (k === 4 ? 1 : 0)); }
+      if (strata) for (let k = 0; k < 5; k++) { g.fillStyle = STRATA[(k + ty * 5) % 5]; g.fillRect(X, Y + k * 3, TILE, 3 + (k === 4 ? 1 : 0)); }
+      else { g.fillStyle = '#8a8d92'; g.fillRect(X, Y, TILE, TILE); g.fillStyle = '#a3a6ab'; g.fillRect(X, Y, TILE, 2); if (tileAt(f, tx, ty + 1) !== T.WALL) { g.fillStyle = L.color; g.fillRect(X, Y + 8, TILE, 3); } }
       if (tileAt(f, tx, ty + 1) === T.WALL) { g.fillStyle = '#2c2620'; g.fillRect(X, Y, TILE, 3); }
-      if (rnd() < 0.12) { g.fillStyle = '#efe6cc'; g.fillRect(X + 4, Y + 5, 8, 5); g.fillStyle = '#5a4a3a'; g.fillRect(X + 5, Y + 7, 6, 1); g.fillRect(X + 7, Y + 6, 1, 3); }
+      if (strata && rnd() < 0.12) { g.fillStyle = '#efe6cc'; g.fillRect(X + 4, Y + 5, 8, 5); g.fillStyle = '#5a4a3a'; g.fillRect(X + 5, Y + 7, 6, 1); g.fillRect(X + 7, Y + 6, 1, 3); }
       g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(X, Y + TILE - 2, TILE, 2);
     } else { g.fillStyle = '#1b1814'; g.fillRect(X, Y, TILE, TILE); if (tileAt(f, tx, ty - 1) !== T.WALL || tileAt(f, tx - 1, ty) !== T.WALL || tileAt(f, tx + 1, ty) !== T.WALL) { g.fillStyle = '#2c2620'; g.fillRect(X, Y, TILE, TILE); } }
   }
@@ -137,31 +141,42 @@ let tipT = 0; function tip(s, sec) { $('tip').textContent = s; $('tip').classLis
 function bar(id, v, m, label) { $(id).querySelector('i').style.width = Math.max(0, v / m * 100) + '%'; $(id).querySelector('span').textContent = label; }
 function hud(w, dt) {
   const p = w.player; bar('hp', p.hp, p.maxHp, `체력 ${p.hp}/${p.maxHp}`); bar('sh', p.shield, p.maxShield, `방어막 ${p.shield}/${p.maxShield}`); bar('en', p.energy, p.maxEnergy, `에너지 ${Math.floor(p.energy)}/${p.maxEnergy}`);
-  $('where').textContent = `구역 1 지층 터널 · ${w.floor.station + 1}번째 역`;
+  const sec = Math.floor((game.run.ticks + w.tick) / 30);
+  $('where').textContent = `${w.line}호선 ${LINES[w.line].name} · ${w.order + 1}/${RUN_LINES} · ⏱ ${clock(sec)}`;
   if (tipT > 0 && (tipT -= dt) <= 0) $('tip').classList.remove('on');
 }
 
-// ---------- 흐름: 직업 고르기 → 역 1~4 → 끝 ----------
-const game = { w: null, bg: null, acc: 0, run: null };
+// ---------- 흐름: 직업 고르기 → 환승역(열린 호선 중 3개) → 호선 던전 → … 5개 → 지상 출구 ----------
+const game = { w: null, bg: null, acc: 0, run: null, open: [1, 2, 3, 4, 5, 6, 7, 8, 9] };
+const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
+// 교사가 열어 둔 호선(연구소에 연결되어 있을 때만 서버에서 읽고, 아니면 모두 열림)
+async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
 function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; }
 function jobSelect() {
-  menu(`<h1>🚇 막차: 지하 생존기</h1><p>지층 터널을 지나 다음 역으로. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 왼쪽 Shift로 달린다(달리는 동안 방어막이 차지 않음). 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 오른쪽 위 지도로 방을 확인한다.</p>
+  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 왼쪽 Shift로 달린다. 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
     <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}</small></button>`).join('')}</div>`);
   for (const c of document.querySelectorAll('[data-c]')) { const g = c.getContext('2d'), im = A.chars[+c.dataset.c][0]; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); }
-  for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = { job: b.dataset.j, station: 0, seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0 }; startStation(); };
+  for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j }); transfer(); };
 }
-function startStation() {
-  const r = game.run, w = createWorld({ seed: r.seed + r.station * 101, job: r.job, zone: 1, station: r.station });
-  if (r.keep) Object.assign(w.player, r.keep);
-  game.w = w; game.bg = bakeFloor(w.floor); $('menu').hidden = true; $('hud').hidden = false;
-  tip(`🚉 지층 터널 ${r.station + 1}번째 역`, 2.5);
+function transfer() {
+  const r = game.run, offer = offerLines(r, game.open), first = r.visited.length === 0;
+  game.w = null;
+  menu(`<h1>${first ? '🏠 은신처 역' : '🔁 환승역'} · ${r.visited.length + 1}/${RUN_LINES}번째 호선</h1><p>${first ? '첫 호선을 고르자.' : `지금까지 ${r.visited.map(n => n + '호선').join(' → ')} · ⏱ ${clock(Math.floor(r.ticks / 30))}`} 표지판의 재난을 보고 고르자. 뒤에 들어가는 호선일수록 적이 강해진다.</p>
+    <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(n => { const L = LINES[n]; return `<button class="job" data-l="${n}" style="text-align:left">
+      <span style="display:inline-flex;width:30px;height:30px;border-radius:50%;background:${L.color};color:#fff;font-weight:800;align-items:center;justify-content:center;margin-right:6px">${n}</span><b>${L.name}</b>
+      <br><small style="color:var(--sub)">재난: ${L.hazard}<br>단원: ${L.unit}${r.visited.includes(n) ? '<br>(다시 가는 호선)' : ''}${L.ready ? '' : '<br>그림 준비 중(1호선 몬스터로 시험)'}</small></button>`; }).join('')}</div>`);
+  for (const b of document.querySelectorAll('[data-l]')) b.onclick = () => startLine(+b.dataset.l);
 }
-function endStation(w) {
-  const r = game.run, p = w.player;
-  if (w.done === 'dead') { game.w = null; return menu(`<h1>💀 쓰러졌다</h1><p>지층 터널 ${r.station + 1}번째 역에서 쓰러졌다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect); }
-  r.keep = { hp: p.hp, shield: p.shield, energy: p.energy }; r.station++;
-  if (r.station > 3) { game.w = null; return menu(`<h1>🎉 지층 터널 통과!</h1><p>화석 짜깁기 공룡을 물리치고 구역 1을 빠져나왔다. 다음 구역(지하 텃밭 마을)은 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect); }
-  startStation();
+function startLine(n) {
+  const w = enterLine(game.run, n); game.w = w; game.bg = bakeFloor(w.floor); game.acc = 0;
+  $('menu').hidden = true; $('hud').hidden = false; tip(`🚇 ${n}호선 ${LINES[n].name} · 재난: ${LINES[n].hazard}`, 3);
+}
+function endLine(w) {
+  const r = game.run; finishLine(r, w); game.w = null;
+  const time = clock(Math.floor(r.ticks / 30));
+  if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
+  if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p><p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
+  transfer();
 }
 
 let last = performance.now();
@@ -172,7 +187,7 @@ function frame(now) {
     game.acc += dt; let n = 0;
     while (game.acc >= DT && n++ < 5) { game.acc -= DT; step(w, readInput()); feed(w); if (w.done) break; }
     if (n >= 5) game.acc = 0;
-    if (w.done) setTimeout(() => endStation(w), w.done === 'dead' ? 800 : 150);
+    if (w.done) setTimeout(() => endLine(w), w.done === 'dead' ? 800 : 150);
   }
   updateFx(dt);
   if (game.w) { drawWorld(game.w, t); hud(game.w, dt); }
@@ -184,6 +199,7 @@ function frame(now) {
   A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s)))));
   A.weapons = await Promise.all(m.weapons.map(s => load('assets/' + s)));
   A.mons = Object.fromEntries(await Promise.all(Object.entries(m.mons).map(async ([k, f]) => [k, await Promise.all(f.map(s => load('assets/' + s)))])));
-  window.__game = game; window.__jump = st => { game.run.station = st; startStation(); };   // 개발용: 원하는 역으로 바로 가기
+  window.__game = game; window.__line = n => startLine(n);   // 개발용: 원하는 호선으로 바로 가기
+  await loadOpenLines();
   jobSelect(); requestAnimationFrame(frame);
 })();

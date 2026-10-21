@@ -1,4 +1,4 @@
-// 역 하나의 던전 만들기: 5×5 격자 위에 방을 놓고(주 경로 + 곁방), 이웃한 방끼리 통로로 잇는다
+// 호선 하나의 던전 만들기: 5×5 격자 위에 방을 놓고(주 경로 + 곁방), 이웃한 방끼리 통로로 잇는다
 // 결과는 모두 평범한 데이터(JSON으로 저장 가능)다
 import { createRng } from './rng.js';
 import { GRID, CELL_W, CELL_H } from './constants.js';
@@ -9,9 +9,9 @@ const SIZE = { start: [11, 9], battle: [19, 13], elite: [19, 13], chest: [11, 9]
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const CORRIDOR = 3;   // 통로 폭(타일)
 
-function layout(rng, station) {
-  // 주 경로: 시작 → 전투 방들 → 출구(구역 마지막 역이면 보스)
-  const len = 5 + (station >= 2 ? 1 : 0);
+function layout(rng, order) {
+  // 주 경로: 시작 → 전투 방들 → 호선 보스. 뒤에 들어간 호선일수록 전투 방이 하나 더
+  const len = 5 + (order >= 2 ? 1 : 0);
   for (let tries = 0; tries < 200; tries++) {
     const used = new Map(), path = [];
     let gx = rng.int(GRID), gy = rng.int(GRID); path.push([gx, gy]); used.set(gx + ',' + gy, 0);
@@ -22,13 +22,11 @@ function layout(rng, station) {
       [gx, gy] = rng.pick(opts); used.set(gx + ',' + gy, i); path.push([gx, gy]);
     }
     if (!ok) continue;
-    const last = station === 3 ? 'boss' : 'exit';
-    const rooms = path.map(([x, y], i) => ({ gx: x, gy: y, type: i === 0 ? 'start' : i === len - 1 ? last : 'battle' }));
-    if (station >= 1) rooms[len - 2].type = 'elite';
-    if (station >= 1 && rooms.filter(r => r.type === 'battle').length < 3) rooms[len - 2].type = 'battle';
+    const rooms = path.map(([x, y], i) => ({ gx: x, gy: y, type: i === 0 ? 'start' : i === len - 1 ? 'boss' : 'battle' }));
+    if (order >= 1 && rooms.filter(r => r.type === 'battle').length > 3) rooms[len - 2].type = 'elite';
     const links = path.slice(1).map((_, i) => [i, i + 1]);
     // 곁방: 보급(상자) 1개, 과학 장치 방 1개, 홀수 역에는 상점
-    const extras = ['chest', 'event', ...(station % 2 === 1 ? ['shop'] : [])];
+    const extras = ['chest', 'event', ...(order % 2 === 1 ? ['shop'] : [])];
     for (const type of extras) {
       const hosts = rooms.map((r, i) => i).filter(i => i > 0 && i < len - 1);
       let placed = false;
@@ -45,9 +43,9 @@ function layout(rng, station) {
   throw new Error('던전을 만들지 못했다');
 }
 
-export function generateFloor(seed, { zone, station }) {
-  const rng = createRng(seed).fork('floor' + zone + ':' + station);
-  const { rooms, links } = layout(rng, station);
+export function generateFloor(seed, { line, order }) {
+  const rng = createRng(seed).fork('floor' + line + ':' + order);
+  const { rooms, links } = layout(rng, order);
   const w = GRID * CELL_W, h = GRID * CELL_H, tiles = new Array(w * h).fill(T.WALL);
   const set = (x, y, t) => { tiles[y * w + x] = t; };
   rooms.forEach((r, id) => {
@@ -73,7 +71,7 @@ export function generateFloor(seed, { zone, station }) {
     for (const id of [L.id, R.id]) { for (const k of tilesOf[id]) tiles[k] = T.DOOR; doors.push({ room: id, to: id === L.id ? R.id : L.id, tiles: tilesOf[id] }); }
   }
   const doorOwner = {}; for (const d of doors) for (const k of d.tiles) doorOwner[k] = d.room;
-  return { zone, station, w, h, tiles, rooms, links, doors, doorOwner };
+  return { line, order, w, h, tiles, rooms, links, doors, doorOwner };
 }
 
 export function tileAt(f, x, y) { return x < 0 || y < 0 || x >= f.w || y >= f.h ? T.WALL : f.tiles[y * f.w + x]; }

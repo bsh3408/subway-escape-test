@@ -4,13 +4,14 @@ import { createRng } from './rng.js';
 import { generateFloor, isSolid, T } from './dungeon.js';
 import { INPUT, TILE, DT, TICK_HZ } from './constants.js';
 import { JOBS, WEAPONS, MONSTERS, WAVES } from './data.js';
+import { difficulty } from './run.js';
 
 const PLAYER_SPEED = 120, RUN_MUL = 1.4, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300;
 
-export function createWorld({ seed, job, zone, station }) {
-  const floor = generateFloor(seed, { zone, station }), J = JOBS[job], s = floor.rooms[0];
+export function createWorld({ seed, job, line, order }) {
+  const floor = generateFloor(seed, { line, order }), J = JOBS[job], s = floor.rooms[0];
   return {
-    tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
+    line, order, diff: difficulty(order), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false, running: false,
       hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy, weapon: J.weapon,
@@ -53,7 +54,7 @@ function updateRooms(w, rng) {
     if (r.type === 'chest' && !st.opened && Math.hypot(p.x - (r.cx + 0.5) * TILE, p.y - (r.cy + 0.5) * TILE) < 18) {
       st.opened = true; p.hp = Math.min(p.maxHp, p.hp + 2); p.energy = Math.min(p.maxEnergy, p.energy + 60); w.events.push({ type: 'chest', room: id });
     }
-    const portal = r.type === 'exit' || (r.type === 'boss' && st.cleared);
+    const portal = r.type === 'boss' && st.cleared;   // 호선 보스를 잡으면 다음 환승역으로 가는 포털
     if (portal && Math.hypot(p.x - (r.cx + 0.5) * TILE, p.y - (r.cy + 0.5) * TILE) < 20) w.done = 'next';
   }
   // 잠긴 방: 적을 다 잡으면 다음 물결, 마지막 물결이면 문을 연다
@@ -69,12 +70,13 @@ function updateRooms(w, rng) {
 
 function spawnWave(w, rng, rid) {
   const r = w.floor.rooms[rid], st = w.rooms[rid], wave = WAVES[r.type][st.wave++], p = w.player;
-  for (const [id, count] of wave) for (let i = 0; i < count; i++) {
+  for (const [id, count] of wave) for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {
     let x, y, k = 0;
     do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 30 && Math.hypot(x - p.x, y - p.y) < 90);
     if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
     const M = MONSTERS[id];
-    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp: M.hp, maxHp: M.hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
+    const hp = Math.round(M.hp * w.diff.hpMul);
+    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
   }
   w.events.push({ type: 'wave', room: rid, index: st.wave });
 }

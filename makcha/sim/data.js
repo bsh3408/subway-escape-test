@@ -27,3 +27,15 @@ export const MONSTERS = {
 };
 // 방마다 물결 목록, 물결은 [몬스터, 마리 수] 묶음 목록
 export const WAVES = { battle: [[['trilobite', 3]], [['ammonite', 2], ['germ', 1]]], elite: [[['trilobite', 4], ['ammonite', 1]], [['germ', 3], ['ammonite', 2]]], boss: [[['fossilrex', 1]]] };
+// 9개 호선(혼합안). 실내 모습·몬스터·보스·재난은 1호선부터 차례로 채운다. 지금은 1호선 몬스터를 모든 호선에 임시로 쓴다
+export const LINES = {
+  1: { name: '지층 공사선', color: '#0052A4', unit: '지질시대, 대멸종', hazard: '낙석·먼지', ready: true },
+  2: { name: '진화 실험선', color: '#00A84D', unit: '자연선택, 생물다양성', hazard: '감염 구름' },
+  3: { name: '텃밭 마을선', color: '#EF7C1C', unit: '생태계 구성, 먹이 관계', hazard: '생태 교란' },
+  4: { name: '녹슨 침수선', color: '#00A5DE', unit: '산화·환원', hazard: '침수·부식' },
+  5: { name: '산성비 매연선', color: '#996CAC', unit: '산·염기, 중화', hazard: '산성비' },
+  6: { name: '냉동 창고선', color: '#CD7C2F', unit: '에너지 출입', hazard: '한파' },
+  7: { name: '폭염 지상선', color: '#747F00', unit: '온난화, 엘니뇨, 사막화', hazard: '폭염·모래 폭풍' },
+  8: { name: '정전 발전소선', color: '#E6186C', unit: '태양 에너지, 발전, 효율', hazard: '정전' },
+  9: { name: '관제 센터선', color: '#BDB092', unit: '감염병, 빅데이터·AI', hazard: '감염병·데이터 교란' },
+};
