@@ -1,11 +1,11 @@
-// 직업 6명, 시작 무기, 구역 1(지층 터널) 몬스터. 수치는 첫 판 기준
+// 직업 6명, 스킬(마우스 오른쪽, cd는 대기 시간 초), 시작 무기, 구역 1(지층 터널) 몬스터. 수치는 첫 판 기준
 export const JOBS = {
-  driver:    { name: '지하철 기관사', hp: 7, shield: 5, energy: 160, weapon: 'shotgun', sprite: 0 },
-  geologist: { name: '지질학자', hp: 6, shield: 4, energy: 180, weapon: 'hammer', sprite: 1 },
-  ecologist: { name: '생태학자', hp: 6, shield: 4, energy: 180, weapon: 'smg', sprite: 2 },
-  chemist:   { name: '화학 연구원', hp: 5, shield: 4, energy: 200, weapon: 'sprayer', sprite: 3 },
-  meteo:     { name: '기상 연구원', hp: 5, shield: 5, energy: 200, weapon: 'beam', sprite: 4 },
-  medic:     { name: '응급 구조사', hp: 6, shield: 3, energy: 180, weapon: 'medpistol', sprite: 5 },
+  driver:    { name: '지하철 기관사', hp: 7, shield: 5, energy: 160, weapon: 'shotgun', sprite: 0, skill: { id: 'regen', name: '회생 제동', cd: 8 } },
+  geologist: { name: '지질학자', hp: 6, shield: 4, energy: 180, weapon: 'hammer', sprite: 1, skill: { id: 'strata', name: '지층 판독', cd: 14 } },
+  ecologist: { name: '생태학자', hp: 6, shield: 4, energy: 180, weapon: 'smg', sprite: 2, skill: { id: 'biocontrol', name: '생물적 방제', cd: 16 } },
+  chemist:   { name: '화학 연구원', hp: 5, shield: 4, energy: 200, weapon: 'sprayer', sprite: 3, skill: { id: 'neutral', name: '중화제 투척', cd: 9 } },
+  meteo:     { name: '기상 연구원', hp: 5, shield: 5, energy: 200, weapon: 'beam', sprite: 4, skill: { id: 'warning', name: '기상 경보', cd: 15 } },
+  medic:     { name: '응급 구조사', hp: 6, shield: 3, energy: 180, weapon: 'medpistol', sprite: 5, skill: { id: 'firstaid', name: '응급 처치', cd: 18 } },
 };
 export const JOB_ORDER = ['driver', 'geologist', 'ecologist', 'chemist', 'meteo', 'medic'];
 // 무기: rate 초당 발사, count 한 번에 나가는 탄, spread 퍼짐(라디안), speed 픽셀/초, range 픽셀, energy 한 발 에너지

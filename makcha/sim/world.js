@@ -6,7 +6,7 @@ import { INPUT, TILE, DT, TICK_HZ } from './constants.js';
 import { JOBS, WEAPONS, MONSTERS, WAVES } from './data.js';
 import { difficulty } from './run.js';
 
-const PLAYER_SPEED = 120, RUN_MUL = 1.4, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300;
+const DASH_SPEED = 420, PLAYER_SPEED = 120, RUN_MUL = 1.4, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300;
 
 export function createWorld({ seed, job, line, order }) {
   const floor = generateFloor(seed, { line, order }), J = JOBS[job], s = floor.rooms[0];
@@ -15,8 +15,8 @@ export function createWorld({ seed, job, line, order }) {
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false, running: false,
       hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy, weapon: J.weapon,
-      cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0 },
-    mons: [], shots: [], eshots: [],
+      cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
+    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], scanT: 0, hazardOffT: 0,
   };
 }
 
@@ -39,6 +39,9 @@ function movePlayer(w, input) {
   const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
   p.moving = l > 0; p.running = p.moving && !!(input & INPUT.RUN);
   if (p.moving) p.lastDir = Math.atan2(my, mx);
+  if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
+    const x0 = p.x, y0 = p.y, d = DASH_SPEED * DT; moveBody(w, p, Math.cos(p.dashA) * d, Math.sin(p.dashA) * d, 5); p.dashDist += Math.hypot(p.x - x0, p.y - y0); return;
+  }
   const sp = PLAYER_SPEED * (p.running ? RUN_MUL : 1) * DT;
   moveBody(w, p, mx * sp, my * sp, 5);
 }
@@ -76,7 +79,7 @@ function spawnWave(w, rng, rid) {
     if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
     const M = MONSTERS[id];
     const hp = Math.round(M.hp * w.diff.hpMul);
-    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
+    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, stun: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
   }
   w.events.push({ type: 'wave', room: rid, index: st.wave });
 }
@@ -119,8 +122,9 @@ function updateShots(w) {
     s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
     if (solidAt(w, s.x, s.y)) { s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
     for (const m of w.mons) if (Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
-      m.hp -= s.dmg; m.flash = 3; const k = MONSTERS[m.id].kind === 'boss' ? 0.1 : 1; m.kx += s.vx * 0.01 * k; m.ky += s.vy * 0.01 * k;
-      w.events.push({ type: 'hit', uid: m.uid, amount: s.dmg, x: m.x, y: m.y }); s.life = 0; break;
+      const dmg = Math.round(s.dmg * (w.scanT > 0 ? 1.3 : 1));   // 지층 판독: 약점이 드러나 피해 +30%
+      m.hp -= dmg; m.flash = 3; const k = MONSTERS[m.id].kind === 'boss' ? 0.1 : 1; m.kx += s.vx * 0.01 * k; m.ky += s.vy * 0.01 * k;
+      w.events.push({ type: 'hit', uid: m.uid, amount: dmg, x: m.x, y: m.y }); s.life = 0; break;
     }
   }
   w.shots = w.shots.filter(s => s.life > 0);
@@ -138,7 +142,9 @@ function updateMons(w, rng) {
   const p = w.player;
   for (const m of w.mons) {
     const M = MONSTERS[m.id], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy) || 1;
-    m.t += DT; if (m.flash > 0) m.flash--; m.cd -= DT; m.touch -= DT;
+    m.t += DT; if (m.flash > 0) m.flash--;
+    if (m.stun > 0) { m.stun -= DT; continue; }   // 얼거나 기절하면 움직이지도 공격하지도 못한다
+    m.cd -= DT; m.touch -= DT;
     let vx = dx / d, vy = dy / d, sp = m.speed;
     if (M.kind === 'ranged' || M.kind === 'boss') {
       if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) {
@@ -163,12 +169,57 @@ function updateMons(w, rng) {
   w.mons = w.mons.filter(m => m.hp > 0);
 }
 
+// ---------- 직업 스킬(마우스 오른쪽) ----------
+function hitMon(w, m, dmg, kx = 0, ky = 0) { m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: dmg, x: m.x, y: m.y }); }
+function nearestTo(w, x, y, range) { let best = null, bd = range; for (const m of w.mons) { const d = Math.hypot(m.x - x, m.y - y); if (d < bd) { bd = d; best = m; } } return best; }
+function useSkill(w) {
+  const p = w.player, S = JOBS[p.job].skill;
+  p.skillCd = Math.round(S.cd * TICK_HZ); w.events.push({ type: 'skill', id: S.id });
+  switch (S.id) {
+    case 'regen': p.dashT = Math.round(0.3 * TICK_HZ); p.dashA = p.moving ? p.lastDir : p.aim; p.dashDist = 0; p.dashHit = []; p.invuln = Math.max(p.invuln, p.dashT + 4); break;
+    case 'strata': w.scanT = 5 * TICK_HZ; for (const r of w.rooms) r.seen = true; break;
+    case 'biocontrol': for (let i = 0; i < 3; i++) w.allies.push({ kind: 'hawk', x: p.x + (i - 1) * 14, y: p.y - 20, t: 8 * TICK_HZ, cd: i * 5 }); break;
+    case 'neutral': { const t = nearestTo(w, p.x, p.y, 300), tx = t ? t.x : p.x + Math.cos(p.aim) * 120, ty = t ? t.y : p.y + Math.sin(p.aim) * 120;
+      w.bombs.push({ sx: p.x, sy: p.y - 10, tx, ty, x: p.x, y: p.y - 10, t: 0, T: 15 }); break; }
+    case 'warning': for (const m of w.mons) m.stun = Math.max(m.stun || 0, 2.5); w.eshots = []; w.hazardOffT = 5 * TICK_HZ; break;
+    case 'firstaid': p.hp = Math.min(p.maxHp, p.hp + 3); w.zones.push({ kind: 'heal', x: p.x, y: p.y, r: 50, t: 4 * TICK_HZ, acc: 0 }); break;
+  }
+}
+function updateSkills(w, input) {
+  const p = w.player;
+  if (p.skillCd > 0) p.skillCd--;
+  if (input & INPUT.SKILL) { if (!p.skillHeld && p.skillCd <= 0) useSkill(w); p.skillHeld = true; } else p.skillHeld = false;
+  if (w.scanT > 0) w.scanT--; if (w.hazardOffT > 0) w.hazardOffT--;
+  if (p.dashT > 0) {   // 회생 제동: 돌진 중 부딪힌 적을 밀치고, 멈출 때 달린 거리만큼 방어막(운동 에너지 → 전기 에너지)
+    for (const m of w.mons) if (!p.dashHit.includes(m.uid) && Math.hypot(m.x - p.x, m.y - p.y) < 18 + m.r) { p.dashHit.push(m.uid); hitMon(w, m, 4, Math.cos(p.dashA) * 10, Math.sin(p.dashA) * 10); }
+    if (--p.dashT === 0) { const gain = Math.min(p.maxShield - p.shield, Math.max(1, Math.ceil(p.dashDist / 50))); p.shield += gain; w.events.push({ type: 'charge', amount: gain }); }
+  }
+  for (const a of w.allies) {   // 생물적 방제: 풀어 준 천적(매)이 가까운 적을 쫓아가 공격
+    a.t--; a.cd--; const t = nearestTo(w, a.x, a.y + 20, 400);
+    if (t) { const dx = t.x - a.x, dy = t.y - 20 - a.y, d = Math.hypot(dx, dy) || 1;
+      if (d > 14) { a.x += dx / d * 170 * DT; a.y += dy / d * 170 * DT; } else if (a.cd <= 0) { a.cd = 12; hitMon(w, t, 3); } }
+    else { a.x += (p.x - a.x) * 0.08; a.y += (p.y - 26 - a.y) * 0.08; }
+  }
+  w.allies = w.allies.filter(a => a.t > 0);
+  for (const b of w.bombs) {   // 중화제 플라스크: 포물선으로 날아가 떨어지면 터진다
+    b.t++; const k = b.t / b.T; b.x = b.sx + (b.tx - b.sx) * k; b.y = b.sy + (b.ty - b.sy) * k;
+    if (b.t >= b.T) { b.done = true; w.events.push({ type: 'splash', x: b.tx, y: b.ty, r: 55 });
+      for (const m of w.mons) if (Math.hypot(m.x - b.tx, m.y - b.ty) < 55 + m.r) hitMon(w, m, 14, Math.sign(m.x - b.tx) * 6, Math.sign(m.y - b.ty) * 3); }
+  }
+  w.bombs = w.bombs.filter(b => !b.done);
+  for (const z of w.zones) {   // 응급 처치 구역: 안에 있으면 1초마다 체력 1
+    z.t--; if (z.kind === 'heal' && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 1) { z.acc -= 1; p.hp = Math.min(p.maxHp, p.hp + 1); w.events.push({ type: 'heal' }); }
+  }
+  w.zones = w.zones.filter(z => z.t > 0);
+}
+
 export function step(w, input) {
   if (w.done) return;
   w.events = [];
   const rng = createRng(w.rng);
   movePlayer(w, input);
   updatePlayer(w, input, rng);
+  updateSkills(w, input);
   updateShots(w);
   updateMons(w, rng);
   updateRooms(w, rng);

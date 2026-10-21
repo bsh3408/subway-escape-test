@@ -11,15 +11,15 @@ const A = { chars: [], weapons: [], mons: {} };
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
 
 // ---------- 입력: WASD·방향키, 마우스 왼쪽 공격, 왼쪽 Shift 달리기 ----------
-const keys = new Set(); let mouseDown = false;
-const KEY = { KeyW: INPUT.UP, ArrowUp: INPUT.UP, KeyS: INPUT.DOWN, ArrowDown: INPUT.DOWN, KeyA: INPUT.LEFT, ArrowLeft: INPUT.LEFT, KeyD: INPUT.RIGHT, ArrowRight: INPUT.RIGHT, KeyJ: INPUT.ATTACK, ShiftLeft: INPUT.RUN };
+const keys = new Set(); let mouseDown = false, rightDown = false;
+const KEY = { KeyW: INPUT.UP, ArrowUp: INPUT.UP, KeyS: INPUT.DOWN, ArrowDown: INPUT.DOWN, KeyA: INPUT.LEFT, ArrowLeft: INPUT.LEFT, KeyD: INPUT.RIGHT, ArrowRight: INPUT.RIGHT, KeyJ: INPUT.ATTACK, KeyK: INPUT.SKILL, ShiftLeft: INPUT.RUN };
 addEventListener('keydown', e => { if (KEY[e.code]) { keys.add(e.code); e.preventDefault(); } });
 addEventListener('keyup', e => keys.delete(e.code));
-cv.addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; });
-addEventListener('mouseup', () => mouseDown = false);
-addEventListener('blur', () => { keys.clear(); mouseDown = false; });
+cv.addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; if (e.button === 2) rightDown = true; });
+addEventListener('mouseup', e => { if (e.button === 0) mouseDown = false; if (e.button === 2) rightDown = false; });
+addEventListener('blur', () => { keys.clear(); mouseDown = rightDown = false; });
 cv.addEventListener('contextmenu', e => e.preventDefault());
-function readInput() { let b = 0; for (const k of keys) b |= KEY[k]; if (mouseDown) b |= INPUT.ATTACK; return b; }
+function readInput() { let b = 0; for (const k of keys) b |= KEY[k]; if (mouseDown) b |= INPUT.ATTACK; if (rightDown) b |= INPUT.SKILL; return b; }
 
 function fit() { const s = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H); cv.style.width = VIEW_W * s + 'px'; cv.style.height = VIEW_H * s + 'px'; }
 addEventListener('resize', fit); fit();
@@ -64,8 +64,9 @@ function drawMon(m, t) {
   const fr = A.mons[m.id], X = Math.round(m.x), Y = Math.round(m.y);
   const img = m.id === 'fossilrex' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
-  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
+  if (game.w?.scanT > 0) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 1; x.strokeRect(X - 4.5, top + img.height * 0.4 - 4.5, 9, 9); x.fillStyle = '#ff4a3a'; x.fillRect(X - 1, top + img.height * 0.4 - 1, 2, 2); }
   if (m.id === 'fossilrex') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
   if (m.windT > 0) { x.font = 'bold 14px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; x.strokeText('!', X, top - 10); x.fillStyle = '#ff3a2a'; x.fillText('!', X, top - 10); }
 }
@@ -82,7 +83,7 @@ function drawPlayer(p, t) {
 }
 
 // ---------- 화면 효과: 피해 숫자, 불꽃, 총구 불꽃, 화면 흔들림 ----------
-const fx = { nums: [], parts: [], flashes: [], shake: 0 };
+const fx = { nums: [], parts: [], flashes: [], rings: [], trail: [], shake: 0, skillFlash: 0 };
 function feed(w) {
   const p = w.player;
   for (const e of w.events) {
@@ -94,11 +95,26 @@ function feed(w) {
     else if (e.type === 'lock') tip('🚪 문이 잠겼다! 적을 모두 쓰러뜨려라', 2);
     else if (e.type === 'clear') tip('✅ 방을 정리했다. 문이 열렸다', 2);
     else if (e.type === 'chest') tip('📦 보급 상자: 체력 +2, 에너지 +60', 2.5);
+    else if (e.type === 'skill') { fx.skillFlash = 0.35; tip(`✨ ${JOBS[p.job].skill.name}`, 1.2); }
+    else if (e.type === 'charge') fx.nums.push({ x: p.x, y: p.y - 36, v: `방어막 +${e.amount}`, t: 1, blue: true });
+    else if (e.type === 'splash') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: '#7ad0ff' }); for (let i = 0; i < 18; i++) fx.parts.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 220, vy: (Math.random() - 0.5) * 160, t: 0.45, c: i % 2 ? '#bfe8ff' : '#ffffff' }); fx.shake = Math.max(fx.shake, 3); }
+    else if (e.type === 'heal') fx.nums.push({ x: p.x, y: p.y - 34, v: '+1', t: 0.7, green: true });
   }
 }
 function updateFx(dt) {
-  for (const L of [fx.nums, fx.parts, fx.flashes]) { for (const o of L) { o.t -= dt; if (o.vx !== undefined) { o.x += o.vx * dt; o.y += o.vy * dt; } } for (let i = L.length - 1; i >= 0; i--) if (L[i].t <= 0) L.splice(i, 1); }
+  fx.skillFlash = Math.max(0, fx.skillFlash - dt);
+  for (const L of [fx.nums, fx.parts, fx.flashes, fx.rings, fx.trail]) { for (const o of L) { o.t -= dt; if (o.vx !== undefined) { o.x += o.vx * dt; o.y += o.vy * dt; } } for (let i = L.length - 1; i >= 0; i--) if (L[i].t <= 0) L.splice(i, 1); }
   fx.shake = Math.max(0, fx.shake - dt * 20);
+}
+
+// ---------- 스킬 칸(오른쪽 아래): 이름과 남은 대기 시간 ----------
+function drawSkillHud(w) {
+  const p = w.player, S = JOBS[p.job].skill, X = VIEW_W - 58, Y = VIEW_H - 58, k = p.skillCd / (S.cd * 30);
+  x.fillStyle = 'rgba(10,12,16,.7)'; x.beginPath(); x.arc(X + 24, Y + 24, 24, 0, 7); x.fill();
+  if (k > 0) { x.fillStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.moveTo(X + 24, Y + 24); x.arc(X + 24, Y + 24, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); x.fill(); }
+  x.strokeStyle = k > 0 ? '#5a5f68' : '#e0b04a'; x.lineWidth = 2; x.beginPath(); x.arc(X + 24, Y + 24, 24, 0, 7); x.stroke();
+  x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = 'bold 9px sans-serif'; x.fillText(S.name, X + 24, Y + 22);
+  x.font = 'bold 8px sans-serif'; x.fillStyle = k > 0 ? '#ffb070' : '#e0b04a'; x.fillText(k > 0 ? Math.ceil(p.skillCd / 30) + '초' : '우클릭', X + 24, Y + 33);
 }
 
 // ---------- 미니맵: 지나간 방과 문 너머로 본 방만 ----------
@@ -124,15 +140,25 @@ function drawWorld(w, t) {
     if (r.type === 'chest') { x.fillStyle = '#2a1c10'; x.fillRect(X - 9, Y - 12, 18, 12); x.fillStyle = st.opened ? '#6a4a2a' : '#c8902a'; x.fillRect(X - 8, Y - 11, 16, 10); x.fillStyle = '#e8d070'; x.fillRect(X - 2, Y - 8, 4, 3); }
     if (r.type === 'exit' || (r.type === 'boss' && st.cleared)) { const g = 0.5 + Math.sin(t * 4) * 0.2; x.fillStyle = `rgba(120,200,255,${g})`; x.beginPath(); x.ellipse(X, Y, 14, 7, 0, 0, 7); x.fill(); x.fillStyle = '#e8f6ff'; x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.fillText('다음 역', X, Y - 12); }
   }
+  // 스킬 효과(바닥): 응급 처치 회복 구역, 돌진 잔상
+  for (const z of w.zones) { x.fillStyle = `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); }
+  if (p.dashT > 0) fx.trail.push({ x: p.x, y: p.y, t: 0.25 });
+  for (const q of fx.trail) { x.globalAlpha = q.t * 2; x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(q.x) - 6, Math.round(q.y) - 22, 12, 22); } x.globalAlpha = 1;
   const list = [...w.mons.map(m => ({ y: m.y, d: () => drawMon(m, t) })), { y: p.y, d: () => drawPlayer(p, t) }];
   list.sort((a, b) => a.y - b.y).forEach(o => o.d());
+  // 생물적 방제의 천적(매), 중화제 플라스크, 터지는 고리
+  for (const a of w.allies) { const f = Math.floor(t * 10) % 2, X = Math.round(a.x), Y = Math.round(a.y); x.fillStyle = '#3a2a1a'; x.fillRect(X - 5, Y - 2, 10, 4); x.fillStyle = '#8a5a2a'; x.fillRect(X - 4, Y - 1, 8, 2); x.fillStyle = '#5a3a1a'; x.fillRect(X - 9, Y - (f ? 4 : 0), 5, 2); x.fillRect(X + 4, Y - (f ? 4 : 0), 5, 2); x.fillStyle = '#ffd040'; x.fillRect(X + 3, Y - 2, 2, 1); }
+  for (const b of w.bombs) { const k = b.t / b.T, z = Math.sin(k * Math.PI) * 26; x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y) + 6, 6, 2); x.fillStyle = '#1c2a3a'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y - z) - 4, 7, 8); x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(b.x) - 2, Math.round(b.y - z) - 1, 5, 4); x.fillStyle = '#e8e8e8'; x.fillRect(Math.round(b.x) - 1, Math.round(b.y - z) - 6, 3, 3); }
+  for (const r of fx.rings) { x.globalAlpha = r.t / 0.35; x.strokeStyle = r.c; x.lineWidth = 2; const k = 1.15 - r.t; x.beginPath(); x.ellipse(r.x, r.y, r.r * k, r.r * 0.55 * k, 0, 0, 7); x.stroke(); } x.globalAlpha = 1;
   for (const s of w.shots) { x.fillStyle = '#fff2a0'; x.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4); }
   for (const e of w.eshots) { x.fillStyle = '#2a0c10'; x.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 3, 7, 7); x.fillStyle = '#ff6a5a'; x.fillRect(Math.round(e.x) - 2, Math.round(e.y) - 2, 5, 5); }
   for (const f of fx.flashes) { x.save(); x.translate(f.x, f.y); x.rotate(f.a); x.fillStyle = '#ffd040'; x.beginPath(); x.moveTo(0, -4); x.lineTo(10, 0); x.lineTo(0, 4); x.fill(); x.restore(); }
   for (const q of fx.parts) { x.fillStyle = q.c; x.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); }
   x.textAlign = 'center'; x.font = 'bold 10px sans-serif'; x.lineWidth = 3;
-  for (const n of fx.nums) { const up = (0.7 - n.t) * 24; x.strokeStyle = '#000'; x.strokeText(n.v, n.x, n.y - up); x.fillStyle = n.red ? '#ff5a4a' : '#fff'; x.fillText(n.v, n.x, n.y - up); }
+  for (const n of fx.nums) { const up = (0.7 - n.t) * 24; x.strokeStyle = '#000'; x.strokeText(n.v, n.x, n.y - up); x.fillStyle = n.red ? '#ff5a4a' : n.blue ? '#8ad0ff' : n.green ? '#7ae08a' : '#fff'; x.fillText(n.v, n.x, n.y - up); }
   x.restore();
+  if (w.hazardOffT > 0 || fx.skillFlash > 0) { x.fillStyle = w.hazardOffT > 0 ? 'rgba(170,220,255,.10)' : `rgba(255,255,255,${fx.skillFlash * 0.4})`; x.fillRect(0, 0, VIEW_W, VIEW_H); }
+  drawSkillHud(w);
   drawMinimap(w);
 }
 
@@ -153,8 +179,8 @@ const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0'
 async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
 function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; }
 function jobSelect() {
-  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 왼쪽 Shift로 달린다. 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
-    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}</small></button>`).join('')}</div>`);
+  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 마우스 오른쪽(또는 K)으로 직업 스킬, 왼쪽 Shift로 달린다. 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
+    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>우클릭: ${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
   for (const c of document.querySelectorAll('[data-c]')) { const g = c.getContext('2d'), im = A.chars[+c.dataset.c][0]; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); }
   for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j }); transfer(); };
 }
