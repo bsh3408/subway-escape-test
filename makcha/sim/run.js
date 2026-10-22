@@ -26,7 +26,7 @@ export function createRun({ seed, job, relics = [] }) {
   return { seed: seed >>> 0, job, visited: [], ticks: 0, escaped: false, dead: false,
     hp, maxHp: hp, shield: sh, maxShield: sh, energy: en, maxEnergy: en,
     weapons: [{ id: J.weapon, lv: 0 }], cur: 0, skillLv: 1, parts: fx.parts || 0, mats: {}, gear: { head: null, body: null, feet: null }, abilities: [],
-    relics: rl, revive: fx.revive || 0, coins: 0, lastCoins: 0 };
+    relics: rl, revive: fx.revive || 0, coins: 0, lastCoins: 0, splits: [], picks: 0 };
 }
 const fxOf = run => relicFx(run.relics);
 
@@ -50,7 +50,9 @@ export function enterLine(run, line) {
 // 토큰: 호선 안에서 모은 것(적 1, 보스 15)에 호선을 지나면 10을 더한다. 유물 뽑기에 쓴다
 export const LINE_COINS = 10;
 export function finishLine(run, w) {
-  run.ticks = Math.max(0, run.ticks + w.tick - (w.bonusTicks || 0));
+  const t = w.clearTick ?? w.tick;   // 보스를 잡은 순간 시계가 멈춘다
+  run.ticks = Math.max(0, run.ticks + t - (w.bonusTicks || 0)); (run.splits ||= []).push({ line: w.line, ticks: t });
+  run.picks = 1 + (w.loot.picks || 0);   // 환승역에서 고를 특수능력 수: 기본 1 + 정예 방을 정리한 수
   run.lastCoins = Math.floor(((w.loot.coins || 0) + (w.done === 'dead' ? 0 : LINE_COINS)) * (fxOf(run).coinMul || 1)); run.coins = (run.coins || 0) + run.lastCoins;
   run.revive = w.player.revive || 0;
   run.parts += w.loot.parts; for (const [k, v] of Object.entries(w.loot.mats)) run.mats[k] = (run.mats[k] || 0) + v;
@@ -63,7 +65,7 @@ export function finishLine(run, w) {
 }
 
 // ---------- 무기 강화: 부품으로 단계를 올린다(최대 3단계). 단계마다 피해 +30%, 연사 +8% ----------
-export const MAX_LV = 3, ENHANCE_COST = lv => 6 + 6 * lv;
+export const MAX_LV = 3, ENHANCE_COST = lv => 4 + 3 * lv;
 export const enhanceCost = (run, lv) => Math.ceil(ENHANCE_COST(lv) * (fxOf(run).costMul || 1));   // 공구 벨트면 싸진다
 export function enhanceWeapon(run, slot) {
   const wpn = run.weapons[slot]; if (!wpn || wpn.lv >= MAX_LV) return false;
@@ -72,7 +74,7 @@ export function enhanceWeapon(run, slot) {
 }
 
 // ---------- 스킬 레벨업: 부품으로 2·3레벨. 레벨마다 효과 +30%, 대기 시간 −15% ----------
-export const SKILL_MAX = 3, SKILL_COST = lv => 8 * lv;
+export const SKILL_MAX = 3, SKILL_COST = lv => 6 * lv;
 export const skillCost = run => Math.ceil(SKILL_COST(run.skillLv) * (fxOf(run).costMul || 1));
 export function upgradeSkill(run) {
   if (run.skillLv >= SKILL_MAX || run.parts < skillCost(run)) return false;
@@ -98,35 +100,52 @@ export function craftGear(run, id) {
   run.gear[GEAR[id].slot] = id; return true;
 }
 
-// ---------- 특수능력: 환승역마다 3개 중 1개. 총을 바꾸는 것, 캐릭터 강화, 스킬 강화 ----------
+// ---------- 특수능력: 환승역마다 고른다. req가 있으면 그 능력을 먼저 가져야 나온다(능력 트리) ----------
 export const ABILITIES = {
+  // 총: 사거리 → 튕김 → 연쇄 튕김 / 관통 → 드릴 관통
+  longShot:   { kind: 'gun', name: '장거리탄', text: '탄이 최대 사거리까지 날아간다(사거리 2배, 탄속 +20%)' },
+  bounce:     { kind: 'gun', name: '튕김탄', req: 'longShot', text: '탄이 벽에 맞으면 한 번 튕긴다' },
+  ricochet:   { kind: 'gun', name: '연쇄 튕김', req: 'bounce', text: '두 번 더 튕기고, 튕길 때마다 피해 +20%' },
+  pierceUp:   { kind: 'gun', name: '관통탄', req: 'longShot', text: '탄이 적을 하나 더 뚫는다' },
+  drillShot:  { kind: 'gun', name: '드릴 관통', req: 'pierceUp', text: '탄이 적을 둘 더 뚫는다' },
+  // 총: 갈래 → 부채 / 집탄
   extraShot:  { kind: 'gun', name: '갈래탄', text: '한 번에 탄이 1발 더 나간다' },
-  pierceUp:   { kind: 'gun', name: '관통탄', text: '탄이 적을 하나 더 뚫는다' },
-  bounce:     { kind: 'gun', name: '튕김탄', text: '탄이 벽에 맞으면 한 번 튕긴다' },
-  homing:     { kind: 'gun', name: '유도탄', text: '탄이 가까운 적 쪽으로 휜다' },
-  boom:       { kind: 'gun', name: '폭발탄', text: '맞은 자리에서 작은 폭발이 일어난다' },
+  fan:        { kind: 'gun', name: '부채탄', req: 'extraShot', text: '탄이 2발 더 나가고 넓게 퍼진다' },
   focus:      { kind: 'gun', name: '집탄', text: '탄이 덜 퍼지고 한곳으로 모인다' },
-  rapid:      { kind: 'gun', name: '속사', text: '연사 속도 +25%' },
+  // 총: 유도 → 추적 강화, 폭발 → 집속, 속사 → 과열, 강한 탄 → 약점 사격
+  homing:     { kind: 'gun', name: '유도탄', text: '탄이 가까운 적 쪽으로 휜다' },
+  homingPlus: { kind: 'gun', name: '추적 강화', req: 'homing', text: '더 세게 휘고 사거리 +30%' },
+  boom:       { kind: 'gun', name: '폭발탄', text: '맞은 자리에서 작은 폭발이 일어난다' },
+  cluster:    { kind: 'gun', name: '집속탄', req: 'boom', text: '폭발 범위 2배, 폭발 피해 +50%' },
+  rapid:      { kind: 'gun', name: '속사', text: '연사 속도 +20%' },
+  overclock:  { kind: 'gun', name: '과열 사격', req: 'rapid', text: '연사 속도 +20% 더' },
   bigShot:    { kind: 'gun', name: '강한 탄', text: '모든 무기 피해 +30%' },
-  maxHp:      { kind: 'body', name: '튼튼한 몸', text: '최대 체력 +2' },
+  critShot:   { kind: 'gun', name: '약점 사격', req: 'bigShot', text: '15% 확률로 치명타(피해 2배)' },
+  // 몸
+  maxHp:      { kind: 'body', name: '튼튼한 몸', text: '최대 체력 +1' },
+  regen:      { kind: 'body', name: '회복력', req: 'maxHp', text: '방을 정리할 때마다 체력 +1' },
   shieldUp:   { kind: 'body', name: '두꺼운 방어막', text: '최대 방어막 +1' },
-  energyUp:   { kind: 'body', name: '큰 배터리', text: '최대 에너지 +60' },
+  shieldBurst:{ kind: 'body', name: '방어막 폭발', req: 'shieldUp', text: '방어막이 깨지면 둘레 적을 밀치고 다치게 한다' },
   swift:      { kind: 'body', name: '날렵한 발', text: '이동 속도 +12%' },
-  rollMaster: { kind: 'body', name: '구르기 달인', text: '구르기 대기 시간 절반' },
-  scavenger:  { kind: 'body', name: '전리품 사냥꾼', text: '적을 쓰러뜨리면 에너지 +6, 부품이 더 잘 나온다' },
+  rollMaster: { kind: 'body', name: '구르기 달인', req: 'swift', text: '구르기 대기 시간 절반' },
+  rollShot:   { kind: 'body', name: '구르며 쏘기', req: 'rollMaster', text: '구르기가 끝나면 사방으로 탄 8발' },
+  energyUp:   { kind: 'body', name: '큰 배터리', text: '최대 에너지 +60' },
+  scavenger:  { kind: 'body', name: '전리품 사냥꾼', req: 'energyUp', text: '적을 쓰러뜨리면 에너지 +6, 부품이 더 잘 나온다' },
+  // 스킬
   skillCd:    { kind: 'skill', name: '스킬 숙련', text: '스킬 대기 시간 −30%' },
+  skillCharge:{ kind: 'skill', name: '스킬 충전기', req: 'skillCd', text: '스킬을 쓰면 에너지 +40, 방어막 +1' },
   skillPower: { kind: 'skill', name: '스킬 강화', text: '스킬 효과 1.5배(피해·회복·시간·마릿수)' },
-  skillCharge:{ kind: 'skill', name: '스킬 충전기', text: '스킬을 쓰면 에너지 +40, 방어막 +1' },
+  skillGuard: { kind: 'skill', name: '스킬 보호막', req: 'skillPower', text: '스킬을 쓰면 1.5초 동안 다치지 않는다' },
 };
 export function offerAbilities(run) {
-  const rng = createRng(run.seed).fork('ability' + run.visited.length);
-  const left = Object.keys(ABILITIES).filter(id => !run.abilities.includes(id)), out = [], n = 3 + (fxOf(run).abilityOffer || 0);
+  const rng = createRng(run.seed).fork('ability' + run.visited.length + ':' + run.abilities.length);
+  const left = Object.keys(ABILITIES).filter(id => !run.abilities.includes(id) && (!ABILITIES[id].req || run.abilities.includes(ABILITIES[id].req))), out = [], n = 3 + (fxOf(run).abilityOffer || 0);
   while (out.length < n && left.length) out.push(left.splice(rng.int(left.length), 1)[0]);
   return out;
 }
 export function applyAbility(run, id) {
   run.abilities.push(id);
-  if (id === 'maxHp') { run.maxHp += 2; run.hp += 2; }
+  if (id === 'maxHp') { run.maxHp += 1; run.hp += 1; }
   if (id === 'shieldUp') { run.maxShield += 1; run.shield += 1; }
   if (id === 'energyUp') { run.maxEnergy += 60; run.energy += 60; }
 }

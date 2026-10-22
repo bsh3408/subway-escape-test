@@ -24,8 +24,15 @@ canvas{image-rendering:pixelated;display:block}
 .whelp{font-size:12px;color:var(--sub);text-align:right}#pickhint{font-size:13px;color:#ffe9a0;font-weight:700;text-align:right}
 .skill{width:clamp(70px,7vw,96px);height:clamp(70px,7vw,96px);border-radius:50%;background:var(--panel);border:3px solid var(--acc);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:clamp(12px,1.2vw,15px);position:relative;overflow:hidden}
 .skill i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}.skill b,.skill span{position:relative}.skill span{font-size:.85em;color:var(--acc)}.skill.cd{border-color:#5a5f68}.skill.cd span{color:#ffb070}
-#tip{position:fixed;left:50%;top:clamp(56px,7vw,84px);transform:translateX(-50%);max-width:min(70vw,720px);text-align:center;background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
+#tip{position:fixed;left:50%;top:clamp(92px,10vw,120px);transform:translateX(-50%);max-width:min(70vw,720px);text-align:center;background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
 #tip.on{opacity:1}
+#timer{position:fixed;left:50%;top:10px;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:4}#timer[hidden]{display:none}
+#timer b{display:inline-block;background:var(--panel);border:2px solid var(--acc);border-radius:10px;padding:3px 14px;font-size:clamp(18px,2.2vw,28px);font-variant-numeric:tabular-nums}
+#timer.stop b{border-color:#7ae08a;color:#a8f0b0}#timer div{display:flex;gap:4px;justify-content:center;margin-top:4px;flex-wrap:wrap}
+#timer span{background:var(--panel);border-left:4px solid;border-radius:5px;padding:1px 7px;font-size:clamp(11px,1.1vw,14px);font-weight:700;font-variant-numeric:tabular-nums}#timer span.now{outline:1px solid rgba(255,255,255,.4)}
+.tree{margin-top:12px;display:grid;gap:4px;font-size:13px}.tree div{display:flex;align-items:center;flex-wrap:wrap;gap:4px}.tree i{color:var(--sub);font-style:normal}
+.tree span{padding:1px 7px;border-radius:5px;background:#262a33}.tree .own{background:rgba(224,176,74,.3);color:#ffe9a0;font-weight:700}.tree .lock{opacity:.45}
+.tree .fork{display:inline-flex;flex-direction:column;gap:3px;background:none;padding:0}.tree .fork>span{background:none;padding:0;display:flex;gap:4px;align-items:center}
 #status{display:flex;flex-wrap:wrap;gap:4px}#status:empty{display:none}#status span{background:rgba(0,0,0,.55);border:1px solid;border-radius:6px;padding:1px 6px;font-size:clamp(11px,1.1vw,14px);font-weight:800}
 .pop{position:fixed;transform:translate(-50%,0);font-size:clamp(18px,2.4vw,30px);font-weight:900;text-shadow:0 0 4px #000,0 2px 0 #000;pointer-events:none;animation:popup 1.3s ease-out forwards;white-space:nowrap;z-index:5}
 @keyframes popup{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}15%{opacity:1;transform:translate(-50%,0) scale(1.15)}30%{transform:translate(-50%,-6px) scale(1)}100%{opacity:0;transform:translate(-50%,-50px)}}
@@ -52,6 +59,7 @@ canvas{image-rendering:pixelated;display:block}
 <div id="loadout" hidden><div class="wslots"><div id="pickhint"></div><div id="wslots"></div><div class="whelp">Q 바꾸기 · E 줍기 · <span id="parts"></span></div></div>
   <div class="skill" id="skill"><i id="skillFill"></i><b id="skillName"></b><span id="skillCd"></span></div></div>
 <div id="tip"></div>
+<div id="timer" hidden></div>
 <div id="menu"><div class="card" id="card"></div></div>
 <script type="module" src="client/main.js"></script>
 </body>

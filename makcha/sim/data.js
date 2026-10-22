@@ -1,21 +1,26 @@
 // 직업 6명, 스킬(마우스 오른쪽, cd는 대기 시간 초), 시작 무기, 구역 1(지층 터널) 몬스터. 수치는 첫 판 기준
 export const JOBS = {
-  driver:    { name: '지하철 기관사', hp: 7, shield: 5, energy: 160, weapon: 'flare', sprite: 0, skill: { id: 'regen', name: '회생 제동', cd: 8 } },
-  geologist: { name: '지질학자', hp: 6, shield: 4, energy: 180, weapon: 'drill', sprite: 1, skill: { id: 'strata', name: '지층 판독', cd: 14 } },
-  ecologist: { name: '생태학자', hp: 6, shield: 4, energy: 180, weapon: 'dart', sprite: 2, skill: { id: 'biocontrol', name: '생물적 방제', cd: 16 } },
-  chemist:   { name: '화학 연구원', hp: 5, shield: 4, energy: 200, weapon: 'reagent', sprite: 3, skill: { id: 'neutral', name: '중화제 투척', cd: 9 } },
-  meteo:     { name: '기상 연구원', hp: 5, shield: 5, energy: 200, weapon: 'rod', sprite: 4, skill: { id: 'warning', name: '기상 경보', cd: 15 } },
-  medic:     { name: '응급 구조사', hp: 6, shield: 3, energy: 180, weapon: 'defib', sprite: 5, skill: { id: 'firstaid', name: '응급 처치', cd: 18 } },
+  driver:    { name: '지하철 기관사', hp: 5, shield: 3, energy: 160, weapon: 'flare', sprite: 0, skill: { id: 'regen', name: '회생 제동', cd: 8 } },
+  geologist: { name: '지질학자', hp: 5, shield: 2, energy: 180, weapon: 'drill', sprite: 1, skill: { id: 'strata', name: '지층 판독', cd: 14 } },
+  ecologist: { name: '생태학자', hp: 4, shield: 2, energy: 180, weapon: 'dart', sprite: 2, skill: { id: 'biocontrol', name: '생물적 방제', cd: 16 } },
+  chemist:   { name: '화학 연구원', hp: 3, shield: 2, energy: 200, weapon: 'reagent', sprite: 3, skill: { id: 'neutral', name: '중화제 투척', cd: 9 } },
+  meteo:     { name: '기상 연구원', hp: 3, shield: 3, energy: 200, weapon: 'rod', sprite: 4, skill: { id: 'warning', name: '기상 경보', cd: 15 } },
+  medic:     { name: '응급 구조사', hp: 4, shield: 1, energy: 180, weapon: 'defib', sprite: 5, skill: { id: 'firstaid', name: '응급 처치', cd: 18 } },
 };
 export const JOB_ORDER = ['driver', 'geologist', 'ecologist', 'chemist', 'meteo', 'medic'];
 // 무기: 직업이 실제로 쓰는 도구. trait 직업 특색(burn 불붙음, pierce 관통, slow 느리게·잠듦, acid 산성 웅덩이, chain 연쇄 번개, shock 기절·처치 시 회복), rate 초당 발사, count 한 번에 나가는 탄, spread 퍼짐(라디안), speed 픽셀/초, range 픽셀, energy 한 발 에너지
 export const WEAPONS = {
-  flare:   { name: '비상 신호탄총', trait: 'burn', traitText: '맞은 적에 불이 붙어 3초 동안 타오름(열차 비상 신호용 홍염)', sprite: 0, dmg: 6, rate: 1.8, count: 1, spread: 0.04, speed: 360, range: 260, energy: 2, kick: 1, size: 4 },
-  drill:   { name: '시추 드릴총', trait: 'pierce', traitText: '드릴 날이 적과 상자를 여럿 뚫고 지나감', sprite: 1, dmg: 4, rate: 4, count: 1, spread: 0.04, speed: 460, range: 300, energy: 1, kick: 0.6, size: 3 },
-  dart:    { name: '마취 다트총', trait: 'slow', traitText: '맞은 적이 느려지고, 3번 맞으면 잠깐 잠듦(야생동물 조사용)', sprite: 2, dmg: 3, rate: 5, count: 1, spread: 0.06, speed: 560, range: 320, energy: 1, kick: 0.35, size: 2 },
-  reagent: { name: '시약 분사기', trait: 'acid', traitText: '맞은 자리에 산성 웅덩이(적에게 피해)', sprite: 3, dmg: 2, rate: 6, count: 2, spread: 0.25, speed: 360, range: 160, energy: 1, kick: 0.4, size: 3 },
-  rod:     { name: '피뢰침 번개총', trait: 'chain', traitText: '맞은 적 옆으로 번개가 한 번 더 튐', sprite: 4, dmg: 4, rate: 5, count: 1, spread: 0, speed: 700, range: 340, energy: 1, kick: 0.5, size: 3 },
-  defib:   { name: '제세동 충격기', trait: 'shock', traitText: '가까운 거리 전기 충격 3갈래, 맞은 적 잠깐 기절, 쓰러뜨리면 가끔 체력 회복, 에너지 안 씀', sprite: 5, dmg: 3, rate: 3, count: 3, spread: 0.6, speed: 380, range: 120, energy: 0, kick: 0.5, size: 3 },
+  flare:   { name: '비상 신호탄총', trait: 'burn', traitText: '맞은 적에 불이 붙어 3초 동안 타오름(열차 비상 신호용 홍염)', sprite: 0, dmg: 6, rate: 1.4, count: 1, spread: 0.04, speed: 360, range: 260, energy: 2, kick: 1, size: 4 },
+  drill:   { name: '시추 드릴총', trait: 'pierce', traitText: '드릴 날이 적과 상자를 여럿 뚫고 지나감', sprite: 1, dmg: 5, rate: 2.6, count: 1, spread: 0.04, speed: 460, range: 300, energy: 1, kick: 0.6, size: 3 },
+  dart:    { name: '마취 다트총', trait: 'slow', traitText: '맞은 적이 느려지고, 3번 맞으면 잠깐 잠듦(야생동물 조사용)', sprite: 2, dmg: 4, rate: 3, count: 1, spread: 0.06, speed: 560, range: 320, energy: 1, kick: 0.35, size: 2 },
+  reagent: { name: '시약 분사기', trait: 'acid', traitText: '맞은 자리에 산성 웅덩이(적에게 피해)', sprite: 3, dmg: 3, rate: 3, count: 2, spread: 0.25, speed: 360, range: 160, energy: 1, kick: 0.4, size: 3 },
+  rod:     { name: '피뢰침 번개총', trait: 'chain', traitText: '맞은 적 옆으로 번개가 한 번 더 튐', sprite: 4, dmg: 5, rate: 2.6, count: 1, spread: 0, speed: 700, range: 340, energy: 1, kick: 0.5, size: 3 },
+  // 줍는 독특한 무기: 표창(갔다가 돌아오며 두 번 맞힘), 레이저(한 줄을 바로 꿰뚫음), 근접(앞쪽 부채꼴을 휘둘러 치고 적 탄을 쳐냄, 에너지 안 씀)
+  shuriken:{ name: '회전 표창', trait: 'boomerang', traitText: '날아갔다가 손으로 돌아오며 오갈 때 모두 맞힌다', sprite: 6, dmg: 5, rate: 1.6, count: 1, spread: 0, speed: 300, range: 220, energy: 2, kick: 0.5, size: 5 },
+  laser:   { name: '레이저 측량기', trait: 'beam', traitText: '한 줄에 있는 적을 한꺼번에 꿰뚫는다', sprite: 7, dmg: 7, rate: 1.2, count: 1, spread: 0, speed: 0, range: 320, energy: 4, kick: 0.8, size: 2 },
+  crowbar: { name: '쇠지렛대', trait: 'melee', traitText: '앞을 크게 휘둘러 적을 밀치고 적 탄을 쳐낸다', sprite: 8, dmg: 9, rate: 1.4, count: 1, spread: 0, speed: 0, range: 30, arc: 2.2, energy: 0, kick: 1.2, size: 0 },
+  pickaxe: { name: '지질 조사 피켈', trait: 'melee', traitText: '빠르게 찍고 적 탄을 쳐낸다', sprite: 9, dmg: 5, rate: 2.6, count: 1, spread: 0, speed: 0, range: 26, arc: 1.6, energy: 0, kick: 0.8, size: 0 },
+  defib:   { name: '제세동 충격기', trait: 'shock', traitText: '가까운 거리 전기 충격 3갈래, 맞은 적 잠깐 기절, 쓰러뜨리면 가끔 체력 회복, 에너지 안 씀', sprite: 5, dmg: 4, rate: 2, count: 3, spread: 0.6, speed: 380, range: 120, energy: 0, kick: 0.5, size: 3 },
 };
 // cy: 발밑에서 몸 가운데까지 높이(총알이 맞는 곳)
 // 구역 1 몬스터: 근접(삼엽충, 고생대 표준화석), 돌진(암모나이트, 중생대 표준화석), 원거리(내성균 덩어리), 보스(화석 짜깁기 공룡)

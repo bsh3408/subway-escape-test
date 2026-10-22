@@ -14,12 +14,14 @@ const MAT_IDS = Object.keys(MATS);
 function modsOf(ab, skillLv = 1, relics = [], gear = {}) {
   const has = id => ab.includes(id), r = relicFx(relics), m = k => r[k] ?? 1;
   const immune = [...r.immune]; for (const g of Object.values(gear)) if (g && GEAR[g].block) immune.push(...GEAR[g].block);
-  return { extraShot: (has('extraShot') ? 1 : 0) + (r.extraShot || 0), pierce: has('pierceUp') ? 1 : 0, bounce: has('bounce') ? 1 : 0, homing: has('homing'), boom: has('boom'),
-    rateMul: has('rapid') ? 1.25 : 1, spreadMul: (has('focus') ? 0.35 : 1) * m('spreadMul'), dmgMul: (has('bigShot') ? 1.3 : 1) * m('dmgMul'), speedMul: (has('swift') ? 1.12 : 1) * m('speedMul'), rollCdMul: (has('rollMaster') ? 0.5 : 1) * m('rollCdMul'),
+  return { extraShot: (has('extraShot') ? 1 : 0) + (has('fan') ? 2 : 0) + (r.extraShot || 0), fan: has('fan'), pierce: (has('pierceUp') ? 1 : 0) + (has('drillShot') ? 2 : 0),
+    bounce: (has('bounce') ? 1 : 0) + (has('ricochet') ? 2 : 0), ricochet: has('ricochet'), homing: has('homing'), homingTurn: has('homingPlus') ? 0.25 : 0.12, boom: has('boom'), boomR: has('cluster') ? 52 : 26, boomMul: has('cluster') ? 0.6 : 0.4,
+    rangeMul: (has('longShot') ? 2 : 1) * (has('homingPlus') ? 1.3 : 1), shotSpeedMul: has('longShot') ? 1.2 : 1, shieldBurst: has('shieldBurst'), rollShot: has('rollShot'), skillGuard: has('skillGuard'),
+    rateMul: (has('rapid') ? 1.2 : 1) * (has('overclock') ? 1.2 : 1), spreadMul: (has('focus') ? 0.35 : 1) * m('spreadMul'), dmgMul: (has('bigShot') ? 1.3 : 1) * m('dmgMul'), speedMul: (has('swift') ? 1.12 : 1) * m('speedMul'), rollCdMul: (has('rollMaster') ? 0.5 : 1) * m('rollCdMul'),
     scavenger: has('scavenger'), skillCdMul: (has('skillCd') ? 0.7 : 1) * (1 - 0.15 * (skillLv - 1)) * m('skillCdMul'), skillPower: (has('skillPower') ? 1.5 : 1) * (1 + 0.3 * (skillLv - 1)), skillCharge: has('skillCharge'),
     // 유물
-    immune, statusMul: r.statusMul, bossMul: m('bossMul'), propMul: m('propMul'), pickMul: m('pickMul'), energyRegenMul: m('energyRegenMul'), crit: r.crit || 0, critChain: !!r.critChain,
-    matBonus: r.matBonus || 0, regenFaster: r.regenFaster || 0, clearHeal: r.clearHeal || 0, chestWeapon: r.chestWeapon || 0, warnPlus: r.warnPlus || 0, bossTime: r.bossTime || 0,
+    immune, statusMul: r.statusMul, bossMul: m('bossMul'), propMul: m('propMul'), pickMul: m('pickMul'), energyRegenMul: m('energyRegenMul'), crit: (r.crit || 0) + (has('critShot') ? 0.15 : 0), critChain: !!r.critChain,
+    matBonus: r.matBonus || 0, regenFaster: r.regenFaster || 0, clearHeal: has('regen') ? 1 : r.clearHeal || 0, chestWeapon: r.chestWeapon || 0, warnPlus: r.warnPlus || 0, bossTime: r.bossTime || 0,
     lifesteal: r.lifesteal || 0, skillEnergy: r.skillEnergy || 0, roomShield: r.roomShield || 0, partsChance: r.partsChance || 0, blastImmune: !!r.blastImmune, reflect: !!r.reflect };
 }
 
@@ -52,8 +54,8 @@ export function createWorld({ seed, job, line, order, loadout }) {
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
       ...L.stats, hp: Math.min(L.stats.maxHp, L.stats.hp + (rfx.lineHeal || 0)), maxShield: L.stats.maxShield + bonusShield, st: {}, revive: L.revive || 0, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
       cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, swapHeld: false, itemHeld: false, rollHeld: false,
-      rollT: 0, rollCd: 0, rollA: 0, slowT: 0, rootT: 0, rootCd: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
-    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {}, coins: 0 }, scanT: 0, hazardOffT: 0,
+      rollT: 0, rollCd: 0, rollA: 0, slowT: 0, rootT: 0, rootCd: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [], swingT: 0, swingA: 0 },
+    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {}, coins: 0, picks: 0 }, scanT: 0, hazardOffT: 0,
   };
 }
 
@@ -88,7 +90,8 @@ function movePlayer(w, input) {
   if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
     const x0 = p.x, y0 = p.y, d = DASH_SPEED * DT; moveBody(w, p, Math.cos(p.dashA) * d, Math.sin(p.dashA) * d, 5); p.dashDist += Math.hypot(p.x - x0, p.y - y0); return;
   }
-  if (p.rollT > 0) { p.rollT--; delete p.st.root; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
+  if (p.rollT > 0) { p.rollT--; delete p.st.root;
+    if (p.rollT === 0 && w.mods.rollShot) for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; w.shots.push({ x: p.x, y: p.y - 10, vx: Math.cos(a) * 320, vy: Math.sin(a) * 320, life: 20, dmg: 3 * w.mods.dmgMul, weapon: 'reflect', size: 3, pierce: 1, bounce: 0, hit: [] }); } const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
   if (p.st.root > 0 || p.st.shock > 0) return;   // 덩굴에 묶이거나 감전되면 못 움직인다
   const sp = PLAYER_SPEED * w.mods.speedMul * (p.st.wet > 0 ? 0.7 : 1) * (p.st.frost > 0 ? 0.6 : 1) * DT;
   moveBody(w, p, mx * sp, my * sp, 5);
@@ -120,6 +123,7 @@ function updateRooms(w, rng) {
     st.locked = false; st.cleared = true; w.locked = w.locked.filter(x => x !== rid);
     w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 30);
     if (w.mods.clearHeal && rng.chance(w.mods.clearHeal) && w.player.hp < w.player.maxHp) { w.player.hp++; w.events.push({ type: 'heal' }); }
+    const ty = w.floor.rooms[rid].type; if (ty === 'elite') w.loot.picks++; if (ty === 'boss' && w.clearTick == null) w.clearTick = w.tick;
     w.events.push({ type: 'clear', room: rid });
   }
 }
@@ -144,7 +148,9 @@ function nearestTo(w, x, y, range, skip) { let best = null, bd = range; for (con
 // ---------- 무기: 강화 단계와 특수능력을 얹은 수치 ----------
 export function weaponStat(w, slot) {
   const it = w.player.weapons[slot], W = WEAPONS[it.id], M = w.mods;
-  return { ...W, dmg: W.dmg * (1 + 0.3 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.08 * it.lv) * M.rateMul, count: W.count + M.extraShot, spread: (W.spread + (M.extraShot ? 0.12 : 0)) * M.spreadMul };
+  if (W.trait === 'melee') return { ...W, dmg: W.dmg * (1 + 0.3 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.08 * it.lv) * M.rateMul };
+  return { ...W, dmg: W.dmg * (1 + 0.3 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.08 * it.lv) * M.rateMul, count: W.trait === 'beam' ? 1 : W.count + M.extraShot,
+    spread: (W.spread + (M.extraShot ? 0.12 : 0) + (M.fan ? 0.5 : 0)) * M.spreadMul, range: W.range * M.rangeMul, speed: W.speed * M.shotSpeedMul };
 }
 
 function updatePlayer(w, input, rng) {
@@ -159,13 +165,17 @@ function updatePlayer(w, input, rng) {
   if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= st.energy && p.rollT <= 0 && !(p.st.shock > 0)) {
     p.cool = Math.max(1, Math.round(TICK_HZ / st.rate * (p.st.frost > 0 ? 1.4 : 1))); p.energy -= st.energy; p.kick = st.kick;
     const mx = p.x + Math.cos(p.aim) * 12, my = p.y - 10 + Math.sin(p.aim) * 12;
-    for (let i = 0; i < st.count; i++) {
+    if (st.trait === 'beam') fireBeam(w, st, mx, my, p.aim, rng);
+    else if (st.trait === 'melee') swing(w, st, p.aim, rng);
+    else for (let i = 0; i < st.count; i++) {
       const a = p.aim + (st.count > 1 ? (i / (st.count - 1) - 0.5) * st.spread : (rng.next() - 0.5) * st.spread);
       w.shots.push({ x: mx, y: my, vx: Math.cos(a) * st.speed, vy: Math.sin(a) * st.speed, life: Math.round(st.range / st.speed * TICK_HZ), dmg: st.dmg, weapon: st.id || p.weapons[p.cur].id,
-        trait: st.trait, size: st.size, pierce: (st.trait === 'pierce' ? 3 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
+        trait: st.trait, size: st.size, pierce: st.trait === 'boomerang' ? 99 : (st.trait === 'pierce' ? 3 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
+      if (st.trait === 'boomerang') { const s = w.shots[w.shots.length - 1]; s.half = Math.floor(s.life / 2); s.back = false; }
     }
     w.events.push({ type: 'fire', weapon: p.weapons[p.cur].id });
   }
+  if (p.swingT > 0) p.swingT--;
   if (!(input & INPUT.ATTACK) || st.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * w.mods.energyRegenMul * DT);
   p.sinceHit++;
   if (p.sinceHit > REGEN_WAIT - w.mods.regenFaster && p.shield < p.maxShield && !(p.st.infect > 0) && !(p.st.corrode > 0) && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }   // 감염·부식 중에는 방어막이 안 찬다
@@ -186,7 +196,8 @@ function pickWeapon(w) {
 
 export function hurtPlayer(w, amount) {
   const p = w.player; if (p.invuln > 0 || w.done) return false;
-  const s = Math.min(p.shield, amount); p.shield -= s; p.hp = Math.max(0, p.hp - (amount - s));
+  const had = p.shield, s = Math.min(p.shield, amount); p.shield -= s; p.hp = Math.max(0, p.hp - (amount - s));
+  if (w.mods.shieldBurst && had > 0 && p.shield === 0) { w.events.push({ type: 'splash', x: p.x, y: p.y, r: 60 }); for (const m of w.mons) if (Math.hypot(m.x - p.x, m.y - p.y) < 60 + m.r) hitMon(w, m, 8, Math.sign(m.x - p.x) * 12, Math.sign(m.y - p.y) * 6); w.eshots = w.eshots.filter(e => Math.hypot(e.x - p.x, e.y - p.y) > 60); }   // 방어막 폭발
   p.invuln = INVULN; p.sinceHit = 0; p.regen = 0; w.events.push({ type: 'hurt', amount });
   checkDead(w); return true;
 }
@@ -233,34 +244,66 @@ function breakProp(w, o, rng) {
   }
   for (let i = 0; i < w.mods.matBonus && o.kind !== 'barrel'; i++) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x - 8, y: o.y + 4 });   // 목장갑
   if (o.kind === 'rock') { if (rng.chance(0.5)) w.pickups.push({ kind: 'mat', id: 'scrap', x: o.x, y: o.y }); return; }
-  w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
+  if (rng.chance(0.35)) w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
   if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
 }
 
+// 맞힘 하나: 지층 판독 +30%, 보스 추가 피해, 치명타 2배(피뢰침 조각이면 옆 적에게 번개)
+function strike(w, m, base, rng, kx = 0, ky = 0) {
+  const boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1, crit = w.mods.crit > 0 && rng.chance(w.mods.crit);
+  const dmg = base * (w.scanT > 0 ? 1.3 : 1) * (boss ? w.mods.bossMul : 1) * (crit ? 2 : 1);
+  hitMon(w, m, dmg, kx * k, ky * k);
+  if (crit) { w.events.push({ type: 'crit', x: m.x, y: m.y }); if (w.mods.critChain) { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } } }
+  return dmg;
+}
+// 레이저: 벽에 닿을 때까지 한 줄을 곧바로 꿰뚫는다
+function fireBeam(w, st, x0, y0, a, rng) {
+  const dx = Math.cos(a), dy = Math.sin(a); let L = 0;
+  while (L < st.range && !solidAt(w, x0 + dx * L, y0 + dy * L)) L += 4;
+  const on = (x, y, r) => { const ax = x - x0, ay = y - y0, along = ax * dx + ay * dy; return along > -4 && along < L && Math.abs(ax * dy - ay * dx) < r; };
+  for (const m of w.mons) if (on(m.x, m.y - MONSTERS[m.id].cy, m.r + 4)) strike(w, m, st.dmg, rng, dx * 3, dy * 3);
+  for (const o of w.props) if (o.hp > 0 && on(o.x, o.y - 6, o.r + 2)) { o.hp -= st.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); }
+  w.props = w.props.filter(o => o.hp > 0);
+  w.events.push({ type: 'beam', x1: x0, y1: y0, x2: x0 + dx * L, y2: y0 + dy * L });
+}
+// 근접: 앞쪽 부채꼴 안의 적을 치고 밀치며, 그 안의 적 탄을 쳐낸다
+function swing(w, st, a, rng) {
+  const p = w.player, cx = p.x, cy = p.y - 10, half = st.arc / 2;
+  const inArc = (x, y, R) => { const d = Math.hypot(x - cx, y - cy); if (d > R) return false; let da = Math.atan2(y - cy, x - cx) - a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; return d < 8 || Math.abs(da) <= half; };
+  for (const m of w.mons) if (inArc(m.x, m.y - MONSTERS[m.id].cy, st.range + m.r)) strike(w, m, st.dmg, rng, Math.cos(a) * 9, Math.sin(a) * 9);
+  const before = w.eshots.length; w.eshots = w.eshots.filter(e => !inArc(e.x, e.y, st.range + 8)); if (w.eshots.length < before) w.events.push({ type: 'parry', x: cx + Math.cos(a) * 16, y: cy + Math.sin(a) * 16 });
+  for (const o of w.props) if (o.hp > 0 && inArc(o.x, o.y - 6, st.range + o.r)) { o.hp -= st.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); }
+  w.props = w.props.filter(o => o.hp > 0);
+  p.swingT = 8; p.swingA = a; w.events.push({ type: 'swing', x: cx, y: cy, a, r: st.range + 6, arc: st.arc });
+}
+
 function updateShots(w, rng) {
+  const p = w.player;
   for (const s of w.shots) {
-    if (w.mods.homing) { const t = nearestTo(w, s.x, s.y, 150); if (t) { const want = Math.atan2(t.y - MONSTERS[t.id].cy - s.y, t.x - s.x), cur = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy);
-      let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const a = cur + Math.max(-0.12, Math.min(0.12, d)); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; } }
+    if (s.trait === 'boomerang') {   // 표창: 절반쯤 가면 손으로 되돌아오고, 돌아올 때 다시 맞힐 수 있다
+      if (!s.back && s.life <= s.half) { s.back = true; s.hit = []; }
+      if (s.back) { const dx = p.x - s.x, dy = p.y - 10 - s.y, d = Math.hypot(dx, dy), sp = Math.hypot(s.vx, s.vy); if (d < 10) { s.life = 0; continue; } s.vx = dx / d * sp; s.vy = dy / d * sp; s.life = Math.max(s.life, 2); }
+    }
+    if (w.mods.homing && !s.back) { const t = nearestTo(w, s.x, s.y, 150); if (t) { const want = Math.atan2(t.y - MONSTERS[t.id].cy - s.y, t.x - s.x), cur = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy);
+      let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const a = cur + Math.max(-w.mods.homingTurn, Math.min(w.mods.homingTurn, d)); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; } }
     s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
-    if (solidAt(w, s.x, s.y)) {
-      if (s.bounce > 0) { s.bounce--; s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(w, s.x + s.vx * DT, s.y)) s.vx = -s.vx; else s.vy = -s.vy; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
+    if (solidAt(w, s.x, s.y) && !s.back) {
+      if (s.trait === 'boomerang') { s.x -= s.vx * DT; s.y -= s.vy * DT; s.back = true; s.hit = []; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
+      if (s.bounce > 0) { s.bounce--; if (w.mods.ricochet) s.dmg *= 1.2; s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(w, s.x + s.vx * DT, s.y)) s.vx = -s.vx; else s.vy = -s.vy; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
       s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue;
     }
-    for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); s.life = 0; break; }
+    if (!s.back) for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); if (s.trait === 'boomerang') { s.back = true; s.hit = []; } else s.life = 0; break; }
     if (s.life <= 0) continue;
     for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
       s.hit.push(m.uid);
-      const boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1, crit = w.mods.crit > 0 && rng.chance(w.mods.crit);
-      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1) * (boss ? w.mods.bossMul : 1) * (crit ? 2 : 1);   // 지층 판독: 약점이 드러나 피해 +30%, 치명타 2배
-      hitMon(w, m, dmg, s.vx * 0.01 * k, s.vy * 0.01 * k);
-      if (crit) { w.events.push({ type: 'crit', x: m.x, y: m.y }); if (w.mods.critChain) { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } } }
+      const boss = MONSTERS[m.id].kind === 'boss', dmg = strike(w, m, s.dmg, rng, s.vx * 0.01, s.vy * 0.01);
       if (s.trait === 'slow') { m.slowT = 1.2; if ((m.darts = (m.darts || 0) + 1) >= 3) { m.darts = 0; m.stun = Math.max(m.stun, boss ? 0.4 : 1.5); w.events.push({ type: 'sleep', uid: m.uid }); } }   // 마취 다트: 느려지고 3번이면 잠듦
       if (s.trait === 'burn') m.burnT = 3;   // 신호 홍염: 불이 붙어 3초 동안 탄다
       if (s.trait === 'shock') m.stun = Math.max(m.stun, boss ? 0.1 : 0.35);   // 제세동 충격: 잠깐 기절
       if (s.trait === 'acid' && !w.zones.some(z => z.kind === 'acid' && Math.hypot(z.x - m.x, z.y - m.y) < 14)) w.zones.push({ kind: 'acid', x: m.x, y: m.y, r: 16, t: 2 * TICK_HZ, acc: 0 });
       if (s.trait === 'chain') { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } }
       if (s.trait === 'shock' && m.hp <= 0 && rng.chance(0.25)) { w.player.hp = Math.min(w.player.maxHp, w.player.hp + 1); w.events.push({ type: 'heal' }); }
-      if (w.mods.boom) { w.events.push({ type: 'splash', x: m.x, y: m.y, r: 26 }); for (const o of w.mons) if (o !== m && Math.hypot(o.x - m.x, o.y - m.y) < 26 + o.r) hitMon(w, o, dmg * 0.4); }
+      if (w.mods.boom) { const B = w.mods.boomR; w.events.push({ type: 'splash', x: m.x, y: m.y, r: B }); for (const o of w.mons) if (o !== m && Math.hypot(o.x - m.x, o.y - m.y) < B + o.r) hitMon(w, o, dmg * w.mods.boomMul); }
       if (!(--s.pierce > 0)) { s.life = 0; break; }
     }
   }
@@ -338,8 +381,8 @@ function updateMons(w, rng) {
       for (let i = 0; i < 2; i++) { const [x, y] = spots[i] || [m.x, m.y]; addMon(w, m.room, sp, x, y, rng); } }
     const boss = MONSTERS[m.id].kind === 'boss';
     w.loot.coins += boss ? 15 : 1;
-    if (boss) { w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y }); w.bonusTicks += w.mods.bossTime * TICK_HZ; }
-    else if (rng.chance((w.mods.scavenger ? 0.55 : 0.35) + w.mods.partsChance)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
+    if (boss) { w.pickups.push({ kind: 'parts', n: 4, x: m.x, y: m.y }); w.bonusTicks += w.mods.bossTime * TICK_HZ; }
+    else if (rng.chance((w.mods.scavenger ? 0.3 : 0.12) + w.mods.partsChance)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
     if (w.mods.lifesteal && rng.chance(w.mods.lifesteal) && w.player.hp < w.player.maxHp) { w.player.hp++; w.events.push({ type: 'heal' }); }
     if (w.mods.scavenger) w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 6);
   }
@@ -350,6 +393,7 @@ function updateMons(w, rng) {
 function useSkill(w) {
   const p = w.player, S = JOBS[p.job].skill, k = w.mods.skillPower;
   p.skillCd = Math.round(S.cd * TICK_HZ * w.mods.skillCdMul); w.events.push({ type: 'skill', id: S.id });
+  if (w.mods.skillGuard) p.invuln = Math.max(p.invuln, Math.round(1.5 * TICK_HZ));
   if (w.mods.skillCharge) { p.energy = Math.min(p.maxEnergy, p.energy + 40); p.shield = Math.min(p.maxShield, p.shield + 1); }
   if (w.mods.skillEnergy) p.energy = Math.min(p.maxEnergy, p.energy + w.mods.skillEnergy);
   switch (S.id) {

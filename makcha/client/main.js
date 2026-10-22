@@ -8,6 +8,7 @@ import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS, STATUS, RELICS, GRADES
 const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
 // 받침이 있으면 앞 조사, 없으면 뒤 조사(을/를, 이/가)
+const stars = (lv, max = 0) => '★'.repeat(lv) + '☆'.repeat(Math.max(0, max - lv));   // 강화 단계는 별 개수로
 const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? a : b); };
 const A = { chars: [], weapons: [], mons: {} };
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
@@ -90,7 +91,7 @@ function drawPlayer(p, t) {
   if (!blink) { x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(img.width / 2), -img.height); x.restore(); }
   for (const id of sts) if (Math.random() < 0.25) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 12, y: p.y - 8 - Math.random() * 14, vx: 0, vy: id === 'wet' ? 25 : -25, t: 0.4, c: STATUS[id].color });
   const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
-  x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
+  const sw = p.swingT > 0 ? (p.swingT / 8 - 0.5) * -2.2 : 0; x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k + sw * p.face); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
 }
 
 // ---------- 화면 효과: 피해 숫자, 불꽃, 총구 불꽃, 화면 흔들림 ----------
@@ -109,6 +110,9 @@ function feed(w) {
     else if (e.type === 'pickup') fx.nums.push({ x: p.x, y: p.y - 36, v: e.kind === 'mat' ? `+${MATS[e.id]}` : `+부품 ${e.n}`, t: 0.8, gold: true });
     else if (e.type === 'getWeapon') tip(`🔫 ${WEAPONS[e.id].name}`, 1.5);
     else if (e.type === 'swap') tip(`🔁 ${WEAPONS[p.weapons[p.cur].id].name}`, 0.9);
+    else if (e.type === 'beam') { (fx.beams ||= []).push({ ...e, t: 0.15 }); fx.shake = Math.max(fx.shake, 2); }
+    else if (e.type === 'swing') (fx.swings ||= []).push({ ...e, t: 0.16 });
+    else if (e.type === 'parry') for (let i = 0; i < 8; i++) fx.parts.push({ x: e.x, y: e.y, vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.5) * 160, t: 0.25, c: '#fff6c0' });
     else if (e.type === 'zap') fx.zaps = (fx.zaps || []).concat([{ ...e, t: 0.12 }]);
     else if (e.type === 'trapHit') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: { vent: '#ff7a2a', meteor: '#ffb060', gas: '#9ad050', heat: '#ffb040', icicle: '#bfe8ff', drip: '#ff9a4a', acidrain: '#b8f040', vine: '#6ac050' }[e.kind] || '#fff' });
       for (let i = 0; i < 14; i++) fx.parts.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.8) * 160, t: 0.45, c: { vent: '#ff8a3a', meteor: '#8a6a4a', icicle: '#e8f8ff' }[e.kind] || '#ffd060' }); if (e.kind === 'meteor' || e.kind === 'vent') fx.shake = Math.max(fx.shake, 4); }
@@ -122,6 +126,7 @@ function feed(w) {
   }
 }
 function updateFx(dt) {
+  fx.beams = (fx.beams || []).filter(b => (b.t -= dt) > 0); fx.swings = (fx.swings || []).filter(b => (b.t -= dt) > 0);
   fx.skillFlash = Math.max(0, fx.skillFlash - dt); fx.zaps = (fx.zaps || []).filter(z => (z.t -= dt) > 0);
   for (const L of [fx.nums, fx.parts, fx.flashes, fx.rings, fx.trail]) { for (const o of L) { o.t -= dt; if (o.vx !== undefined) { o.x += o.vx * dt; o.y += o.vy * dt; } } for (let i = L.length - 1; i >= 0; i--) if (L[i].t <= 0) L.splice(i, 1); }
   fx.shake = Math.max(0, fx.shake - dt * 20);
@@ -169,7 +174,7 @@ function drawWorld(w, t) {
     const X = Math.round(k.x), Y = Math.round(k.y + Math.sin(t * 4 + k.x) * 1.5);
     x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(X - 5, Math.round(k.y) + 3, 10, 2);
     if (k.kind === 'weapon') { const g = A.weapons[WEAPONS[k.id].sprite]; x.fillStyle = 'rgba(255,230,140,.25)'; x.beginPath(); x.arc(X, Y - 2, 11, 0, 7); x.fill(); x.drawImage(g, X - Math.round(g.width / 2), Y - Math.round(g.height / 2) - 2);
-      if (Math.hypot(p.x - k.x, p.y - k.y) < 22) { x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; const s2 = `E 줍기: ${WEAPONS[k.id].name}${k.lv ? ' +' + k.lv : ''}`; x.strokeText(s2, X, Y - 16); x.fillStyle = '#ffe9a0'; x.fillText(s2, X, Y - 16); } }
+      if (Math.hypot(p.x - k.x, p.y - k.y) < 22) { x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; const s2 = `E 줍기: ${WEAPONS[k.id].name}${k.lv ? ' ' + stars(k.lv) : ''}`; x.strokeText(s2, X, Y - 16); x.fillStyle = '#ffe9a0'; x.fillText(s2, X, Y - 16); } }
     else if (k.kind === 'mat') { const C = { cloth: '#d8c8a8', rubber: '#3a3a3a', glass: '#9ad8f0', filter: '#e8e8e8', scrap: '#8a8f98', leather: '#8a5a3a' }[k.id]; x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 9); x.fillStyle = C; x.fillRect(X - 4, Y - 6, 8, 7); }
     else { x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 10); x.fillStyle = '#c8ccd2'; x.fillRect(X - 4, Y - 6, 8, 8); x.fillStyle = '#5a5f68'; x.fillRect(X - 1, Y - 3, 3, 3); }
   }
@@ -188,8 +193,11 @@ function drawWorld(w, t) {
   // 무기마다 탄 모양: 신호탄(붉은 불꽃), 드릴 날(회색 쐐기), 다트(가는 침), 시약(초록 방울), 번개(하늘빛), 전기 충격(노란 불꽃)
   for (const s of w.shots) { const X = Math.round(s.x), Y = Math.round(s.y), a = Math.atan2(s.vy, s.vx);
     if (s.weapon === 'flare') { x.fillStyle = 'rgba(255,120,40,.35)'; x.beginPath(); x.arc(X, Y, 5, 0, 7); x.fill(); x.fillStyle = '#ffdd60'; x.fillRect(X - 2, Y - 2, 4, 4); }
+    else if (s.weapon === 'shuriken') { x.save(); x.translate(X, Y); x.rotate(t * 25); x.fillStyle = '#1a1c20'; x.fillRect(-5, -2, 10, 4); x.fillRect(-2, -5, 4, 10); x.fillStyle = '#c8d0d8'; x.fillRect(-4, -1, 8, 2); x.fillRect(-1, -4, 2, 8); x.restore(); }
     else if (s.weapon === 'drill' || s.weapon === 'dart') { x.save(); x.translate(X, Y); x.rotate(a); x.fillStyle = s.weapon === 'drill' ? '#c8ccd2' : '#e8e0c8'; x.fillRect(-4, -1, 7, 2); x.fillStyle = s.weapon === 'drill' ? '#7a7f88' : '#8ac850'; x.fillRect(-5, -2, 2, 4); x.restore(); }
     else { x.fillStyle = { reagent: '#b8f040', rod: '#9ad8ff', defib: '#ffe860' }[s.weapon] || '#fff2a0'; x.fillRect(X - 2, Y - 2, 4, 4); } }
+  for (const b of fx.beams || []) { const a = b.t / 0.15; x.strokeStyle = `rgba(255,60,60,${a * 0.5})`; x.lineWidth = 6; x.beginPath(); x.moveTo(b.x1, b.y1); x.lineTo(b.x2, b.y2); x.stroke(); x.strokeStyle = `rgba(255,230,230,${a})`; x.lineWidth = 2; x.stroke(); }
+  for (const b of fx.swings || []) { const a = b.t / 0.16; x.strokeStyle = `rgba(255,250,220,${a})`; x.lineWidth = 3; x.beginPath(); x.arc(b.x, b.y, b.r * (1.1 - a * 0.2), b.a - b.arc / 2, b.a + b.arc / 2); x.stroke(); x.strokeStyle = `rgba(255,255,255,${a * 0.4})`; x.lineWidth = 8; x.stroke(); }
   for (const z of fx.zaps || []) { x.strokeStyle = '#bfefff'; x.lineWidth = 2; x.beginPath(); x.moveTo(z.x1, z.y1); x.lineTo((z.x1 + z.x2) / 2 + 4, (z.y1 + z.y2) / 2 - 5); x.lineTo(z.x2, z.y2); x.stroke(); }
   const ECOL = { germ: '#8ad050', germlet: '#b8f070', ammonite: '#6a3a8a', fossilrex: '#ff8a3a' };   // 몬스터마다 탄 색과 크기
   for (const e of w.eshots) { const z = e.size || 3, X = Math.round(e.x), Y = Math.round(e.y); x.fillStyle = '#1a0c10'; x.beginPath(); x.arc(X, Y, z + 1, 0, 7); x.fill(); x.fillStyle = ECOL[e.src] || '#ff6a5a'; x.beginPath(); x.arc(X, Y, z, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(X - 1, Y - 1, 1, 1); }
@@ -207,22 +215,29 @@ let tipT = 0; function tip(s, sec) { $('tip').textContent = s; $('tip').classLis
 function bar(id, v, m, label) { $(id).querySelector('i').style.width = Math.max(0, v / m * 100) + '%'; $(id).querySelector('span').textContent = label; }
 function hud(w, dt) {
   const p = w.player; bar('hp', p.hp, p.maxHp, `체력 ${p.hp}/${p.maxHp}`); bar('sh', p.shield, p.maxShield, `방어막 ${p.shield}/${p.maxShield}`); bar('en', p.energy, p.maxEnergy, `에너지 ${Math.floor(p.energy)}/${p.maxEnergy}`);
-  const sec = Math.floor((game.run.ticks + w.tick) / 30);
-  $('where').textContent = `${w.line}호선 ${LINES[w.line].name} · ${w.order + 1}/${RUN_LINES} · ⏱ ${clock(sec)}`;
+
+  $('where').textContent = `${w.line}호선 ${LINES[w.line].name} · ${w.order + 1}/${RUN_LINES}`;
   if (tipT > 0 && (tipT -= dt) <= 0) $('tip').classList.remove('on');
   // 무기 칸(웹 글씨): 바뀔 때만 다시 만든다
   const key = p.cur + ':' + p.weapons.map(it => it.id + it.lv).join(',');
-  if (key !== lastSlots) { lastSlots = key; $('wslots').innerHTML = p.weapons.map((it, i) => `<div class="ws ${i === p.cur ? 'on' : ''}"><canvas width="22" height="12" data-w="${it.id}"></canvas><div>${WEAPONS[it.id].name}${it.lv ? ' +' + it.lv : ''}</div></div>`).join('');
+  if (key !== lastSlots) { lastSlots = key; $('wslots').innerHTML = p.weapons.map((it, i) => `<div class="ws ${i === p.cur ? 'on' : ''}"><canvas width="22" height="12" data-w="${it.id}"></canvas><div>${WEAPONS[it.id].name}${it.lv ? ' <span style="color:var(--acc)">' + stars(it.lv) + '</span>' : ''}</div></div>`).join('');
     for (const c of $('wslots').querySelectorAll('canvas')) { const g = c.getContext('2d'), im = A.weapons[WEAPONS[c.dataset.w].sprite]; g.imageSmoothingEnabled = false; g.drawImage(im, Math.round((22 - im.width) / 2), Math.round((12 - im.height) / 2)); } }
   $('parts').textContent = `부품 ${game.run.parts + w.loot.parts}`;
   const near = w.pickups.find(k => k.kind === 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < 22);
-  $('pickhint').textContent = near ? `E 줍기: ${WEAPONS[near.id].name}${near.lv ? ' +' + near.lv : ''}` : '';
+  $('pickhint').textContent = near ? `E 줍기: ${WEAPONS[near.id].name}${near.lv ? ' ' + stars(near.lv) : ''}` : '';
   const stKey = Object.entries(p.st || {}).map(([id, v]) => id + Math.ceil(v)).join(',');
   if (stKey !== lastSt) { lastSt = stKey; $('status').innerHTML = Object.entries(p.st || {}).map(([id, v]) => `<span style="border-color:${STATUS[id].color}">${STATUS[id].icon} ${STATUS[id].name} ${Math.ceil(v)}</span>`).join(''); }
   const S = JOBS[p.job].skill, k = p.skillCd / Math.max(1, Math.round(S.cd * 30 * w.mods.skillCdMul));
   $('skill').classList.toggle('cd', k > 0); $('skillFill').style.height = Math.min(100, k * 100) + '%'; $('skillName').textContent = S.name; $('skillCd').textContent = k > 0 ? Math.ceil(p.skillCd / 30) + '초' : '우클릭';
 }
 let lastSlots = '', lastSt = '';
+const clockMs = ticks => { const t = ticks / 30, m = Math.floor(t / 60); return `${m}:${String(Math.floor(t % 60)).padStart(2, '0')}.${Math.floor((t % 1) * 10)}`; };
+function drawTimer() {
+  const r = game.run, w = game.w, el = $('timer'); if (!r) { el.hidden = true; return; }
+  el.hidden = false; const stop = !w || w.clearTick != null || w.done, now = w ? (w.clearTick ?? w.tick) : 0;
+  el.className = stop ? 'stop' : '';
+  el.innerHTML = `<b>⏱ ${clockMs(r.ticks + now)}</b><div>${(r.splits || []).map(sp => `<span style="border-color:${LINES[sp.line].color}">${sp.line}호선 ${clockMs(sp.ticks)}</span>`).join('')}${w && !w.done ? `<span class="now" style="border-color:${LINES[w.line].color}">${w.line}호선 ${clockMs(now)}${w.clearTick != null ? ' ✔' : ''}</span>` : ''}</div>`;
+}
 // 상태 이상 알림: 캐릭터 머리 위(화면 가운데)에 큰 글씨로 떠올랐다 사라진다
 function pop(text, color) {
   const el = document.createElement('div'), r = cv.getBoundingClientRect();
@@ -265,22 +280,30 @@ function jobSelect() {
 const matText = m => Object.entries(m).filter(([, v]) => v > 0).map(([k, v]) => `${MATS[k]} ${v}`).join(', ') || '없음';
 function abilityPick() {
   const r = game.run, offer = offerAbilities(r), KIND = { gun: '🔫 총', body: '💪 몸', skill: '✨ 스킬' };
-  if (!offer.length) return workshop();
-  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>⏱ ${clock(Math.floor(r.ticks / 30))} · 🪙 +${r.lastCoins}</p>
+  if (!offer.length || r.picks <= 0) return workshop();
+  menu(`<h1>🔁 환승역 · 특수능력 고르기 ${r.picks > 1 ? `<small style="color:var(--acc)">×${r.picks}</small>` : ''}</h1><p>🪙 +${r.lastCoins}</p>
     <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(id => { const a = ABILITIES[id]; return `<button class="job" data-a="${id}" style="text-align:left"><small style="color:var(--acc)">${KIND[a.kind]}</small><br><b style="font-size:17px">${a.name}</b></button>`; }).join('')}</div>
-    ${r.abilities.length ? `<p style="margin-top:10px">가진 특수능력: ${r.abilities.map(id => ABILITIES[id].name).join(', ')}</p>` : ''}`);
-  for (const b of document.querySelectorAll('[data-a]')) b.onclick = () => { applyAbility(r, b.dataset.a); workshop(); };
+    <div class="tree">${abilityTree(r)}</div>`);
+  for (const b of document.querySelectorAll('[data-a]')) b.onclick = () => { applyAbility(r, b.dataset.a); r.picks--; abilityPick(); };
+}
+// 능력 트리: 뿌리부터 가지까지 한 줄씩. 가진 것은 밝게, 다음에 열릴 것은 🔒
+function abilityTree(r) {
+  const kids = id => Object.keys(ABILITIES).filter(k => ABILITIES[k].req === id);
+  const node = id => { const own = r.abilities.includes(id), open = !ABILITIES[id].req || r.abilities.includes(ABILITIES[id].req);
+    return `<span class="${own ? 'own' : open ? 'open' : 'lock'}">${own ? '✔ ' : open ? '' : '🔒 '}${ABILITIES[id].name}</span>`; };
+  const branch = id => { const k = kids(id); return node(id) + (k.length ? `<i>→</i>${k.length > 1 ? `<span class="fork">${k.map(c => `<span>${branch(c)}</span>`).join('')}</span>` : branch(k[0])}` : ''); };
+  return Object.keys(ABILITIES).filter(id => !ABILITIES[id].req).map(id => `<div>${branch(id)}</div>`).join('');
 }
 function workshop(msg = '') {
   const r = game.run, slots = ['head', 'body', 'feet'], SL = { head: '머리', body: '몸', feet: '발' };
   menu(`<h1>🔧 정비소</h1><p>부품 <b>${r.parts}</b> · 재료: ${matText(r.mats)} · 장비: ${slots.map(sl => `${SL[sl]} ${r.gear[sl] ? GEAR[r.gear[sl]].name : '없음'}`).join(' · ')}</p>${msg ? `<p style="color:var(--acc)">${msg}</p>` : ''}
     <h2 style="font-size:16px;margin:10px 0 4px">강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = enhanceCost(r, it.lv), ok = it.lv < MAX_LV && r.parts >= c;
-      return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} +${it.lv}</b><br><small style="color:var(--sub)">${it.lv >= MAX_LV ? '최고 단계' : `→ +${it.lv + 1} · 부품 ${c}`}</small></button>`; }).join('')}
+      return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} <span style="color:var(--acc)">${stars(it.lv, MAX_LV)}</span></b><br><small style="color:var(--sub)">${it.lv >= MAX_LV ? '최고 단계' : `→ ${stars(it.lv + 1)} · 부품 ${c}`}</small></button>`; }).join('')}
       ${(() => { const S = JOBS[r.job].skill, c = skillCost(r), ok = r.skillLv < SKILL_MAX && r.parts >= c; return `<button class="job" id="skillUp" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>✨ ${S.name} Lv ${r.skillLv}</b><br><small style="color:var(--sub)">${r.skillLv >= SKILL_MAX ? '최고 레벨' : `→ Lv ${r.skillLv + 1} · 부품 ${c}`}</small></button>`; })()}</div>
     <h2 style="font-size:16px;margin:12px 0 4px">장비 만들기(재료)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${Object.entries(GEAR).map(([id, g]) => { const ok = canCraft(r, id);
       return `<button class="job" data-g="${id}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${g.name}</b> <small>(${SL[g.slot]})</small>${r.gear[g.slot] === id ? ' ✔' : ''}<br><small style="color:var(--sub)">${r.gear[g.slot] === id ? g.text + '<br>' : ''}${matText(g.recipe)}</small></button>`; }).join('')}</div>
     <div style="margin-top:14px"><button class="job" id="next" style="background:var(--acc);color:#1a1410;font-weight:800">다음 호선 고르기 →</button></div>`);
-  for (const b of document.querySelectorAll('[data-e]')) b.onclick = () => workshop(enhanceWeapon(r, +b.dataset.e) ? `${josa(WEAPONS[r.weapons[+b.dataset.e].id].name, '을', '를')} +${r.weapons[+b.dataset.e].lv}로 강화했다` : '부품이 모자라거나 최고 단계다');
+  for (const b of document.querySelectorAll('[data-e]')) b.onclick = () => workshop(enhanceWeapon(r, +b.dataset.e) ? `${WEAPONS[r.weapons[+b.dataset.e].id].name} ${stars(r.weapons[+b.dataset.e].lv)}` : '부품이 모자라거나 최고 단계다');
   for (const b of document.querySelectorAll('[data-g]')) b.onclick = () => workshop(craftGear(r, b.dataset.g) ? `${josa(GEAR[b.dataset.g].name, '을', '를')} 만들어 입었다` : '재료가 모자란다');
   $('skillUp').onclick = () => workshop(upgradeSkill(r) ? `${JOBS[r.job].skill.name} Lv ${r.skillLv}` : '부품이 모자란다');
   $('next').onclick = transfer;
@@ -302,8 +325,9 @@ function endLine(w) {
   const r = game.run; finishLine(r, w); game.w = null;
   game.meta.coins += r.lastCoins; saveMeta();
   const time = clock(Math.floor(r.ticks / 30)), coinLine = `<p>🪙 토큰 +${r.lastCoins} (이번 판 ${r.coins})</p>`;
-  if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p>${coinLine}<button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
-  if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p>${coinLine}<p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
+  const done = () => { game.run = null; jobSelect(); };
+  if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p>${coinLine}<button class="job" id="again">처음부터</button>`), ($('again').onclick = done);
+  if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p>${coinLine}<p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = done);
   abilityPick();
 }
 
@@ -319,6 +343,7 @@ function frame(now) {
   }
   updateFx(dt);
   if (game.w) { drawWorld(game.w, t); hud(game.w, dt); }
+  drawTimer();
   requestAnimationFrame(frame);
 }
 
@@ -326,6 +351,13 @@ function frame(now) {
   const m = await fetch('assets/manifest.json').then(r => r.json());
   A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s)))));
   A.weapons = await Promise.all(m.weapons.map(s => load('assets/' + s)));
+  const sprite = (w0, h0, rows, pal) => { const c = document.createElement('canvas'); c.width = w0; c.height = h0; const g = c.getContext('2d');
+    rows.forEach((row, y) => [...row].forEach((ch, x0) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x0, y, 1, 1); } })); return c; };
+  const K = '#18121a';
+  A.weapons[6] = sprite(11, 11, ['.....K.....', '....KwK....', '....KwK....', '.KK.KgK.KK.', 'KwwKKgKKwwK', '.KggggggK..', 'KwwKKgKKwwK', '.KK.KgK.KK.', '....KwK....', '....KwK....', '.....K.....'], { K, w: '#e8eef4', g: '#8a96a4' });
+  A.weapons[7] = sprite(18, 8, ['..KKKKKKKKKKKK....', '.KyyyyyyyyyyyyKKK.', 'KyyKKKKKKyyyyKrrK.', 'KyyKbbbbKyyyyKrrrK', 'KyyKKKKKKyyyyKrrK.', '.KyyyyyyyyyyyyKKK.', '..KKKyyKKKKKKK....', '....KKKK..........'], { K, y: '#e8c040', b: '#5ad0ff', r: '#ff4a3a' });
+  A.weapons[8] = sprite(20, 7, ['................KKK.', '...............KrrK.', 'KKKKKKKKKKKKKKKKrK..', 'KrrrrrrrrrrrrrrrrK..', 'KKKKKKKKKKKKKKKKrK..', '...............KrrK.', '................KKK.'], { K, r: '#c84a3a' });
+  A.weapons[9] = sprite(16, 12, ['.........KKKK...', '.....KKKKssssK..', '...KKssssssKKK..', '..KssKKKKKbK....', '.KsK.....KbK....', 'KK.......KbK....', '.........KbK....', '.........KbK....', '.........KbK....', '.........KbK....', '.........KsK....', '..........K.....'], { K, s: '#c8d0d8', b: '#7a4a2a' });
   A.mons = Object.fromEntries(await Promise.all(Object.entries(m.mons).map(async ([k, f]) => [k, await Promise.all(f.map(s => load('assets/' + s)))])));
   window.__game = game; window.__line = n => startLine(n); window.__coins = n => { game.meta.coins += n; saveMeta(); };   // 개발용: 원하는 호선으로 바로 가기, 토큰 넣기
   await loadOpenLines();
