@@ -81,6 +81,18 @@
    "mons/fossilrex_1.png",
    "mons/fossilrex_2.png",
    "mons/fossilrex_3.png"
+  ],
+  "magmagolem": [
+   "mons/magmagolem_0.png",
+   "mons/magmagolem_1.png",
+   "mons/magmagolem_2.png",
+   "mons/magmagolem_3.png"
+  ],
+  "trilomother": [
+   "mons/trilomother_0.png",
+   "mons/trilomother_1.png",
+   "mons/trilomother_2.png",
+   "mons/trilomother_3.png"
   ]
  }
 }

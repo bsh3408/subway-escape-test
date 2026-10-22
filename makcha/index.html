@@ -26,6 +26,13 @@ canvas{image-rendering:pixelated;display:block}
 .skill i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}.skill b,.skill span{position:relative}.skill span{font-size:.85em;color:var(--acc)}.skill.cd{border-color:#5a5f68}.skill.cd span{color:#ffb070}
 #tip{position:fixed;left:50%;top:clamp(56px,7vw,84px);transform:translateX(-50%);max-width:min(70vw,720px);text-align:center;background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
 #tip.on{opacity:1}
+#status{display:flex;flex-wrap:wrap;gap:4px}#status:empty{display:none}#status span{background:rgba(0,0,0,.55);border:1px solid;border-radius:6px;padding:1px 6px;font-size:clamp(11px,1.1vw,14px);font-weight:800}
+.pop{position:fixed;transform:translate(-50%,0);font-size:clamp(18px,2.4vw,30px);font-weight:900;text-shadow:0 0 4px #000,0 2px 0 #000;pointer-events:none;animation:popup 1.3s ease-out forwards;white-space:nowrap;z-index:5}
+@keyframes popup{0%{opacity:0;transform:translate(-50%,10px) scale(.7)}15%{opacity:1;transform:translate(-50%,0) scale(1.15)}30%{transform:translate(-50%,-6px) scale(1)}100%{opacity:0;transform:translate(-50%,-50px)}}
+.relics{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:6px;max-height:46vh;overflow:auto}
+.relic{display:inline-flex;flex-direction:column;background:#262a33;border:2px solid;border-radius:8px;padding:5px 8px;cursor:pointer;font-size:13px;min-width:120px}.relic small{color:var(--sub);font-size:11px}
+.relic[data-on]{background:rgba(224,176,74,.25);box-shadow:0 0 0 2px var(--acc)}.relic.unknown{cursor:default;opacity:.6}
+.gres{background:#262a33;border:3px solid;border-radius:10px;padding:8px 14px;animation:popup2 .5s ease-out}@keyframes popup2{0%{transform:scale(.6);opacity:0}70%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
 #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,9,12,.88)}
 #menu[hidden]{display:none}
 .card{background:#1c1f26;border:1px solid #333842;border-radius:12px;padding:20px;max-width:900px;width:92vw}
@@ -39,7 +46,7 @@ canvas{image-rendering:pixelated;display:block}
 <body>
 <div id="stage"><canvas id="cv" width="640" height="360"></canvas></div>
 <div id="hud" hidden>
-  <div class="bars"><div class="bar" id="hp"><i></i><span></span></div><div class="bar" id="sh"><i></i><span></span></div><div class="bar" id="en"><i></i><span></span></div></div>
+  <div class="bars"><div class="bar" id="hp"><i></i><span></span></div><div class="bar" id="sh"><i></i><span></span></div><div class="bar" id="en"><i></i><span></span></div><div id="status"></div></div>
   <div id="where"></div>
 </div>
 <div id="loadout" hidden><div class="wslots"><div id="pickhint"></div><div id="wslots"></div><div class="whelp">Q 바꾸기 · E 줍기 · <span id="parts"></span></div></div>

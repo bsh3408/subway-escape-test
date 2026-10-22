@@ -4,25 +4,30 @@
 import { createRng } from './rng.js';
 import { generateFloor, isSolid, T } from './dungeon.js';
 import { INPUT, TILE, DT, TICK_HZ } from './constants.js';
-import { JOBS, WEAPONS, MONSTERS, WAVES, MATS, LINES, TRAPS } from './data.js';
-import { difficulty, GEAR } from './run.js';
+import { JOBS, WEAPONS, MONSTERS, WAVES, MATS, LINES, TRAPS, STATUS, ZONE_STATUS } from './data.js';
+import { difficulty, GEAR, relicFx } from './run.js';
 
 const DASH_SPEED = 420, PLAYER_SPEED = 140, ROLL_SPEED = 330, ROLL_T = 8, ROLL_CD = 24, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300, PICK_R = 14;
 const MAT_IDS = Object.keys(MATS);
 
-// 특수능력을 무기·몸·스킬 수치로 바꾼다
-function modsOf(ab, skillLv = 1) {
-  const has = id => ab.includes(id);
-  return { extraShot: has('extraShot') ? 1 : 0, pierce: has('pierceUp') ? 1 : 0, bounce: has('bounce') ? 1 : 0, homing: has('homing'), boom: has('boom'),
-    rateMul: has('rapid') ? 1.25 : 1, spreadMul: has('focus') ? 0.35 : 1, dmgMul: has('bigShot') ? 1.3 : 1, speedMul: has('swift') ? 1.12 : 1, rollCdMul: has('rollMaster') ? 0.5 : 1,
-    scavenger: has('scavenger'), skillCdMul: (has('skillCd') ? 0.7 : 1) * (1 - 0.15 * (skillLv - 1)), skillPower: (has('skillPower') ? 1.5 : 1) * (1 + 0.3 * (skillLv - 1)), skillCharge: has('skillCharge') };
+// 특수능력·유물·장비를 무기·몸·스킬 수치로 바꾼다
+function modsOf(ab, skillLv = 1, relics = [], gear = {}) {
+  const has = id => ab.includes(id), r = relicFx(relics), m = k => r[k] ?? 1;
+  const immune = [...r.immune]; for (const g of Object.values(gear)) if (g && GEAR[g].block) immune.push(...GEAR[g].block);
+  return { extraShot: (has('extraShot') ? 1 : 0) + (r.extraShot || 0), pierce: has('pierceUp') ? 1 : 0, bounce: has('bounce') ? 1 : 0, homing: has('homing'), boom: has('boom'),
+    rateMul: has('rapid') ? 1.25 : 1, spreadMul: (has('focus') ? 0.35 : 1) * m('spreadMul'), dmgMul: (has('bigShot') ? 1.3 : 1) * m('dmgMul'), speedMul: (has('swift') ? 1.12 : 1) * m('speedMul'), rollCdMul: (has('rollMaster') ? 0.5 : 1) * m('rollCdMul'),
+    scavenger: has('scavenger'), skillCdMul: (has('skillCd') ? 0.7 : 1) * (1 - 0.15 * (skillLv - 1)) * m('skillCdMul'), skillPower: (has('skillPower') ? 1.5 : 1) * (1 + 0.3 * (skillLv - 1)), skillCharge: has('skillCharge'),
+    // 유물
+    immune, statusMul: r.statusMul, bossMul: m('bossMul'), propMul: m('propMul'), pickMul: m('pickMul'), energyRegenMul: m('energyRegenMul'), crit: r.crit || 0, critChain: !!r.critChain,
+    matBonus: r.matBonus || 0, regenFaster: r.regenFaster || 0, clearHeal: r.clearHeal || 0, chestWeapon: r.chestWeapon || 0, warnPlus: r.warnPlus || 0, bossTime: r.bossTime || 0,
+    lifesteal: r.lifesteal || 0, skillEnergy: r.skillEnergy || 0, roomShield: r.roomShield || 0, partsChance: r.partsChance || 0, blastImmune: !!r.blastImmune, reflect: !!r.reflect };
 }
 
 export function createWorld({ seed, job, line, order, loadout }) {
   const floor = generateFloor(seed, { line, order }), J = JOBS[job], s = floor.rooms[0], rng = createRng(seed).fork('props');
-  const L = { weapons: [{ id: J.weapon, lv: 0 }], cur: 0, gear: { head: null, body: null, feet: null }, abilities: [],
+  const L = { weapons: [{ id: J.weapon, lv: 0 }], cur: 0, gear: { head: null, body: null, feet: null }, abilities: [], relics: [], revive: 0,
     stats: { hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy }, ...(loadout || {}) };   // 넘겨받지 않은 항목은 직업 기본값
-  const bonusShield = Object.values(L.gear).reduce((a, g) => a + (g && GEAR[g].shield || 0), 0);
+  const bonusShield = Object.values(L.gear).reduce((a, g) => a + (g && GEAR[g].shield || 0), 0), rfx = relicFx(L.relics);
   // 상자: 전투·엘리트 방마다 2~3개, 부수면 부품·재료가 나온다
   // 부서지는 기물: 상자(부품·재료), 바위(탄을 막는 엄폐물, 부수면 고철), 드럼통(터지면 둘레에 큰 피해)
   const props = [], PROP = { crate: { hp: 6, r: 8 }, rock: { hp: 14, r: 9 }, barrel: { hp: 3, r: 7 } };
@@ -42,13 +47,13 @@ export function createWorld({ seed, job, line, order, loadout }) {
     for (let i = 0; i < 2; i++) { const p = freeSpot(r); if (p) traps.push({ kind, mode, room: r.id, x: p[0], y: p[1], r: mode === 'pool' ? 20 : 18, t: 1.5 + rng.next() * 3, warn: 0, on: false }); }
   }
   return {
-    bossId: rng.pick(LINES[line].bosses), line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities, L.skillLv || 1), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
-    floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
+    bossId: rng.pick(LINES[line].bosses), line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities, L.skillLv || 1, L.relics, L.gear), tick: 0, bonusTicks: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
+    floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, seen: !!rfx.seeAll, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
-      ...L.stats, maxShield: L.stats.maxShield + bonusShield, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
+      ...L.stats, hp: Math.min(L.stats.maxHp, L.stats.hp + (rfx.lineHeal || 0)), maxShield: L.stats.maxShield + bonusShield, st: {}, revive: L.revive || 0, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
       cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, swapHeld: false, itemHeld: false, rollHeld: false,
       rollT: 0, rollCd: 0, rollA: 0, slowT: 0, rootT: 0, rootCd: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
-    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {} }, scanT: 0, hazardOffT: 0,
+    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {}, coins: 0 }, scanT: 0, hazardOffT: 0,
   };
 }
 
@@ -77,15 +82,15 @@ function movePlayer(w, input) {
   p.moving = l > 0;
   if (p.moving) p.lastDir = Math.atan2(my, mx);
   if (p.rollCd > 0) p.rollCd--;
-  if (input & INPUT.RUN) { if (!p.rollHeld && p.rollCd <= 0 && p.rollT <= 0 && p.dashT <= 0) {
+  if (input & INPUT.RUN) { if (!p.rollHeld && p.rollCd <= 0 && p.rollT <= 0 && p.dashT <= 0 && !(p.st.shock > 0)) {
     p.rollT = ROLL_T; p.rollCd = Math.round(ROLL_CD * w.mods.rollCdMul) + ROLL_T; p.rollA = p.moving ? p.lastDir : p.aim; p.invuln = Math.max(p.invuln, ROLL_T + 2); w.events.push({ type: 'roll' }); }
     p.rollHeld = true; } else p.rollHeld = false;
   if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
     const x0 = p.x, y0 = p.y, d = DASH_SPEED * DT; moveBody(w, p, Math.cos(p.dashA) * d, Math.sin(p.dashA) * d, 5); p.dashDist += Math.hypot(p.x - x0, p.y - y0); return;
   }
-  if (p.rollT > 0) { p.rollT--; p.rootT = 0; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
-  if (p.rootT > 0) { p.rootT -= DT; return; }   // 덩굴에 묶임
-  const sp = PLAYER_SPEED * w.mods.speedMul * (p.slowT > 0 ? 0.6 : 1) * DT; if (p.slowT > 0) p.slowT--;
+  if (p.rollT > 0) { p.rollT--; delete p.st.root; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
+  if (p.st.root > 0 || p.st.shock > 0) return;   // 덩굴에 묶이거나 감전되면 못 움직인다
+  const sp = PLAYER_SPEED * w.mods.speedMul * (p.st.wet > 0 ? 0.7 : 1) * (p.st.frost > 0 ? 0.6 : 1) * DT;
   moveBody(w, p, mx * sp, my * sp, 5);
 }
 
@@ -96,14 +101,15 @@ function updateRooms(w, rng) {
     const r = w.floor.rooms[id], st = w.rooms[id];
     if (!st.visited) { st.visited = true; for (const l of w.floor.links) if (l.includes(id)) w.rooms[l[0] === id ? l[1] : l[0]].seen = true; }
     const tx = p.x / TILE, ty = p.y / TILE, inside = tx > r.x0 + 1 && tx < r.x0 + r.w - 1 && ty > r.y0 + 1 && ty < r.y0 + r.h - 1;
-    if (inside && !st.cleared && !st.locked) { st.locked = true; w.locked.push(id); w.events.push({ type: 'lock', room: id }); spawnWave(w, rng, id); }
+    if (inside && !st.cleared && !st.locked) { st.locked = true; w.locked.push(id); w.events.push({ type: 'lock', room: id }); spawnWave(w, rng, id);
+      if (w.mods.roomShield) p.shield = Math.min(p.maxShield, p.shield + w.mods.roomShield); }
     const cx = (r.cx + 0.5) * TILE, cy = (r.cy + 0.5) * TILE;
     // 보급 상자 방: 재료 2개와 부품, 절반 확률로 무기 하나
     if (r.type === 'chest' && !st.opened && Math.hypot(p.x - cx, p.y - cy) < 18) {
       st.opened = true; w.events.push({ type: 'chest', room: id });
       for (let i = 0; i < 2; i++) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: cx - 18 + i * 36, y: cy + 16 });
       w.pickups.push({ kind: 'parts', n: 2, x: cx, y: cy + 22 });
-      if (rng.chance(0.5)) { const pool = Object.keys(WEAPONS).filter(k => !p.weapons.some(x => x.id === k)); w.pickups.push({ kind: 'weapon', id: rng.pick(pool), lv: 0, x: cx, y: cy - 20 }); }
+      if (rng.chance(0.5 + w.mods.chestWeapon)) { const pool = Object.keys(WEAPONS).filter(k => !p.weapons.some(x => x.id === k)); w.pickups.push({ kind: 'weapon', id: rng.pick(pool), lv: 0, x: cx, y: cy - 20 }); }
     }
     if (r.type === 'boss' && st.cleared && Math.hypot(p.x - cx, p.y - cy) < 20) w.done = 'next';   // 호선 보스를 잡으면 다음 환승역으로 가는 포털
   }
@@ -113,6 +119,7 @@ function updateRooms(w, rng) {
     if (st.wave < waves.length) { spawnWave(w, rng, rid); continue; }
     st.locked = false; st.cleared = true; w.locked = w.locked.filter(x => x !== rid);
     w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 30);
+    if (w.mods.clearHeal && rng.chance(w.mods.clearHeal) && w.player.hp < w.player.maxHp) { w.player.hp++; w.events.push({ type: 'heal' }); }
     w.events.push({ type: 'clear', room: rid });
   }
 }
@@ -149,8 +156,8 @@ function updatePlayer(w, input, rng) {
   const st = weaponStat(w, p.cur), t = nearestTo(w, p.x, p.y, AIM_RANGE);
   p.aim = t ? Math.atan2(t.y - MONSTERS[t.id].cy - (p.y - 10), t.x - p.x) : p.lastDir;
   p.face = Math.cos(p.aim) >= 0 ? 1 : -1;
-  if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= st.energy && p.rollT <= 0) {
-    p.cool = Math.max(1, Math.round(TICK_HZ / st.rate)); p.energy -= st.energy; p.kick = st.kick;
+  if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= st.energy && p.rollT <= 0 && !(p.st.shock > 0)) {
+    p.cool = Math.max(1, Math.round(TICK_HZ / st.rate * (p.st.frost > 0 ? 1.4 : 1))); p.energy -= st.energy; p.kick = st.kick;
     const mx = p.x + Math.cos(p.aim) * 12, my = p.y - 10 + Math.sin(p.aim) * 12;
     for (let i = 0; i < st.count; i++) {
       const a = p.aim + (st.count > 1 ? (i / (st.count - 1) - 0.5) * st.spread : (rng.next() - 0.5) * st.spread);
@@ -159,11 +166,11 @@ function updatePlayer(w, input, rng) {
     }
     w.events.push({ type: 'fire', weapon: p.weapons[p.cur].id });
   }
-  if (!(input & INPUT.ATTACK) || st.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * DT);
+  if (!(input & INPUT.ATTACK) || st.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * w.mods.energyRegenMul * DT);
   p.sinceHit++;
-  if (p.sinceHit > REGEN_WAIT && p.shield < p.maxShield && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }
+  if (p.sinceHit > REGEN_WAIT - w.mods.regenFaster && p.shield < p.maxShield && !(p.st.infect > 0) && !(p.st.corrode > 0) && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }   // 감염·부식 중에는 방어막이 안 찬다
   // 재료·부품은 밟으면 줍는다
-  for (const k of w.pickups) if (k.kind !== 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < PICK_R) {
+  for (const k of w.pickups) if (k.kind !== 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < PICK_R * w.mods.pickMul) {
     k.taken = true; if (k.kind === 'mat') w.loot.mats[k.id] = (w.loot.mats[k.id] || 0) + 1; else w.loot.parts += k.n; w.events.push({ type: 'pickup', kind: k.kind, id: k.id, n: k.n });
   }
   w.pickups = w.pickups.filter(k => !k.taken);
@@ -178,10 +185,39 @@ function pickWeapon(w) {
 }
 
 export function hurtPlayer(w, amount) {
-  const p = w.player; if (p.invuln > 0 || w.done) return;
+  const p = w.player; if (p.invuln > 0 || w.done) return false;
   const s = Math.min(p.shield, amount); p.shield -= s; p.hp = Math.max(0, p.hp - (amount - s));
   p.invuln = INVULN; p.sinceHit = 0; p.regen = 0; w.events.push({ type: 'hurt', amount });
-  if (p.hp <= 0) { w.done = 'dead'; w.events.push({ type: 'dead' }); }
+  checkDead(w); return true;
+}
+// 쓰러짐: 백신 앰플이 있으면 한 번 체력 절반으로 일어난다
+function checkDead(w) {
+  const p = w.player; if (p.hp > 0) return;
+  if (p.revive > 0) { p.revive--; p.hp = Math.ceil(p.maxHp / 2); p.st = {}; p.invuln = 2 * TICK_HZ; w.events.push({ type: 'revive' }); return; }
+  w.done = 'dead'; w.events.push({ type: 'dead' });
+}
+// 상태 이상에 따른 지속 피해: 무적 시간과 상관없이 방어막부터 깎는다
+function dot(w, n) {
+  const p = w.player; if (w.done) return;
+  const s = Math.min(p.shield, n); p.shield -= s; p.hp = Math.max(0, p.hp - (n - s)); p.sinceHit = 0; p.regen = 0; w.events.push({ type: 'hurt', amount: n, dot: true }); checkDead(w);
+}
+// 상태 이상 걸기: 구르는 중이거나 장비·유물로 막으면 안 걸린다. 새로 걸리면 화면에 띄울 수 있게 알린다
+export function inflict(w, id) {
+  const p = w.player; if (w.done || p.rollT > 0 || w.mods.immune.includes(id)) return false;
+  if (id === 'wet') delete p.st.burn;   // 물이 불을 끈다
+  if (id === 'burn') { if (p.st.wet > 0) return false; delete p.st.frost; }   // 젖어 있으면 불이 안 붙고, 불은 동상을 녹인다
+  if (id === 'root') { if (p.rootCd > 0) return false; p.rootCd = 3; }
+  const t = STATUS[id].t * (w.mods.statusMul[id] ?? 1);
+  if (!(p.st[id] > 0)) w.events.push({ type: 'status', id });
+  p.st[id] = Math.max(p.st[id] || 0, t); return true;
+}
+function updateStatus(w) {
+  const p = w.player, s = p.st, k = w.tick;
+  if (s.infect > 0 && k % (2 * TICK_HZ) === 0) dot(w, 1);   // 감염: 2초마다 피해 1
+  if (s.burn > 0 && k % TICK_HZ === 0) dot(w, 1);   // 화상: 1초마다 피해 1
+  if (s.corrode > 0 && k % 45 === 0 && p.shield > 0) { p.shield--; w.events.push({ type: 'hurt', amount: 0, dot: true }); }   // 부식: 방어막이 깎인다
+  if (s.poison > 0) p.energy = Math.max(0, p.energy - 15 * DT);   // 중독: 에너지가 빠진다
+  for (const id of Object.keys(s)) if ((s[id] -= DT) <= 0) delete s[id];
 }
 
 function hitMon(w, m, dmg, kx = 0, ky = 0) { if (m.invuln) dmg = 0; dmg = Math.round(dmg * 10) / 10; m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: Math.round(dmg), x: m.x, y: m.y }); }
@@ -191,10 +227,11 @@ function breakProp(w, o, rng) {
   if (o.kind === 'barrel') {   // 드럼통: 터지며 둘레 40에 큰 피해(나도 맞는다)
     w.events.push({ type: 'splash', x: o.x, y: o.y, r: 40 });
     for (const m of w.mons) if (Math.hypot(m.x - o.x, m.y - o.y) < 40 + m.r) hitMon(w, m, 10, Math.sign(m.x - o.x) * 8, Math.sign(m.y - o.y) * 4);
-    if (Math.hypot(w.player.x - o.x, w.player.y - o.y) < 40) hurtPlayer(w, 1);
+    if (Math.hypot(w.player.x - o.x, w.player.y - o.y) < 40 && !w.mods.blastImmune) hurtPlayer(w, 1);
     for (const q of w.props) if (q !== o && q.hp > 0 && Math.hypot(q.x - o.x, q.y - o.y) < 40) { q.hp -= 10; if (q.hp <= 0) breakProp(w, q, rng); }   // 옆 기물도 연쇄로
     return;
   }
+  for (let i = 0; i < w.mods.matBonus && o.kind !== 'barrel'; i++) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x - 8, y: o.y + 4 });   // 목장갑
   if (o.kind === 'rock') { if (rng.chance(0.5)) w.pickups.push({ kind: 'mat', id: 'scrap', x: o.x, y: o.y }); return; }
   w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
   if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
@@ -209,12 +246,14 @@ function updateShots(w, rng) {
       if (s.bounce > 0) { s.bounce--; s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(w, s.x + s.vx * DT, s.y)) s.vx = -s.vx; else s.vy = -s.vy; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
       s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue;
     }
-    for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg; if (o.hp <= 0) breakProp(w, o, rng); s.life = 0; break; }
+    for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); s.life = 0; break; }
     if (s.life <= 0) continue;
     for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
       s.hit.push(m.uid);
-      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1), boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1;   // 지층 판독: 약점이 드러나 피해 +30%
+      const boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1, crit = w.mods.crit > 0 && rng.chance(w.mods.crit);
+      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1) * (boss ? w.mods.bossMul : 1) * (crit ? 2 : 1);   // 지층 판독: 약점이 드러나 피해 +30%, 치명타 2배
       hitMon(w, m, dmg, s.vx * 0.01 * k, s.vy * 0.01 * k);
+      if (crit) { w.events.push({ type: 'crit', x: m.x, y: m.y }); if (w.mods.critChain) { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } } }
       if (s.trait === 'slow') { m.slowT = 1.2; if ((m.darts = (m.darts || 0) + 1) >= 3) { m.darts = 0; m.stun = Math.max(m.stun, boss ? 0.4 : 1.5); w.events.push({ type: 'sleep', uid: m.uid }); } }   // 마취 다트: 느려지고 3번이면 잠듦
       if (s.trait === 'burn') m.burnT = 3;   // 신호 홍염: 불이 붙어 3초 동안 탄다
       if (s.trait === 'shock') m.stun = Math.max(m.stun, boss ? 0.1 : 0.35);   // 제세동 충격: 잠깐 기절
@@ -230,7 +269,11 @@ function updateShots(w, rng) {
   for (const e of w.eshots) {
     e.x += e.vx * DT; e.y += e.vy * DT; e.life--;
     if (solidAt(w, e.x, e.y)) e.life = 0;
-    else if (Math.hypot(w.player.x - e.x, w.player.y - 10 - e.y) < 4 + (e.size || 3)) { e.life = 0; hurtPlayer(w, e.dmg); }
+    else if (w.mods.reflect && w.player.rollT > 0 && Math.hypot(w.player.x - e.x, w.player.y - 10 - e.y) < 14 + (e.size || 3)) {   // 반사경: 구르며 스친 탄을 되받아 쏜다
+      e.life = 0; const t = nearestTo(w, e.x, e.y, 300), a = t ? Math.atan2(t.y - MONSTERS[t.id].cy - e.y, t.x - e.x) : Math.atan2(-e.vy, -e.vx);
+      w.shots.push({ x: e.x, y: e.y, vx: Math.cos(a) * 380, vy: Math.sin(a) * 380, life: TICK_HZ, dmg: 4 * w.mods.dmgMul, weapon: 'reflect', size: 3, pierce: 1, bounce: 0, hit: [] }); }
+    else if (Math.hypot(w.player.x - e.x, w.player.y - 10 - e.y) < 4 + (e.size || 3)) { e.life = 0; const I = MONSTERS[e.src]?.inflict;
+      if (hurtPlayer(w, e.dmg) && I && rng.chance(I[1])) inflict(w, I[0]); }
   }
   w.eshots = w.eshots.filter(e => e.life > 0);
 }
@@ -294,8 +337,10 @@ function updateMons(w, rng) {
     if (sp) { const spots = [[-12, 0], [12, 0], [0, -10], [0, 10], [-8, -8], [8, 8]].map(([dx, dy]) => [m.x + dx, m.y + dy]).filter(([x, y]) => !blocked(w, x, y, 5));
       for (let i = 0; i < 2; i++) { const [x, y] = spots[i] || [m.x, m.y]; addMon(w, m.room, sp, x, y, rng); } }
     const boss = MONSTERS[m.id].kind === 'boss';
-    if (boss) w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y });
-    else if (rng.chance(w.mods.scavenger ? 0.55 : 0.35)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
+    w.loot.coins += boss ? 15 : 1;
+    if (boss) { w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y }); w.bonusTicks += w.mods.bossTime * TICK_HZ; }
+    else if (rng.chance((w.mods.scavenger ? 0.55 : 0.35) + w.mods.partsChance)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
+    if (w.mods.lifesteal && rng.chance(w.mods.lifesteal) && w.player.hp < w.player.maxHp) { w.player.hp++; w.events.push({ type: 'heal' }); }
     if (w.mods.scavenger) w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 6);
   }
   w.mons = w.mons.filter(m => m.hp > 0);
@@ -306,6 +351,7 @@ function useSkill(w) {
   const p = w.player, S = JOBS[p.job].skill, k = w.mods.skillPower;
   p.skillCd = Math.round(S.cd * TICK_HZ * w.mods.skillCdMul); w.events.push({ type: 'skill', id: S.id });
   if (w.mods.skillCharge) { p.energy = Math.min(p.maxEnergy, p.energy + 40); p.shield = Math.min(p.maxShield, p.shield + 1); }
+  if (w.mods.skillEnergy) p.energy = Math.min(p.maxEnergy, p.energy + w.mods.skillEnergy);
   switch (S.id) {
     case 'regen': p.dashT = Math.round(0.3 * TICK_HZ * k); p.dashA = p.moving ? p.lastDir : p.aim; p.dashDist = 0; p.dashHit = []; p.invuln = Math.max(p.invuln, p.dashT + 4); break;
     case 'strata': w.scanT = Math.round(5 * TICK_HZ * k); for (const r of w.rooms) r.seen = true; break;
@@ -341,7 +387,7 @@ function updateSkills(w, input) {
   for (const z of w.zones) {
     z.t--;
     if (z.kind === 'heal' && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 1) { z.acc -= 1; p.hp = Math.min(p.maxHp, p.hp + 1); w.events.push({ type: 'heal' }); }   // 응급 처치 구역: 1초마다 체력 1
-    if ((z.kind === 'lava' || z.kind === 'fire' || z.kind === 'gas' || z.kind === 'acidpool') && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 0.8) { z.acc = 0; hurtPlayer(w, 1); }   // 함정 장판은 0.8초마다 피해 1
+    if (ZONE_STATUS[z.kind] && Math.hypot(p.x - z.x, p.y - z.y) < z.r) inflict(w, ZONE_STATUS[z.kind]);   // 함정 장판: 서 있으면 상태 이상(용암·불 화상, 감염 구름 감염, 매연 중독, 산성 웅덩이 부식)
     if (z.kind === 'acid') for (const m of w.mons) if (Math.hypot(m.x - z.x, m.y - z.y) < z.r + m.r) m.hp -= 3 * DT;   // 산성 웅덩이: 밟은 적에게 초당 3
   }
   w.zones = w.zones.filter(z => z.t > 0);
@@ -350,7 +396,7 @@ function updateSkills(w, input) {
 // ---------- 함정: 그 방에서 싸우는 동안만 움직인다(바닥형 함정은 늘 켜져 있음) ----------
 function trapBlast(w, x, y, r, kind) {
   const p = w.player; w.events.push({ type: 'trapHit', kind, x, y, r });
-  if (Math.hypot(p.x - x, p.y - y) < r) hurtPlayer(w, 1);
+  if (Math.hypot(p.x - x, p.y - y) < r) { const st = TRAPS[kind]?.status; if (!w.mods.blastImmune) hurtPlayer(w, 1); if (st) inflict(w, st); }
   for (const m of w.mons) if (Math.hypot(m.x - x, m.y - y) < r + m.r) hitMon(w, m, 6);
 }
 function updateTraps(w, rng) {
@@ -358,22 +404,20 @@ function updateTraps(w, rng) {
   if (p.rootCd > 0) p.rootCd -= DT;
   for (const t of w.traps) {
     if (t.room !== here) continue;
-    if (t.mode === 'pool') { if (Math.hypot(p.x - t.x, p.y - t.y) < t.r) {
-      if (TRAPS[t.kind].slow) p.slowT = 2;
-      if (TRAPS[t.kind].root && p.rootCd <= 0 && p.rollT <= 0) { p.rootT = 0.7; p.rootCd = 3; w.events.push({ type: 'trapHit', kind: t.kind, x: t.x, y: t.y, r: t.r }); } } continue; }
+    if (t.mode === 'pool') { if (Math.hypot(p.x - t.x, p.y - t.y) < t.r && inflict(w, TRAPS[t.kind].status) && t.kind === 'vine') w.events.push({ type: 'trapHit', kind: t.kind, x: t.x, y: t.y, r: t.r }); continue; }   // 바닥 함정: 밟고 있으면 상태 이상
     if (!fighting) continue;
     t.t -= DT;
     if (t.mode === 'vent') {
       if (t.warn > 0) { if ((t.warn -= DT) <= 0) { trapBlast(w, t.x, t.y, 26, t.kind); const z = TRAPS[t.kind].zone; if (z) w.zones.push({ kind: z, x: t.x, y: t.y, r: 20, t: Math.round(2.5 * TICK_HZ), acc: 0.5 }); t.t = 4 + rng.next() * 3; } }
-      else if (t.t <= 0) { t.warn = 1; w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: 26 }); }
+      else if (t.t <= 0) { t.warn = 1 + w.mods.warnPlus; w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: 26 }); }
     } else if (t.mode === 'drop' && t.t <= 0) {
       for (let i = 0, n = 1 + (w.order >= 2 ? 1 : 0); i < n; i++) { let x = p.x, y = p.y;
         for (let k = 0; k < 10; k++) { x = p.x + rng.range(-45, 45); y = p.y + rng.range(-35, 35); if (!solidAt(w, x, y)) break; }
-        w.falls.push({ kind: t.kind, x, y, t: 0.9, r: 20 }); w.events.push({ type: 'trapWarn', kind: t.kind, x, y, r: 20 }); }
+        w.falls.push({ kind: t.kind, x, y, t: 0.9 + w.mods.warnPlus, T: 0.9 + w.mods.warnPlus, r: 20 }); w.events.push({ type: 'trapWarn', kind: t.kind, x, y, r: 20 }); }
       t.t = 2.5 + rng.next() * 2;
     } else if (t.mode === 'pulse') {
       if (t.t <= 0) { t.on = !t.on; t.t = 2; if (t.on) w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: t.r }); }
-      if (t.on && Math.hypot(p.x - t.x, p.y - t.y) < t.r) { hurtPlayer(w, 1); }
+      if (t.on && Math.hypot(p.x - t.x, p.y - t.y) < t.r && !w.mods.immune.includes('shock')) { if (hurtPlayer(w, p.st.wet > 0 ? 2 : 1)) inflict(w, 'shock'); }   // 젖은 채 감전되면 피해 2
     }
   }
   for (const d of w.falls) if ((d.t -= DT) <= 0) { trapBlast(w, d.x, d.y, d.r, d.kind); const z = TRAPS[d.kind].zone; if (z) w.zones.push({ kind: z, x: d.x, y: d.y, r: 18, t: Math.round(3 * TICK_HZ), acc: 0.5 }); }
@@ -391,6 +435,7 @@ export function step(w, input) {
   updateMons(w, rng);
   updateRooms(w, rng);
   updateTraps(w, rng);
+  updateStatus(w);
   w.tick++; w.rng = rng.state();
 }
 export { T };

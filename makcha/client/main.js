@@ -1,9 +1,9 @@
 // 막차: 화면(입력·그리기·미니맵·직업 고르기). 게임 규칙은 sim/에만 있고, 여기서는 그리기만 한다
 import { step } from '../sim/world.js';
-import { createRun, offerLines, enterLine, finishLine, RUN_LINES, offerAbilities, applyAbility, ABILITIES, enhanceWeapon, ENHANCE_COST, MAX_LV, GEAR, canCraft, craftGear, upgradeSkill, SKILL_COST, SKILL_MAX } from '../sim/run.js';
+import { createRun, offerLines, enterLine, finishLine, RUN_LINES, offerAbilities, applyAbility, ABILITIES, enhanceWeapon, enhanceCost, MAX_LV, GEAR, canCraft, craftGear, upgradeSkill, skillCost, SKILL_MAX, newMeta, pullRelic, toggleEquip, GACHA_COST, RELIC_SLOTS } from '../sim/run.js';
 import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
-import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS } from '../sim/data.js';
+import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS, STATUS, RELICS, GRADES } from '../sim/data.js';
 
 const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
@@ -66,7 +66,7 @@ function drawMon(m, t) {
   const M = MONSTERS[m.id], small = M.small, fr = A.mons[m.id] || A.mons[M.sprite] || A.mons.germ, X = Math.round(m.x), Y = Math.round(m.y);   // 작은 내성균은 내성균 그림을 작게, 그림 없는 보스는 색을 입혀 임시로
   const img = M.kind === 'boss' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
-  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.invuln) x.filter = 'grayscale(1) brightness(.7)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; else if (M.tint) x.filter = M.tint; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.invuln) x.filter = 'grayscale(1) brightness(.7)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; else if (M.tint && !A.mons[m.id]) x.filter = M.tint; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
   if (game.w?.scanT > 0) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 1; x.strokeRect(X - 4.5, top + img.height * 0.4 - 4.5, 9, 9); x.fillStyle = '#ff4a3a'; x.fillRect(X - 1, top + img.height * 0.4 - 1, 2, 2); }
   if (M.kind === 'boss') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
@@ -86,7 +86,9 @@ function drawPlayer(p, t) {
   const k = p.kick * p.kick, bx = Math.round(p.x - Math.cos(p.aim) * k * 2), by = Math.round(p.y);
   const blink = p.invuln > 0 && Math.floor(p.invuln / 3) % 2;
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(bx, by, 7, 3, 0, 0, 7); x.fill();
-  if (!blink) { x.save(); x.translate(bx, by); x.scale(p.face, 1); x.drawImage(img, -Math.round(img.width / 2), -img.height); x.restore(); }
+  const sts = Object.keys(p.st || {}), SF = { infect: 'sepia(1) hue-rotate(50deg) saturate(2.5)', burn: 'sepia(1) saturate(4) hue-rotate(-20deg)', wet: 'hue-rotate(180deg) saturate(1.6)', corrode: 'sepia(1) hue-rotate(30deg) saturate(3)', frost: 'saturate(.3) brightness(1.4) hue-rotate(160deg)', shock: 'brightness(2)', root: 'hue-rotate(60deg)', poison: 'hue-rotate(250deg) saturate(1.8)' };
+  if (!blink) { x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(img.width / 2), -img.height); x.restore(); }
+  for (const id of sts) if (Math.random() < 0.25) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 12, y: p.y - 8 - Math.random() * 14, vx: 0, vy: id === 'wet' ? 25 : -25, t: 0.4, c: STATUS[id].color });
   const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
   x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
 }
@@ -99,7 +101,10 @@ function feed(w) {
     if (e.type === 'hit') { fx.nums.push({ x: e.x + (Math.random() - 0.5) * 10, y: e.y - 22, v: e.amount, t: 0.6 }); for (let i = 0; i < 4; i++) fx.parts.push({ x: e.x, y: e.y - 8, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, t: 0.3, c: '#ffe9a8' }); }
     else if (e.type === 'kill') { for (let i = 0; i < 12; i++) fx.parts.push({ x: e.x, y: e.y - 8, vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.5) * 160, t: 0.45, c: '#d9d4c4' }); fx.shake = Math.max(fx.shake, 2); }
     else if (e.type === 'fire') { fx.flashes.push({ x: p.x + p.face * 4 + Math.cos(p.aim) * 12, y: p.y - 9 + Math.sin(p.aim) * 12, a: p.aim, t: 0.05 }); fx.shake = Math.max(fx.shake, WEAPONS[e.weapon].kick * 1.5); }
-    else if (e.type === 'hurt') { fx.shake = Math.max(fx.shake, 4); fx.nums.push({ x: p.x, y: p.y - 34, v: '-' + e.amount, t: 0.8, red: true }); }
+    else if (e.type === 'hurt') { if (!e.dot) fx.shake = Math.max(fx.shake, 4); if (e.amount) fx.nums.push({ x: p.x, y: p.y - 34, v: '-' + e.amount, t: 0.8, red: true }); }
+    else if (e.type === 'status') pop(`${STATUS[e.id].icon} ${STATUS[e.id].name}!`, STATUS[e.id].color);
+    else if (e.type === 'revive') { pop('💉 백신 앰플! 다시 일어났다', '#7ae08a'); fx.skillFlash = 0.6; }
+    else if (e.type === 'crit') fx.nums.push({ x: e.x, y: e.y - 34, v: '치명타', t: 0.6, gold: true });
     else if (e.type === 'spark') fx.parts.push({ x: e.x, y: e.y, vx: 0, vy: -20, t: 0.15, c: '#fff' });
     else if (e.type === 'pickup') fx.nums.push({ x: p.x, y: p.y - 36, v: e.kind === 'mat' ? `+${MATS[e.id]}` : `+부품 ${e.n}`, t: 0.8, gold: true });
     else if (e.type === 'getWeapon') tip(`🔫 ${WEAPONS[e.id].name}`, 1.5);
@@ -146,16 +151,18 @@ function drawWorld(w, t) {
     if (r.type === 'exit' || (r.type === 'boss' && st.cleared)) { const g = 0.5 + Math.sin(t * 4) * 0.2; x.fillStyle = `rgba(120,200,255,${g})`; x.beginPath(); x.ellipse(X, Y, 14, 7, 0, 0, 7); x.fill(); x.fillStyle = '#e8f6ff'; x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.fillText('다음 역', X, Y - 12); }
   }
   // 스킬 효과(바닥): 응급 처치 회복 구역, 돌진 잔상
-  for (const z of w.zones) { const acid = z.kind !== 'heal', ZC = { acid: '170,220,60', acidpool: '190,240,70', lava: '255,110,30', fire: '255,170,60', gas: '140,190,80' }[z.kind]; x.fillStyle = acid ? `rgba(${ZC},${0.35 + 0.08 * Math.sin(t * 8)})` : `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); if (!acid) { x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); } }
+  for (const z of w.zones) { const acid = z.kind !== 'heal', ZC = { acid: '170,220,60', acidpool: '190,240,70', lava: '255,110,30', fire: '255,170,60', gas: '140,190,80', smog: '110,100,120' }[z.kind]; x.fillStyle = acid ? `rgba(${ZC},${0.35 + 0.08 * Math.sin(t * 8)})` : `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); if (!acid) { x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); } }
   // 함정: 분화구·분출구(경고 중이면 붉게 깜빡), 웅덩이·덩굴, 전기 바닥, 떨어질 자리 표시
   for (const tr of w.traps) { if (tr.x === undefined) continue; const X = Math.round(tr.x), Y = Math.round(tr.y);
-    if (tr.mode === 'vent') { const C = { vent: ['#2a1a14', '#ff7a2a'], gas: ['#1e2a1a', '#9ad050'], heat: ['#3a2a1a', '#ffb040'] }[tr.kind]; x.fillStyle = C[0]; x.beginPath(); x.ellipse(X, Y, 10, 6, 0, 0, 7); x.fill(); x.fillStyle = C[1]; x.globalAlpha = 0.5 + 0.3 * Math.sin(t * 5 + X); x.beginPath(); x.ellipse(X, Y, 5, 3, 0, 0, 7); x.fill(); x.globalAlpha = 1;
+    if (tr.mode === 'vent') { const C = { vent: ['#2a1a14', '#ff7a2a'], gas: ['#1e2a1a', '#9ad050'], smog: ['#1c1a20', '#8a8090'], heat: ['#3a2a1a', '#ffb040'] }[tr.kind]; x.fillStyle = C[0]; x.beginPath(); x.ellipse(X, Y, 10, 6, 0, 0, 7); x.fill(); x.fillStyle = C[1]; x.globalAlpha = 0.5 + 0.3 * Math.sin(t * 5 + X); x.beginPath(); x.ellipse(X, Y, 5, 3, 0, 0, 7); x.fill(); x.globalAlpha = 1;
       if (tr.warn > 0) { x.strokeStyle = `rgba(255,60,40,${0.5 + 0.5 * Math.abs(Math.sin(t * 20))})`; x.lineWidth = 2; x.beginPath(); x.ellipse(X, Y, 26, 15, 0, 0, 7); x.stroke(); } }
-    else if (tr.mode === 'pool') { x.fillStyle = tr.kind === 'vine' ? 'rgba(70,140,50,.55)' : 'rgba(80,140,210,.45)'; x.beginPath(); x.ellipse(X, Y, tr.r, tr.r * 0.55, 0, 0, 7); x.fill();
+    else if (tr.mode === 'pool') { x.fillStyle = { vine: 'rgba(70,140,50,.55)', sewage: 'rgba(110,130,40,.6)', ice: 'rgba(200,235,255,.55)' }[tr.kind] || 'rgba(80,140,210,.45)'; x.beginPath(); x.ellipse(X, Y, tr.r, tr.r * 0.55, 0, 0, 7); x.fill();
+      if (tr.kind === 'sewage') { x.fillStyle = '#c8e070'; for (let i = 0; i < 3; i++) { const b = (t * 0.8 + i * 0.33) % 1; x.globalAlpha = 1 - b; x.beginPath(); x.arc(X + (i - 1) * 9, Y - b * 5, 1.5 + b * 2, 0, 7); x.fill(); } x.globalAlpha = 1; }
+      if (tr.kind === 'ice') { x.fillStyle = 'rgba(255,255,255,.8)'; x.fillRect(X - 9, Y - 4, 6, 1); x.fillRect(X + 3, Y + 1, 5, 1); x.fillRect(X - 2, Y - 1, 3, 1); }
       if (tr.kind === 'vine') { x.strokeStyle = '#3a7a2a'; x.lineWidth = 1; for (let i = 0; i < 4; i++) { x.beginPath(); x.arc(X + (i - 1.5) * 8, Y, 4, Math.PI, 0); x.stroke(); } } }
     else if (tr.mode === 'pulse') { x.fillStyle = tr.on ? 'rgba(255,230,80,.55)' : 'rgba(90,95,104,.6)'; x.fillRect(X - tr.r, Y - tr.r * 0.5, tr.r * 2, tr.r); x.strokeStyle = '#2a2d33'; x.strokeRect(X - tr.r + 0.5, Y - tr.r * 0.5 + 0.5, tr.r * 2 - 1, tr.r - 1);
       if (tr.on && Math.random() < 0.5) fx.parts.push({ x: X + (Math.random() - 0.5) * tr.r * 2, y: Y + (Math.random() - 0.5) * tr.r, vx: 0, vy: -40, t: 0.15, c: '#fff6a0' }); } }
-  for (const d of w.falls) { const k = Math.max(0, d.t / 0.9), X = Math.round(d.x), Y = Math.round(d.y); x.fillStyle = `rgba(0,0,0,${0.45 - 0.3 * k})`; x.beginPath(); x.ellipse(X, Y, d.r * (1 - k * 0.6), d.r * 0.55 * (1 - k * 0.6), 0, 0, 7); x.fill();
+  for (const d of w.falls) { const k = Math.min(1, Math.max(0, d.t / (d.T || 0.9))), X = Math.round(d.x), Y = Math.round(d.y); x.fillStyle = `rgba(0,0,0,${0.45 - 0.3 * k})`; x.beginPath(); x.ellipse(X, Y, d.r * (1 - k * 0.6), d.r * 0.55 * (1 - k * 0.6), 0, 0, 7); x.fill();
     x.strokeStyle = 'rgba(255,60,40,.85)'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(X, Y, d.r, d.r * 0.55, 0, 0, 7); x.stroke();
     const FC = { meteor: '#5a3a2a', icicle: '#bfe8ff', drip: '#c86a2a', acidrain: '#b8f040' }[d.kind] || '#888'; const h = k * 90; x.fillStyle = FC; x.fillRect(X - 3, Y - 6 - h, 6, 6); if (d.kind === 'meteor') { x.fillStyle = 'rgba(255,140,40,.7)'; x.fillRect(X - 2, Y - 12 - h, 4, 6); } }
   for (const k of w.pickups) {   // 떨어진 물건: 무기(그림), 재료(색 주머니), 부품(톱니)
@@ -210,28 +217,56 @@ function hud(w, dt) {
   $('parts').textContent = `부품 ${game.run.parts + w.loot.parts}`;
   const near = w.pickups.find(k => k.kind === 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < 22);
   $('pickhint').textContent = near ? `E 줍기: ${WEAPONS[near.id].name}${near.lv ? ' +' + near.lv : ''}` : '';
+  const stKey = Object.entries(p.st || {}).map(([id, v]) => id + Math.ceil(v)).join(',');
+  if (stKey !== lastSt) { lastSt = stKey; $('status').innerHTML = Object.entries(p.st || {}).map(([id, v]) => `<span style="border-color:${STATUS[id].color}">${STATUS[id].icon} ${STATUS[id].name} ${Math.ceil(v)}</span>`).join(''); }
   const S = JOBS[p.job].skill, k = p.skillCd / Math.max(1, Math.round(S.cd * 30 * w.mods.skillCdMul));
   $('skill').classList.toggle('cd', k > 0); $('skillFill').style.height = Math.min(100, k * 100) + '%'; $('skillName').textContent = S.name; $('skillCd').textContent = k > 0 ? Math.ceil(p.skillCd / 30) + '초' : '우클릭';
 }
-let lastSlots = '';
+let lastSlots = '', lastSt = '';
+// 상태 이상 알림: 캐릭터 머리 위(화면 가운데)에 큰 글씨로 떠올랐다 사라진다
+function pop(text, color) {
+  const el = document.createElement('div'), r = cv.getBoundingClientRect();
+  el.className = 'pop'; el.textContent = text; el.style.color = color; el.style.left = r.left + r.width / 2 + 'px'; el.style.top = r.top + r.height * 0.36 + 'px';
+  document.body.appendChild(el); setTimeout(() => el.remove(), 1300);
+}
 
 // ---------- 흐름: 직업 고르기 → 환승역(열린 호선 중 3개) → 호선 던전 → … 5개 → 지상 출구 ----------
-const game = { w: null, bg: null, acc: 0, run: null, open: [1, 2, 3, 4, 5, 6, 7, 8, 9] };
+const game = { w: null, bg: null, acc: 0, run: null, open: [1, 2, 3, 4, 5, 6, 7, 8, 9], meta: loadMeta() };
 const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 // 교사가 열어 둔 호선(연구소에 연결되어 있을 때만 서버에서 읽고, 아니면 모두 열림)
 async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
+// 토큰·유물은 이 기기에 저장한다(연구소에 연결하면 서버로 옮긴다)
+function loadMeta() { try { const m = JSON.parse(localStorage.getItem('makcha.meta')); if (m && typeof m.coins === 'number') return { ...newMeta(), ...m }; } catch (e) {} return newMeta(); }
+function saveMeta() { try { localStorage.setItem('makcha.meta', JSON.stringify(game.meta)); } catch (e) {} }
+const relicChip = (id, extra = '') => { const R0 = RELICS[id], G = GRADES[R0.grade]; return `<span class="relic" style="border-color:${G.color}" ${extra}><b style="color:${G.color}">${R0.name}</b><small>${R0.text}</small></span>`; };
+function gacha(result = null) {
+  const m = game.meta, ids = Object.keys(RELICS), owned = ids.filter(id => m.relics[id]).length;
+  menu(`<h1>🎰 역무실 유물 뽑기</h1><p>🪙 토큰 <b style="color:var(--acc)">${m.coins}</b> · 모은 유물 ${owned}/${ids.length} · 끼운 유물 ${m.equip.length}/${RELIC_SLOTS}</p>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><button class="job" id="pull" style="background:var(--acc);color:#1a1410;font-weight:800;opacity:${m.coins >= GACHA_COST ? 1 : 0.5}">뽑기 🪙 ${GACHA_COST}</button><button class="job" id="back">← 돌아가기</button>
+    ${result ? `<div class="gres" style="border-color:${GRADES[result.grade].color}"><small style="color:${GRADES[result.grade].color}">${GRADES[result.grade].name}</small> <b>${RELICS[result.id].name}</b> ${result.dup ? `<small>이미 있다 · 🪙 +${GRADES[result.grade].refund}</small>` : '<small>NEW</small>'}<br><small>${RELICS[result.id].text}</small></div>` : ''}</div>
+    <p style="margin:12px 0 4px;font-size:13px">눌러서 끼우기·빼기(2개까지)</p>
+    <div class="relics">${['S', 'A', 'B', 'C'].flatMap(g => ids.filter(id => RELICS[id].grade === g)).map(id => m.relics[id]
+      ? relicChip(id, `data-r="${id}" ${m.equip.includes(id) ? 'data-on="1"' : ''}`)
+      : `<span class="relic unknown" style="border-color:${GRADES[RELICS[id].grade].color}55"><b style="color:${GRADES[RELICS[id].grade].color}88">${GRADES[RELICS[id].grade].name}</b><small>???</small></span>`).join('')}</div>`);
+  $('pull').onclick = () => { const r = pullRelic(m, Math.random(), Math.random()); if (!r) return; saveMeta(); gacha(r); };
+  $('back').onclick = jobSelect;
+  for (const b of document.querySelectorAll('[data-r]')) b.onclick = () => { toggleEquip(m, b.dataset.r); saveMeta(); gacha(); };
+}
 function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; $('loadout').hidden = true; }
 function jobSelect() {
+  const m = game.meta;
   menu(`<h1>🚇 막차: 지하 생존기</h1><p>호선 ${RUN_LINES}개를 지나 탈출하라.</p><p style="font-size:13px">이동 WASD · 쏘기 마우스 왼쪽 · 스킬 마우스 오른쪽 · 구르기 Shift · 무기 바꾸기 Q · 줍기 E</p>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px"><button class="job" id="gacha">🎰 유물 뽑기 · 🪙 ${m.coins}</button>${m.equip.map(id => relicChip(id)).join('')}${m.equip.length < RELIC_SLOTS ? `<span class="relic unknown"><small>빈 칸</small></span>` : ''}</div>
     <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
   for (const c of document.querySelectorAll('[data-c]')) { const g = c.getContext('2d'), im = A.chars[+c.dataset.c][0]; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); }
-  for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j }); transfer(); };
+  for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j, relics: m.equip }); transfer(); };
+  $('gacha').onclick = () => gacha();
 }
 const matText = m => Object.entries(m).filter(([, v]) => v > 0).map(([k, v]) => `${MATS[k]} ${v}`).join(', ') || '없음';
 function abilityPick() {
   const r = game.run, offer = offerAbilities(r), KIND = { gun: '🔫 총', body: '💪 몸', skill: '✨ 스킬' };
   if (!offer.length) return workshop();
-  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>⏱ ${clock(Math.floor(r.ticks / 30))}</p>
+  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>⏱ ${clock(Math.floor(r.ticks / 30))} · 🪙 +${r.lastCoins}</p>
     <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(id => { const a = ABILITIES[id]; return `<button class="job" data-a="${id}" style="text-align:left"><small style="color:var(--acc)">${KIND[a.kind]}</small><br><b style="font-size:17px">${a.name}</b></button>`; }).join('')}</div>
     ${r.abilities.length ? `<p style="margin-top:10px">가진 특수능력: ${r.abilities.map(id => ABILITIES[id].name).join(', ')}</p>` : ''}`);
   for (const b of document.querySelectorAll('[data-a]')) b.onclick = () => { applyAbility(r, b.dataset.a); workshop(); };
@@ -239,9 +274,9 @@ function abilityPick() {
 function workshop(msg = '') {
   const r = game.run, slots = ['head', 'body', 'feet'], SL = { head: '머리', body: '몸', feet: '발' };
   menu(`<h1>🔧 정비소</h1><p>부품 <b>${r.parts}</b> · 재료: ${matText(r.mats)} · 장비: ${slots.map(sl => `${SL[sl]} ${r.gear[sl] ? GEAR[r.gear[sl]].name : '없음'}`).join(' · ')}</p>${msg ? `<p style="color:var(--acc)">${msg}</p>` : ''}
-    <h2 style="font-size:16px;margin:10px 0 4px">강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = ENHANCE_COST(it.lv), ok = it.lv < MAX_LV && r.parts >= c;
+    <h2 style="font-size:16px;margin:10px 0 4px">강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = enhanceCost(r, it.lv), ok = it.lv < MAX_LV && r.parts >= c;
       return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} +${it.lv}</b><br><small style="color:var(--sub)">${it.lv >= MAX_LV ? '최고 단계' : `→ +${it.lv + 1} · 부품 ${c}`}</small></button>`; }).join('')}
-      ${(() => { const S = JOBS[r.job].skill, c = SKILL_COST(r.skillLv), ok = r.skillLv < SKILL_MAX && r.parts >= c; return `<button class="job" id="skillUp" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>✨ ${S.name} Lv ${r.skillLv}</b><br><small style="color:var(--sub)">${r.skillLv >= SKILL_MAX ? '최고 레벨' : `→ Lv ${r.skillLv + 1} · 부품 ${c}`}</small></button>`; })()}</div>
+      ${(() => { const S = JOBS[r.job].skill, c = skillCost(r), ok = r.skillLv < SKILL_MAX && r.parts >= c; return `<button class="job" id="skillUp" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>✨ ${S.name} Lv ${r.skillLv}</b><br><small style="color:var(--sub)">${r.skillLv >= SKILL_MAX ? '최고 레벨' : `→ Lv ${r.skillLv + 1} · 부품 ${c}`}</small></button>`; })()}</div>
     <h2 style="font-size:16px;margin:12px 0 4px">장비 만들기(재료)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${Object.entries(GEAR).map(([id, g]) => { const ok = canCraft(r, id);
       return `<button class="job" data-g="${id}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${g.name}</b> <small>(${SL[g.slot]})</small>${r.gear[g.slot] === id ? ' ✔' : ''}<br><small style="color:var(--sub)">${r.gear[g.slot] === id ? g.text + '<br>' : ''}${matText(g.recipe)}</small></button>`; }).join('')}</div>
     <div style="margin-top:14px"><button class="job" id="next" style="background:var(--acc);color:#1a1410;font-weight:800">다음 호선 고르기 →</button></div>`);
@@ -265,9 +300,10 @@ function startLine(n) {
 }
 function endLine(w) {
   const r = game.run; finishLine(r, w); game.w = null;
-  const time = clock(Math.floor(r.ticks / 30));
-  if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
-  if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p><p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
+  game.meta.coins += r.lastCoins; saveMeta();
+  const time = clock(Math.floor(r.ticks / 30)), coinLine = `<p>🪙 토큰 +${r.lastCoins} (이번 판 ${r.coins})</p>`;
+  if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p>${coinLine}<button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
+  if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p>${coinLine}<p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
   abilityPick();
 }
 
@@ -291,7 +327,7 @@ function frame(now) {
   A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s)))));
   A.weapons = await Promise.all(m.weapons.map(s => load('assets/' + s)));
   A.mons = Object.fromEntries(await Promise.all(Object.entries(m.mons).map(async ([k, f]) => [k, await Promise.all(f.map(s => load('assets/' + s)))])));
-  window.__game = game; window.__line = n => startLine(n);   // 개발용: 원하는 호선으로 바로 가기
+  window.__game = game; window.__line = n => startLine(n); window.__coins = n => { game.meta.coins += n; saveMeta(); };   // 개발용: 원하는 호선으로 바로 가기, 토큰 넣기
   await loadOpenLines();
   jobSelect(); requestAnimationFrame(frame);
 })();
