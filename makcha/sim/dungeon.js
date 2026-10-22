@@ -70,8 +70,17 @@ export function generateFloor(seed, { line, order }) {
     }
     for (const id of [L.id, R.id]) { for (const k of tilesOf[id]) tiles[k] = T.DOOR; doors.push({ room: id, to: id === L.id ? R.id : L.id, tiles: tilesOf[id] }); }
   }
+  // 지형지물: 전투·엘리트·보스 방에 2×2 기둥 4개(방 네 귀퉁이 쪽, 가운데 십자 길은 비워 둠). 탄과 몸을 막는 엄폐물
+  const pillars = [];
+  for (const r of rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') {
+    const qx = Math.floor(r.w / 4), qy = Math.floor(r.h / 4), inset = rng.int(2);
+    for (const [px, py] of [[r.x0 + qx - 1 + inset, r.y0 + qy - 1], [r.x0 + r.w - qx - 1 - inset, r.y0 + qy - 1], [r.x0 + qx - 1 + inset, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1 - inset, r.y0 + r.h - qy - 1]]) {
+      pillars.push({ room: r.id, x: px, y: py });
+      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(px + dx, py + dy, T.WALL);
+    }
+  }
   const doorOwner = {}; for (const d of doors) for (const k of d.tiles) doorOwner[k] = d.room;
-  return { line, order, w, h, tiles, rooms, links, doors, doorOwner };
+  return { line, order, w, h, tiles, rooms, links, doors, doorOwner, pillars };
 }
 
 export function tileAt(f, x, y) { return x < 0 || y < 0 || x >= f.w || y >= f.h ? T.WALL : f.tiles[y * f.w + x]; }

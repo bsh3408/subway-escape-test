@@ -1,18 +1,20 @@
 // 막차: 화면(입력·그리기·미니맵·직업 고르기). 게임 규칙은 sim/에만 있고, 여기서는 그리기만 한다
 import { step } from '../sim/world.js';
-import { createRun, offerLines, enterLine, finishLine, RUN_LINES } from '../sim/run.js';
+import { createRun, offerLines, enterLine, finishLine, RUN_LINES, offerAbilities, applyAbility, ABILITIES, enhanceWeapon, ENHANCE_COST, MAX_LV, GEAR, canCraft, craftGear } from '../sim/run.js';
 import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
-import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES } from '../sim/data.js';
+import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS } from '../sim/data.js';
 
 const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
+// 받침이 있으면 앞 조사, 없으면 뒤 조사(을/를, 이/가)
+const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? a : b); };
 const A = { chars: [], weapons: [], mons: {} };
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
 
 // ---------- 입력: WASD·방향키, 마우스 왼쪽 공격, 왼쪽 Shift 달리기 ----------
 const keys = new Set(); let mouseDown = false, rightDown = false;
-const KEY = { KeyW: INPUT.UP, ArrowUp: INPUT.UP, KeyS: INPUT.DOWN, ArrowDown: INPUT.DOWN, KeyA: INPUT.LEFT, ArrowLeft: INPUT.LEFT, KeyD: INPUT.RIGHT, ArrowRight: INPUT.RIGHT, KeyJ: INPUT.ATTACK, KeyK: INPUT.SKILL, ShiftLeft: INPUT.RUN };
+const KEY = { KeyW: INPUT.UP, ArrowUp: INPUT.UP, KeyS: INPUT.DOWN, ArrowDown: INPUT.DOWN, KeyA: INPUT.LEFT, ArrowLeft: INPUT.LEFT, KeyD: INPUT.RIGHT, ArrowRight: INPUT.RIGHT, KeyJ: INPUT.ATTACK, KeyK: INPUT.SKILL, KeyQ: INPUT.SWAP, KeyE: INPUT.ITEM, ShiftLeft: INPUT.RUN, ShiftRight: INPUT.RUN };   // Shift = 구르기
 addEventListener('keydown', e => { if (KEY[e.code]) { keys.add(e.code); e.preventDefault(); } });
 addEventListener('keyup', e => keys.delete(e.code));
 cv.addEventListener('mousedown', e => { if (e.button === 0) mouseDown = true; if (e.button === 2) rightDown = true; });
@@ -73,12 +75,19 @@ function drawMon(m, t) {
 
 // ---------- 플레이어: 팔 없는 몸 + 떠서 흔들리는 총(반동) ----------
 function drawPlayer(p, t) {
-  const J = JOBS[p.job], fr = A.chars[J.sprite], img = p.moving ? fr[2 + Math.floor(t * (p.running ? 12 : 9)) % 4] : fr[Math.floor(t * 2) % 2];
+  const J = JOBS[p.job], fr = A.chars[J.sprite], img = p.moving ? fr[2 + Math.floor(t * 10) % 4] : fr[Math.floor(t * 2) % 2];
+  if (p.rollT > 0) {   // 구르기: 몸을 굴리고 먼지를 남긴다(총은 잠깐 숨김)
+    const a = (1 - p.rollT / 8) * Math.PI * 2 * (Math.cos(p.rollA) >= 0 ? 1 : -1);
+    x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(p.x, p.y, 7, 3, 0, 0, 7); x.fill();
+    x.save(); x.translate(Math.round(p.x), Math.round(p.y - img.height / 2)); x.rotate(a); x.scale(0.9, 0.9); x.drawImage(img, -Math.round(img.width / 2), -Math.round(img.height / 2)); x.restore();
+    if (Math.random() < 0.6) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 8, y: p.y - 1, vx: -Math.cos(p.rollA) * 30, vy: -10, t: 0.3, c: '#a89a84' });
+    return;
+  }
   const k = p.kick * p.kick, bx = Math.round(p.x - Math.cos(p.aim) * k * 2), by = Math.round(p.y);
   const blink = p.invuln > 0 && Math.floor(p.invuln / 3) % 2;
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(bx, by, 7, 3, 0, 0, 7); x.fill();
   if (!blink) { x.save(); x.translate(bx, by); x.scale(p.face, 1); x.drawImage(img, -Math.round(img.width / 2), -img.height); x.restore(); }
-  const g = A.weapons[WEAPONS[p.weapon].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
+  const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
   x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
 }
 
@@ -94,7 +103,13 @@ function feed(w) {
     else if (e.type === 'spark') fx.parts.push({ x: e.x, y: e.y, vx: 0, vy: -20, t: 0.15, c: '#fff' });
     else if (e.type === 'lock') tip('🚪 문이 잠겼다! 적을 모두 쓰러뜨려라', 2);
     else if (e.type === 'clear') tip('✅ 방을 정리했다. 문이 열렸다', 2);
-    else if (e.type === 'chest') tip('📦 보급 상자: 체력 +2, 에너지 +60', 2.5);
+    else if (e.type === 'chest') tip('📦 보급 상자를 열었다: 재료와 부품, 가끔 무기', 2.5);
+    else if (e.type === 'pickup') fx.nums.push({ x: p.x, y: p.y - 36, v: e.kind === 'mat' ? `+${MATS[e.id]}` : `+부품 ${e.n}`, t: 0.8, gold: true });
+    else if (e.type === 'getWeapon') tip(`🔫 ${josa(WEAPONS[e.id].name, '을', '를')} 들었다 · ${WEAPONS[e.id].traitText}`, 2.5);
+    else if (e.type === 'swap') tip(`🔁 ${WEAPONS[p.weapons[p.cur].id].name}`, 0.9);
+    else if (e.type === 'zap') fx.zaps = (fx.zaps || []).concat([{ ...e, t: 0.12 }]);
+    else if (e.type === 'propBreak') { for (let i = 0; i < 10; i++) fx.parts.push({ x: e.x, y: e.y - 6, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.7) * 120, t: 0.4, c: i % 2 ? '#b9844a' : '#6a4a2a' }); fx.shake = Math.max(fx.shake, 2); }
+    else if (e.type === 'pattern') { const N = { ring: '원형 탄막', fan: '부채꼴 사격', charge: '돌진', summon: '화석 소환' }; tip(`⚠️ 보스: ${N[e.name] || e.name}`, 1.2); }
     else if (e.type === 'skill') { fx.skillFlash = 0.35; tip(`✨ ${JOBS[p.job].skill.name}`, 1.2); }
     else if (e.type === 'charge') fx.nums.push({ x: p.x, y: p.y - 36, v: `방어막 +${e.amount}`, t: 1, blue: true });
     else if (e.type === 'splash') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: '#7ad0ff' }); for (let i = 0; i < 18; i++) fx.parts.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 220, vy: (Math.random() - 0.5) * 160, t: 0.45, c: i % 2 ? '#bfe8ff' : '#ffffff' }); fx.shake = Math.max(fx.shake, 3); }
@@ -102,12 +117,19 @@ function feed(w) {
   }
 }
 function updateFx(dt) {
-  fx.skillFlash = Math.max(0, fx.skillFlash - dt);
+  fx.skillFlash = Math.max(0, fx.skillFlash - dt); fx.zaps = (fx.zaps || []).filter(z => (z.t -= dt) > 0);
   for (const L of [fx.nums, fx.parts, fx.flashes, fx.rings, fx.trail]) { for (const o of L) { o.t -= dt; if (o.vx !== undefined) { o.x += o.vx * dt; o.y += o.vy * dt; } } for (let i = L.length - 1; i >= 0; i--) if (L[i].t <= 0) L.splice(i, 1); }
   fx.shake = Math.max(0, fx.shake - dt * 20);
 }
 
 // ---------- 스킬 칸(오른쪽 아래): 이름과 남은 대기 시간 ----------
+function drawWeaponHud(w) {
+  const p = w.player, X = VIEW_W - 170, Y = VIEW_H - 50;
+  p.weapons.forEach((it, i) => { const on = i === p.cur, W = WEAPONS[it.id], g = A.weapons[W.sprite], y = Y + (i - (p.weapons.length - 1)) * 22 + 10;
+    x.fillStyle = on ? 'rgba(224,176,74,.35)' : 'rgba(10,12,16,.7)'; x.fillRect(X, y, 104, 20); x.strokeStyle = on ? '#e0b04a' : '#3a3e46'; x.lineWidth = 1; x.strokeRect(X + 0.5, y + 0.5, 103, 19);
+    x.drawImage(g, X + 4, y + 10 - Math.round(g.height / 2)); x.font = 'bold 8px sans-serif'; x.textAlign = 'left'; x.fillStyle = '#fff'; x.fillText(`${W.name}${it.lv ? ' +' + it.lv : ''}`, X + 26, y + 13); });
+  x.font = '7px sans-serif'; x.fillStyle = '#c8c2b0'; x.textAlign = 'left'; x.fillText(`Q 바꾸기 · 부품 ${w.loot.parts}`, X, Y + 40);
+}
 function drawSkillHud(w) {
   const p = w.player, S = JOBS[p.job].skill, X = VIEW_W - 58, Y = VIEW_H - 58, k = p.skillCd / (S.cd * 30);
   x.fillStyle = 'rgba(10,12,16,.7)'; x.beginPath(); x.arc(X + 24, Y + 24, 24, 0, 7); x.fill();
@@ -141,7 +163,16 @@ function drawWorld(w, t) {
     if (r.type === 'exit' || (r.type === 'boss' && st.cleared)) { const g = 0.5 + Math.sin(t * 4) * 0.2; x.fillStyle = `rgba(120,200,255,${g})`; x.beginPath(); x.ellipse(X, Y, 14, 7, 0, 0, 7); x.fill(); x.fillStyle = '#e8f6ff'; x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.fillText('다음 역', X, Y - 12); }
   }
   // 스킬 효과(바닥): 응급 처치 회복 구역, 돌진 잔상
-  for (const z of w.zones) { x.fillStyle = `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); }
+  for (const z of w.zones) { const acid = z.kind === 'acid'; x.fillStyle = acid ? `rgba(170,220,60,${0.35 + 0.08 * Math.sin(t * 8)})` : `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); if (!acid) { x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); } }
+  for (const k of w.pickups) {   // 떨어진 물건: 무기(그림), 재료(색 주머니), 부품(톱니)
+    const X = Math.round(k.x), Y = Math.round(k.y + Math.sin(t * 4 + k.x) * 1.5);
+    x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(X - 5, Math.round(k.y) + 3, 10, 2);
+    if (k.kind === 'weapon') { const g = A.weapons[WEAPONS[k.id].sprite]; x.fillStyle = 'rgba(255,230,140,.25)'; x.beginPath(); x.arc(X, Y - 2, 11, 0, 7); x.fill(); x.drawImage(g, X - Math.round(g.width / 2), Y - Math.round(g.height / 2) - 2);
+      if (Math.hypot(p.x - k.x, p.y - k.y) < 22) { x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; const s2 = `E 줍기: ${WEAPONS[k.id].name}${k.lv ? ' +' + k.lv : ''}`; x.strokeText(s2, X, Y - 16); x.fillStyle = '#ffe9a0'; x.fillText(s2, X, Y - 16); } }
+    else if (k.kind === 'mat') { const C = { cloth: '#d8c8a8', rubber: '#3a3a3a', glass: '#9ad8f0', filter: '#e8e8e8', scrap: '#8a8f98', leather: '#8a5a3a' }[k.id]; x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 9); x.fillStyle = C; x.fillRect(X - 4, Y - 6, 8, 7); }
+    else { x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 10); x.fillStyle = '#c8ccd2'; x.fillRect(X - 4, Y - 6, 8, 8); x.fillStyle = '#5a5f68'; x.fillRect(X - 1, Y - 3, 3, 3); }
+  }
+  for (const o of w.props) { const X = Math.round(o.x), Y = Math.round(o.y); x.fillStyle = 'rgba(0,0,0,.3)'; x.fillRect(X - 9, Y - 1, 18, 3); x.fillStyle = '#2a1c10'; x.fillRect(X - 9, Y - 15, 18, 15); x.fillStyle = '#a8743a'; x.fillRect(X - 8, Y - 14, 16, 13); x.fillStyle = '#7a5028'; x.fillRect(X - 8, Y - 9, 16, 2); x.fillRect(X - 1, Y - 14, 2, 13); x.fillStyle = '#c8945a'; x.fillRect(X - 8, Y - 14, 16, 2); }
   if (p.dashT > 0) fx.trail.push({ x: p.x, y: p.y, t: 0.25 });
   for (const q of fx.trail) { x.globalAlpha = q.t * 2; x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(q.x) - 6, Math.round(q.y) - 22, 12, 22); } x.globalAlpha = 1;
   const list = [...w.mons.map(m => ({ y: m.y, d: () => drawMon(m, t) })), { y: p.y, d: () => drawPlayer(p, t) }];
@@ -150,14 +181,17 @@ function drawWorld(w, t) {
   for (const a of w.allies) { const f = Math.floor(t * 10) % 2, X = Math.round(a.x), Y = Math.round(a.y); x.fillStyle = '#3a2a1a'; x.fillRect(X - 5, Y - 2, 10, 4); x.fillStyle = '#8a5a2a'; x.fillRect(X - 4, Y - 1, 8, 2); x.fillStyle = '#5a3a1a'; x.fillRect(X - 9, Y - (f ? 4 : 0), 5, 2); x.fillRect(X + 4, Y - (f ? 4 : 0), 5, 2); x.fillStyle = '#ffd040'; x.fillRect(X + 3, Y - 2, 2, 1); }
   for (const b of w.bombs) { const k = b.t / b.T, z = Math.sin(k * Math.PI) * 26; x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y) + 6, 6, 2); x.fillStyle = '#1c2a3a'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y - z) - 4, 7, 8); x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(b.x) - 2, Math.round(b.y - z) - 1, 5, 4); x.fillStyle = '#e8e8e8'; x.fillRect(Math.round(b.x) - 1, Math.round(b.y - z) - 6, 3, 3); }
   for (const r of fx.rings) { x.globalAlpha = r.t / 0.35; x.strokeStyle = r.c; x.lineWidth = 2; const k = 1.15 - r.t; x.beginPath(); x.ellipse(r.x, r.y, r.r * k, r.r * 0.55 * k, 0, 0, 7); x.stroke(); } x.globalAlpha = 1;
-  for (const s of w.shots) { x.fillStyle = '#fff2a0'; x.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4); }
+  const SHOT = { shotgun: '#ffe08a', hammer: '#d8d8d8', smg: '#9ae05a', sprayer: '#b8f040', beam: '#9ad8ff', medpistol: '#ff9a9a' };
+  for (const s of w.shots) { x.fillStyle = SHOT[s.weapon] || '#fff2a0'; x.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4); }
+  for (const z of fx.zaps || []) { x.strokeStyle = '#bfefff'; x.lineWidth = 2; x.beginPath(); x.moveTo(z.x1, z.y1); x.lineTo((z.x1 + z.x2) / 2 + 4, (z.y1 + z.y2) / 2 - 5); x.lineTo(z.x2, z.y2); x.stroke(); }
   for (const e of w.eshots) { x.fillStyle = '#2a0c10'; x.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 3, 7, 7); x.fillStyle = '#ff6a5a'; x.fillRect(Math.round(e.x) - 2, Math.round(e.y) - 2, 5, 5); }
   for (const f of fx.flashes) { x.save(); x.translate(f.x, f.y); x.rotate(f.a); x.fillStyle = '#ffd040'; x.beginPath(); x.moveTo(0, -4); x.lineTo(10, 0); x.lineTo(0, 4); x.fill(); x.restore(); }
   for (const q of fx.parts) { x.fillStyle = q.c; x.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); }
   x.textAlign = 'center'; x.font = 'bold 10px sans-serif'; x.lineWidth = 3;
-  for (const n of fx.nums) { const up = (0.7 - n.t) * 24; x.strokeStyle = '#000'; x.strokeText(n.v, n.x, n.y - up); x.fillStyle = n.red ? '#ff5a4a' : n.blue ? '#8ad0ff' : n.green ? '#7ae08a' : '#fff'; x.fillText(n.v, n.x, n.y - up); }
+  for (const n of fx.nums) { const up = (0.7 - n.t) * 24; x.strokeStyle = '#000'; x.strokeText(n.v, n.x, n.y - up); x.fillStyle = n.red ? '#ff5a4a' : n.blue ? '#8ad0ff' : n.green ? '#7ae08a' : n.gold ? '#ffd060' : '#fff'; x.fillText(n.v, n.x, n.y - up); }
   x.restore();
   if (w.hazardOffT > 0 || fx.skillFlash > 0) { x.fillStyle = w.hazardOffT > 0 ? 'rgba(170,220,255,.10)' : `rgba(255,255,255,${fx.skillFlash * 0.4})`; x.fillRect(0, 0, VIEW_W, VIEW_H); }
+  drawWeaponHud(w);
   drawSkillHud(w);
   drawMinimap(w);
 }
@@ -179,10 +213,31 @@ const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0'
 async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
 function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; }
 function jobSelect() {
-  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 마우스 오른쪽(또는 K)으로 직업 스킬, 왼쪽 Shift로 달린다. 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
-    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>우클릭: ${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
+  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 마우스 오른쪽(또는 K)으로 직업 스킬, Shift로 구르기(구르는 동안 공격을 피함), Q로 무기 바꾸기, E로 무기 줍기(무기는 2개까지). 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
+    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>${WEAPONS[JOBS[j].weapon].traitText}<br>우클릭: ${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
   for (const c of document.querySelectorAll('[data-c]')) { const g = c.getContext('2d'), im = A.chars[+c.dataset.c][0]; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); }
   for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j }); transfer(); };
+}
+const matText = m => Object.entries(m).filter(([, v]) => v > 0).map(([k, v]) => `${MATS[k]} ${v}`).join(', ') || '없음';
+function abilityPick() {
+  const r = game.run, offer = offerAbilities(r), KIND = { gun: '🔫 총', body: '💪 몸', skill: '✨ 스킬' };
+  if (!offer.length) return workshop();
+  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지났다. ⏱ ${clock(Math.floor(r.ticks / 30))} · 하나를 골라 가져간다.</p>
+    <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(id => { const a = ABILITIES[id]; return `<button class="job" data-a="${id}" style="text-align:left"><small style="color:var(--acc)">${KIND[a.kind]}</small><br><b>${a.name}</b><br><small style="color:var(--sub)">${a.text}</small></button>`; }).join('')}</div>
+    ${r.abilities.length ? `<p style="margin-top:10px">가진 특수능력: ${r.abilities.map(id => ABILITIES[id].name).join(', ')}</p>` : ''}`);
+  for (const b of document.querySelectorAll('[data-a]')) b.onclick = () => { applyAbility(r, b.dataset.a); workshop(); };
+}
+function workshop(msg = '') {
+  const r = game.run, slots = ['head', 'body', 'feet'], SL = { head: '머리', body: '몸', feet: '발' };
+  menu(`<h1>🔧 정비소</h1><p>부품 <b>${r.parts}</b> · 재료: ${matText(r.mats)} · 장비: ${slots.map(sl => `${SL[sl]} ${r.gear[sl] ? GEAR[r.gear[sl]].name : '없음'}`).join(' · ')}</p>${msg ? `<p style="color:var(--acc)">${msg}</p>` : ''}
+    <h2 style="font-size:16px;margin:10px 0 4px">무기 강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = ENHANCE_COST(it.lv), ok = it.lv < MAX_LV && r.parts >= c;
+      return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} +${it.lv}</b><br><small style="color:var(--sub)">${W.traitText}<br>${it.lv >= MAX_LV ? '최고 단계' : `+${it.lv + 1}로: 피해 +20%, 연사 +5% · 부품 ${c}`}</small></button>`; }).join('')}</div>
+    <h2 style="font-size:16px;margin:12px 0 4px">장비 만들기(재료)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${Object.entries(GEAR).map(([id, g]) => { const ok = canCraft(r, id);
+      return `<button class="job" data-g="${id}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${g.name}</b> <small>(${SL[g.slot]})</small>${r.gear[g.slot] === id ? ' ✔' : ''}<br><small style="color:var(--sub)">${g.text}<br>재료: ${matText(g.recipe)}</small></button>`; }).join('')}</div>
+    <div style="margin-top:14px"><button class="job" id="next" style="background:var(--acc);color:#1a1410;font-weight:800">다음 호선 고르기 →</button></div>`);
+  for (const b of document.querySelectorAll('[data-e]')) b.onclick = () => workshop(enhanceWeapon(r, +b.dataset.e) ? `${josa(WEAPONS[r.weapons[+b.dataset.e].id].name, '을', '를')} +${r.weapons[+b.dataset.e].lv}로 강화했다` : '부품이 모자라거나 최고 단계다');
+  for (const b of document.querySelectorAll('[data-g]')) b.onclick = () => workshop(craftGear(r, b.dataset.g) ? `${josa(GEAR[b.dataset.g].name, '을', '를')} 만들어 입었다` : '재료가 모자란다');
+  $('next').onclick = transfer;
 }
 function transfer() {
   const r = game.run, offer = offerLines(r, game.open), first = r.visited.length === 0;
@@ -202,7 +257,7 @@ function endLine(w) {
   const time = clock(Math.floor(r.ticks / 30));
   if (r.dead) return menu(`<h1>💀 쓰러졌다</h1><p>${w.line}호선 ${LINES[w.line].name}에서 쓰러졌다. 지난 호선 ${r.visited.length}개 · ⏱ ${time}</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
   if (r.escaped) return menu(`<h1>🎉 탈출 성공!</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지나 지상 출구로 나왔다.</p><p style="font-size:22px;color:var(--ink)">⏱ 걸린 시간 <b>${time}</b></p><p>지상 출구의 최종 보스 「폭주하는 막차」는 다음 단계에서 만든다.</p><button class="job" id="again">처음부터</button>`), ($('again').onclick = jobSelect);
-  transfer();
+  abilityPick();
 }
 
 let last = performance.now();

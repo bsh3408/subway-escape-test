@@ -8,14 +8,14 @@ export const JOBS = {
   medic:     { name: '응급 구조사', hp: 6, shield: 3, energy: 180, weapon: 'medpistol', sprite: 5, skill: { id: 'firstaid', name: '응급 처치', cd: 18 } },
 };
 export const JOB_ORDER = ['driver', 'geologist', 'ecologist', 'chemist', 'meteo', 'medic'];
-// 무기: rate 초당 발사, count 한 번에 나가는 탄, spread 퍼짐(라디안), speed 픽셀/초, range 픽셀, energy 한 발 에너지
+// 무기: trait 직업 특색(knock 강한 넉백, pierce 관통, slow 느리게, acid 산성 웅덩이, chain 연쇄, heal 처치 시 회복), rate 초당 발사, count 한 번에 나가는 탄, spread 퍼짐(라디안), speed 픽셀/초, range 픽셀, energy 한 발 에너지
 export const WEAPONS = {
-  shotgun:   { name: '쌍열 산탄총', sprite: 0, dmg: 3, rate: 2.5, count: 5, spread: 0.5, speed: 420, range: 180, energy: 2, kick: 1 },
-  hammer:    { name: '망치 권총', sprite: 1, dmg: 5, rate: 4, count: 1, spread: 0.04, speed: 480, range: 300, energy: 1, kick: 0.6 },
-  smg:       { name: '기관단총', sprite: 2, dmg: 2, rate: 9, count: 1, spread: 0.15, speed: 520, range: 260, energy: 1, kick: 0.35 },
-  sprayer:   { name: '액체 분사기', sprite: 3, dmg: 2, rate: 6, count: 2, spread: 0.25, speed: 360, range: 160, energy: 1, kick: 0.4 },
-  beam:      { name: '손전등 광선총', sprite: 4, dmg: 4, rate: 5, count: 1, spread: 0, speed: 700, range: 340, energy: 1, kick: 0.5 },
-  medpistol: { name: '구급 권총', sprite: 5, dmg: 4, rate: 4.5, count: 1, spread: 0.05, speed: 480, range: 280, energy: 0, kick: 0.5 },
+  shotgun:   { name: '쌍열 산탄총', trait: 'knock', traitText: '가까이서 맞으면 멀리 밀려남', sprite: 0, dmg: 3, rate: 2.5, count: 5, spread: 0.5, speed: 420, range: 180, energy: 2, kick: 1 },
+  hammer:    { name: '망치 권총', trait: 'pierce', traitText: '탄이 적을 하나 더 뚫음(암석 시추)', sprite: 1, dmg: 5, rate: 4, count: 1, spread: 0.04, speed: 480, range: 300, energy: 1, kick: 0.6 },
+  smg:       { name: '씨앗 기관단총', trait: 'slow', traitText: '맞은 적을 덩굴로 느리게', sprite: 2, dmg: 2, rate: 9, count: 1, spread: 0.15, speed: 520, range: 260, energy: 1, kick: 0.35 },
+  sprayer:   { name: '산성 분사기', trait: 'acid', traitText: '맞은 자리에 산성 웅덩이(적에게 피해)', sprite: 3, dmg: 2, rate: 6, count: 2, spread: 0.25, speed: 360, range: 160, energy: 1, kick: 0.4 },
+  beam:      { name: '번개 광선총', trait: 'chain', traitText: '맞은 적 옆으로 번개가 한 번 더 튐', sprite: 4, dmg: 4, rate: 5, count: 1, spread: 0, speed: 700, range: 340, energy: 1, kick: 0.5 },
+  medpistol: { name: '구급 권총', trait: 'heal', traitText: '적을 쓰러뜨리면 가끔 체력 1 회복, 에너지 안 씀', sprite: 5, dmg: 4, rate: 4.5, count: 1, spread: 0.05, speed: 480, range: 280, energy: 0, kick: 0.5 },
 };
 // cy: 발밑에서 몸 가운데까지 높이(총알이 맞는 곳)
 // 구역 1 몬스터: 근접(삼엽충, 고생대 표준화석), 돌진(암모나이트, 중생대 표준화석), 원거리(내성균 덩어리), 보스(화석 짜깁기 공룡)
@@ -39,3 +39,5 @@ export const LINES = {
   8: { name: '정전 발전소선', color: '#E6186C', unit: '태양 에너지, 발전, 효율', hazard: '정전' },
   9: { name: '관제 센터선', color: '#BDB092', unit: '감염병, 빅데이터·AI', hazard: '감염병·데이터 교란' },
 };
+// 장비 재료(아이템 방·상자·적에게서 나옴)
+export const MATS = { cloth: '천', rubber: '고무', glass: '유리', filter: '필터', scrap: '고철', leather: '가죽' };

@@ -1,22 +1,45 @@
-// 역 하나의 진행(30Hz 고정 틱): 걷기·벽 충돌, 방 들어가면 문 잠김·적 등장, 다 잡으면 문 열림, 자동 조준 사격, 출구로 다음 역
+// 호선 하나의 진행(30Hz 고정 틱): 걷기·구르기·벽 충돌, 방 들어가면 문 잠김·적 등장, 다 잡으면 문 열림,
+// 자동 조준 사격(무기 2개 교체·줍기·강화·직업 특색), 상자·지형지물, 보스 패턴, 직업 스킬, 보스 포털로 다음 환승역
 // 상태는 모두 평범한 데이터이고, 난수는 정수 w.rng로만 이어진다
 import { createRng } from './rng.js';
 import { generateFloor, isSolid, T } from './dungeon.js';
 import { INPUT, TILE, DT, TICK_HZ } from './constants.js';
-import { JOBS, WEAPONS, MONSTERS, WAVES } from './data.js';
-import { difficulty } from './run.js';
+import { JOBS, WEAPONS, MONSTERS, WAVES, MATS } from './data.js';
+import { difficulty, GEAR } from './run.js';
 
-const DASH_SPEED = 420, PLAYER_SPEED = 120, RUN_MUL = 1.4, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300;
+const DASH_SPEED = 420, PLAYER_SPEED = 140, ROLL_SPEED = 330, ROLL_T = 8, ROLL_CD = 24, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300, PICK_R = 14;
+const MAT_IDS = Object.keys(MATS);
 
-export function createWorld({ seed, job, line, order }) {
-  const floor = generateFloor(seed, { line, order }), J = JOBS[job], s = floor.rooms[0];
+// 특수능력을 무기·몸·스킬 수치로 바꾼다
+function modsOf(ab) {
+  const has = id => ab.includes(id);
+  return { extraShot: has('extraShot') ? 1 : 0, pierce: has('pierceUp') ? 1 : 0, bounce: has('bounce') ? 1 : 0, homing: has('homing'), boom: has('boom'),
+    rateMul: has('rapid') ? 1.25 : 1, dmgMul: has('bigShot') ? 1.3 : 1, speedMul: has('swift') ? 1.12 : 1, rollCdMul: has('rollMaster') ? 0.5 : 1,
+    scavenger: has('scavenger'), skillCdMul: has('skillCd') ? 0.7 : 1, skillPower: has('skillPower') ? 1.5 : 1, skillCharge: has('skillCharge') };
+}
+
+export function createWorld({ seed, job, line, order, loadout }) {
+  const floor = generateFloor(seed, { line, order }), J = JOBS[job], s = floor.rooms[0], rng = createRng(seed).fork('props');
+  const L = { weapons: [{ id: J.weapon, lv: 0 }], cur: 0, gear: { head: null, body: null, feet: null }, abilities: [],
+    stats: { hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy }, ...(loadout || {}) };   // 넘겨받지 않은 항목은 직업 기본값
+  const bonusShield = Object.values(L.gear).reduce((a, g) => a + (g && GEAR[g].shield || 0), 0);
+  // 상자: 전투·엘리트 방마다 2~3개, 부수면 부품·재료가 나온다
+  const props = [];
+  for (const r of floor.rooms) if (r.type === 'battle' || r.type === 'elite') for (let i = 0, n = 2 + rng.int(2); i < n; i++) {
+    for (let k = 0; k < 30; k++) {
+      const tx = r.x0 + 1 + rng.int(r.w - 2), ty = r.y0 + 1 + rng.int(r.h - 2);
+      if (Math.abs(tx - r.cx) < 3 || Math.abs(ty - r.cy) < 3 || isSolid(floor, tx, ty) || props.some(o => Math.hypot(o.x - (tx + 0.5) * TILE, o.y - (ty + 0.5) * TILE) < 30)) continue;
+      props.push({ kind: 'crate', room: r.id, x: (tx + 0.5) * TILE, y: (ty + 0.7) * TILE, hp: 6, r: 8 }); break;
+    }
+  }
   return {
-    line, order, diff: difficulty(order), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
+    line, order, diff: difficulty(order), mods: modsOf(L.abilities), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
-    player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false, running: false,
-      hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy, weapon: J.weapon,
-      cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
-    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], scanT: 0, hazardOffT: 0,
+    player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
+      ...L.stats, maxShield: L.stats.maxShield + bonusShield, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
+      cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, swapHeld: false, itemHeld: false, rollHeld: false,
+      rollT: 0, rollCd: 0, rollA: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
+    mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {} }, scanT: 0, hazardOffT: 0,
   };
 }
 
@@ -26,27 +49,37 @@ export function roomOf(w, x, y) {
   return r ? r.id : -1;
 }
 const solidAt = (w, px, py) => isSolid(w.floor, Math.floor(px / TILE), Math.floor(py / TILE), w.locked);
-// 발밑 네모(가로 ±5, 세로 -4~+1)가 벽에 닿으면 그 축으로는 움직이지 않는다
-function blocked(w, x, y, hw = 5) { return solidAt(w, x - hw, y - 4) || solidAt(w, x + hw, y - 4) || solidAt(w, x - hw, y + 1) || solidAt(w, x + hw, y + 1); }
+// 발밑 네모(가로 ±5, 세로 -4~+1)가 벽에 닿으면 그 축으로는 움직이지 않는다. 상자도 몸을 막는다
+function blocked(w, x, y, hw = 5) {
+  if (solidAt(w, x - hw, y - 4) || solidAt(w, x + hw, y - 4) || solidAt(w, x - hw, y + 1) || solidAt(w, x + hw, y + 1)) return true;
+  for (const o of w.props) if (Math.abs(o.x - x) < o.r + hw && Math.abs(o.y - y) < 6) return true;
+  return false;
+}
 function moveBody(w, o, dx, dy, hw) {
   if (dx && !blocked(w, o.x + dx, o.y, hw)) o.x += dx;
   if (dy && !blocked(w, o.x, o.y + dy, hw)) o.y += dy;
 }
 
+// ---------- 이동·구르기(왼쪽 Shift) ----------
 function movePlayer(w, input) {
   const p = w.player;
   let mx = (input & INPUT.RIGHT ? 1 : 0) - (input & INPUT.LEFT ? 1 : 0), my = (input & INPUT.DOWN ? 1 : 0) - (input & INPUT.UP ? 1 : 0);
   const l = Math.hypot(mx, my); if (l > 1) { mx /= l; my /= l; }
-  p.moving = l > 0; p.running = p.moving && !!(input & INPUT.RUN);
+  p.moving = l > 0;
   if (p.moving) p.lastDir = Math.atan2(my, mx);
+  if (p.rollCd > 0) p.rollCd--;
+  if (input & INPUT.RUN) { if (!p.rollHeld && p.rollCd <= 0 && p.rollT <= 0 && p.dashT <= 0) {
+    p.rollT = ROLL_T; p.rollCd = Math.round(ROLL_CD * w.mods.rollCdMul) + ROLL_T; p.rollA = p.moving ? p.lastDir : p.aim; p.invuln = Math.max(p.invuln, ROLL_T + 2); w.events.push({ type: 'roll' }); }
+    p.rollHeld = true; } else p.rollHeld = false;
   if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
     const x0 = p.x, y0 = p.y, d = DASH_SPEED * DT; moveBody(w, p, Math.cos(p.dashA) * d, Math.sin(p.dashA) * d, 5); p.dashDist += Math.hypot(p.x - x0, p.y - y0); return;
   }
-  const sp = PLAYER_SPEED * (p.running ? RUN_MUL : 1) * DT;
+  if (p.rollT > 0) { p.rollT--; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
+  const sp = PLAYER_SPEED * w.mods.speedMul * DT;
   moveBody(w, p, mx * sp, my * sp, 5);
 }
 
-// 방에 처음 들어오면(바닥 안쪽으로 한 칸 이상) 문을 잠그고 첫 물결을 부른다
+// ---------- 방: 잠금·물결·보급 상자·포털 ----------
 function updateRooms(w, rng) {
   const p = w.player, id = roomOf(w, p.x, p.y);
   if (id >= 0) {
@@ -54,14 +87,17 @@ function updateRooms(w, rng) {
     if (!st.visited) { st.visited = true; for (const l of w.floor.links) if (l.includes(id)) w.rooms[l[0] === id ? l[1] : l[0]].seen = true; }
     const tx = p.x / TILE, ty = p.y / TILE, inside = tx > r.x0 + 1 && tx < r.x0 + r.w - 1 && ty > r.y0 + 1 && ty < r.y0 + r.h - 1;
     if (inside && !st.cleared && !st.locked) { st.locked = true; w.locked.push(id); w.events.push({ type: 'lock', room: id }); spawnWave(w, rng, id); }
-    if (r.type === 'chest' && !st.opened && Math.hypot(p.x - (r.cx + 0.5) * TILE, p.y - (r.cy + 0.5) * TILE) < 18) {
-      st.opened = true; p.hp = Math.min(p.maxHp, p.hp + 2); p.energy = Math.min(p.maxEnergy, p.energy + 60); w.events.push({ type: 'chest', room: id });
+    const cx = (r.cx + 0.5) * TILE, cy = (r.cy + 0.5) * TILE;
+    // 보급 상자 방: 재료 2개와 부품, 절반 확률로 무기 하나
+    if (r.type === 'chest' && !st.opened && Math.hypot(p.x - cx, p.y - cy) < 18) {
+      st.opened = true; w.events.push({ type: 'chest', room: id });
+      for (let i = 0; i < 2; i++) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: cx - 18 + i * 36, y: cy + 16 });
+      w.pickups.push({ kind: 'parts', n: 2, x: cx, y: cy + 22 });
+      if (rng.chance(0.5)) { const pool = Object.keys(WEAPONS).filter(k => !p.weapons.some(x => x.id === k)); w.pickups.push({ kind: 'weapon', id: rng.pick(pool), lv: 0, x: cx, y: cy - 20 }); }
     }
-    const portal = r.type === 'boss' && st.cleared;   // 호선 보스를 잡으면 다음 환승역으로 가는 포털
-    if (portal && Math.hypot(p.x - (r.cx + 0.5) * TILE, p.y - (r.cy + 0.5) * TILE) < 20) w.done = 'next';
+    if (r.type === 'boss' && st.cleared && Math.hypot(p.x - cx, p.y - cy) < 20) w.done = 'next';   // 호선 보스를 잡으면 다음 환승역으로 가는 포털
   }
-  // 잠긴 방: 적을 다 잡으면 다음 물결, 마지막 물결이면 문을 연다
-  for (const rid of [...w.locked]) {
+  for (const rid of [...w.locked]) {   // 잠긴 방: 적을 다 잡으면 다음 물결, 마지막 물결이면 문을 연다
     if (w.mons.some(m => m.room === rid)) continue;
     const st = w.rooms[rid], waves = WAVES[w.floor.rooms[rid].type];
     if (st.wave < waves.length) { spawnWave(w, rng, rid); continue; }
@@ -71,43 +107,64 @@ function updateRooms(w, rng) {
   }
 }
 
+function addMon(w, rid, id, x, y, rng) {
+  const M = MONSTERS[id], hp = Math.round(M.hp * w.diff.hpMul);
+  w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, stun: 0, slowT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0, pattern: 0, pat: '' });
+}
 function spawnWave(w, rng, rid) {
   const r = w.floor.rooms[rid], st = w.rooms[rid], wave = WAVES[r.type][st.wave++], p = w.player;
   for (const [id, count] of wave) for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {
     let x, y, k = 0;
-    do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 30 && Math.hypot(x - p.x, y - p.y) < 90);
+    do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 40 && (Math.hypot(x - p.x, y - p.y) < 90 || solidAt(w, x, y)));
     if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
-    const M = MONSTERS[id];
-    const hp = Math.round(M.hp * w.diff.hpMul);
-    w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, stun: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0 });
+    addMon(w, rid, id, x, y, rng);
   }
   w.events.push({ type: 'wave', room: rid, index: st.wave });
 }
 
-function nearestMon(w, range) {
-  const p = w.player; let best = null, bd = range;
-  for (const m of w.mons) { const d = Math.hypot(m.x - p.x, m.y - p.y); if (d < bd) { bd = d; best = m; } }
-  return best;
+function nearestTo(w, x, y, range, skip) { let best = null, bd = range; for (const m of w.mons) { if (m === skip) continue; const d = Math.hypot(m.x - x, m.y - y); if (d < bd) { bd = d; best = m; } } return best; }
+
+// ---------- 무기: 강화 단계와 특수능력을 얹은 수치 ----------
+export function weaponStat(w, slot) {
+  const it = w.player.weapons[slot], W = WEAPONS[it.id], M = w.mods;
+  return { ...W, dmg: W.dmg * (1 + 0.2 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.05 * it.lv) * M.rateMul, count: W.count + M.extraShot, spread: W.spread + (M.extraShot ? 0.12 : 0) };
 }
 
 function updatePlayer(w, input, rng) {
-  const p = w.player, W = WEAPONS[p.weapon];
+  const p = w.player;
   if (p.cool > 0) p.cool--; if (p.invuln > 0) p.invuln--; p.kick = Math.max(0, p.kick - DT * 7);
-  const t = nearestMon(w, AIM_RANGE);
+  // 무기 바꾸기(Q)·줍기(E)
+  if (input & INPUT.SWAP) { if (!p.swapHeld && p.weapons.length > 1) { p.cur = (p.cur + 1) % p.weapons.length; w.events.push({ type: 'swap' }); } p.swapHeld = true; } else p.swapHeld = false;
+  if (input & INPUT.ITEM) { if (!p.itemHeld) pickWeapon(w); p.itemHeld = true; } else p.itemHeld = false;
+  const st = weaponStat(w, p.cur), t = nearestTo(w, p.x, p.y, AIM_RANGE);
   p.aim = t ? Math.atan2(t.y - MONSTERS[t.id].cy - (p.y - 10), t.x - p.x) : p.lastDir;
   p.face = Math.cos(p.aim) >= 0 ? 1 : -1;
-  if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= W.energy) {
-    p.cool = Math.max(1, Math.round(TICK_HZ / W.rate)); p.energy -= W.energy; p.kick = W.kick;
+  if ((input & INPUT.ATTACK) && p.cool <= 0 && p.energy >= st.energy && p.rollT <= 0) {
+    p.cool = Math.max(1, Math.round(TICK_HZ / st.rate)); p.energy -= st.energy; p.kick = st.kick;
     const mx = p.x + Math.cos(p.aim) * 12, my = p.y - 10 + Math.sin(p.aim) * 12;
-    for (let i = 0; i < W.count; i++) {
-      const a = p.aim + (W.count > 1 ? (i / (W.count - 1) - 0.5) * W.spread : (rng.next() - 0.5) * W.spread);
-      w.shots.push({ x: mx, y: my, vx: Math.cos(a) * W.speed, vy: Math.sin(a) * W.speed, life: Math.round(W.range / W.speed * TICK_HZ), dmg: W.dmg, weapon: p.weapon });
+    for (let i = 0; i < st.count; i++) {
+      const a = p.aim + (st.count > 1 ? (i / (st.count - 1) - 0.5) * st.spread : (rng.next() - 0.5) * st.spread);
+      w.shots.push({ x: mx, y: my, vx: Math.cos(a) * st.speed, vy: Math.sin(a) * st.speed, life: Math.round(st.range / st.speed * TICK_HZ), dmg: st.dmg, weapon: st.id || p.weapons[p.cur].id,
+        trait: st.trait, pierce: (st.trait === 'pierce' ? 2 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
     }
-    w.events.push({ type: 'fire', weapon: p.weapon });
+    w.events.push({ type: 'fire', weapon: p.weapons[p.cur].id });
   }
-  if (!(input & INPUT.ATTACK) || W.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * DT);
+  if (!(input & INPUT.ATTACK) || st.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * DT);
   p.sinceHit++;
-  if (!p.running && p.sinceHit > REGEN_WAIT && p.shield < p.maxShield && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }
+  if (p.sinceHit > REGEN_WAIT && p.shield < p.maxShield && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }
+  // 재료·부품은 밟으면 줍는다
+  for (const k of w.pickups) if (k.kind !== 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < PICK_R) {
+    k.taken = true; if (k.kind === 'mat') w.loot.mats[k.id] = (w.loot.mats[k.id] || 0) + 1; else w.loot.parts += k.n; w.events.push({ type: 'pickup', kind: k.kind, id: k.id, n: k.n });
+  }
+  w.pickups = w.pickups.filter(k => !k.taken);
+}
+// 무기 줍기: 빈칸이 있으면 넣고, 2개를 들고 있으면 손에 든 무기와 바꿔 바닥에 내려놓는다
+function pickWeapon(w) {
+  const p = w.player, k = w.pickups.find(k => k.kind === 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < 22); if (!k) return;
+  w.pickups = w.pickups.filter(o => o !== k);
+  if (p.weapons.length < 2) { p.weapons.push({ id: k.id, lv: k.lv }); }
+  else { const old = p.weapons[p.cur]; p.weapons[p.cur] = { id: k.id, lv: k.lv }; w.pickups.push({ kind: 'weapon', id: old.id, lv: old.lv, x: p.x + 10, y: p.y + 6 }); }
+  w.events.push({ type: 'getWeapon', id: k.id });
 }
 
 export function hurtPlayer(w, amount) {
@@ -117,17 +174,39 @@ export function hurtPlayer(w, amount) {
   if (p.hp <= 0) { w.done = 'dead'; w.events.push({ type: 'dead' }); }
 }
 
-function updateShots(w) {
+function hitMon(w, m, dmg, kx = 0, ky = 0) { dmg = Math.round(dmg * 10) / 10; m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: Math.round(dmg), x: m.x, y: m.y }); }
+
+function breakProp(w, o, rng) {
+  o.hp = 0; w.events.push({ type: 'propBreak', x: o.x, y: o.y });
+  w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
+  if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
+}
+
+function updateShots(w, rng) {
   for (const s of w.shots) {
+    if (w.mods.homing) { const t = nearestTo(w, s.x, s.y, 150); if (t) { const want = Math.atan2(t.y - MONSTERS[t.id].cy - s.y, t.x - s.x), cur = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy);
+      let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const a = cur + Math.max(-0.12, Math.min(0.12, d)); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; } }
     s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
-    if (solidAt(w, s.x, s.y)) { s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
-    for (const m of w.mons) if (Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
-      const dmg = Math.round(s.dmg * (w.scanT > 0 ? 1.3 : 1));   // 지층 판독: 약점이 드러나 피해 +30%
-      m.hp -= dmg; m.flash = 3; const k = MONSTERS[m.id].kind === 'boss' ? 0.1 : 1; m.kx += s.vx * 0.01 * k; m.ky += s.vy * 0.01 * k;
-      w.events.push({ type: 'hit', uid: m.uid, amount: dmg, x: m.x, y: m.y }); s.life = 0; break;
+    if (solidAt(w, s.x, s.y)) {
+      if (s.bounce > 0) { s.bounce--; s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(w, s.x + s.vx * DT, s.y)) s.vx = -s.vx; else s.vy = -s.vy; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
+      s.life = 0; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue;
+    }
+    for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg; if (o.hp <= 0) breakProp(w, o, rng); s.life = 0; break; }
+    if (s.life <= 0) continue;
+    for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
+      s.hit.push(m.uid);
+      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1), boss = MONSTERS[m.id].kind === 'boss', k = (boss ? 0.1 : 1) * (s.trait === 'knock' ? 3 : 1);   // 지층 판독: 약점이 드러나 피해 +30%
+      hitMon(w, m, dmg, s.vx * 0.01 * k, s.vy * 0.01 * k);
+      if (s.trait === 'slow') m.slowT = 1.2;   // 씨앗탄: 덩굴이 감아 느려짐
+      if (s.trait === 'acid' && !w.zones.some(z => z.kind === 'acid' && Math.hypot(z.x - m.x, z.y - m.y) < 14)) w.zones.push({ kind: 'acid', x: m.x, y: m.y, r: 16, t: 2 * TICK_HZ, acc: 0 });
+      if (s.trait === 'chain') { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } }
+      if (s.trait === 'heal' && m.hp <= 0 && rng.chance(0.2)) { w.player.hp = Math.min(w.player.maxHp, w.player.hp + 1); w.events.push({ type: 'heal' }); }
+      if (w.mods.boom) { w.events.push({ type: 'splash', x: m.x, y: m.y, r: 26 }); for (const o of w.mons) if (o !== m && Math.hypot(o.x - m.x, o.y - m.y) < 26 + o.r) hitMon(w, o, dmg * 0.4); }
+      if (!(--s.pierce > 0)) { s.life = 0; break; }
     }
   }
   w.shots = w.shots.filter(s => s.life > 0);
+  w.props = w.props.filter(o => o.hp > 0);
   for (const e of w.eshots) {
     e.x += e.vx * DT; e.y += e.vy * DT; e.life--;
     if (solidAt(w, e.x, e.y)) e.life = 0;
@@ -138,24 +217,34 @@ function updateShots(w) {
 
 function enemyShot(w, m, a, sp, dmg) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg }); }
 
+// ---------- 보스 패턴: 원형 탄막, 부채꼴 조준 사격, 돌진, 화석 소환을 돌아가며(체력 절반 아래면 더 세게) ----------
+const BOSS_PATTERNS = ['ring', 'fan', 'charge', 'summon'];
+function bossAct(w, m, rng) {
+  const p = w.player, M = MONSTERS[m.id], a = Math.atan2(p.y - m.y, p.x - m.x), rage = m.hp < m.maxHp / 2;
+  m.pat = BOSS_PATTERNS[m.pattern++ % BOSS_PATTERNS.length]; w.events.push({ type: 'pattern', name: m.pat, uid: m.uid });
+  if (m.pat === 'ring') { const n = rage ? 16 : 11; for (let i = 0; i < n; i++) enemyShot(w, m, a + i / n * Math.PI * 2, M.shotSpeed, 1); }
+  if (m.pat === 'fan') { const n = rage ? 7 : 5; for (let i = 0; i < n; i++) enemyShot(w, m, a + (i / (n - 1) - 0.5) * 0.9, M.shotSpeed * 1.4, 1); }
+  if (m.pat === 'charge') { m.dash = 0.7; m.dashA = a; }
+  if (m.pat === 'summon') for (let i = 0; i < (rage ? 3 : 2); i++) addMon(w, m.room, i % 2 ? 'ammonite' : 'trilobite', m.x + (i - 1) * 30, m.y + 30, rng);
+}
+
 function updateMons(w, rng) {
   const p = w.player;
   for (const m of w.mons) {
     const M = MONSTERS[m.id], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy) || 1;
-    m.t += DT; if (m.flash > 0) m.flash--;
+    m.t += DT; if (m.flash > 0) m.flash--; if (m.slowT > 0) m.slowT -= DT;
     if (m.stun > 0) { m.stun -= DT; continue; }   // 얼거나 기절하면 움직이지도 공격하지도 못한다
     m.cd -= DT; m.touch -= DT;
-    let vx = dx / d, vy = dy / d, sp = m.speed;
-    if (M.kind === 'ranged' || M.kind === 'boss') {
-      if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) {
-        const a = Math.atan2(dy, dx);
-        if (M.kind === 'boss') { const n = m.hp < m.maxHp / 2 ? 14 : 10; for (let i = 0; i < n; i++) enemyShot(w, m, a + i / n * Math.PI * 2, M.shotSpeed, 1); }
-        else enemyShot(w, m, a, M.shotSpeed, M.atk);
-        m.cd = M.kind === 'boss' ? 1.6 : 2.2; } }
-      else { if (M.kind === 'ranged' && d < M.range * 0.6) { vx = -vx; vy = -vy; } else if (M.kind === 'ranged' && d < M.range) sp = 0;
+    let vx = dx / d, vy = dy / d, sp = m.speed * (m.slowT > 0 ? 0.5 : 1);
+    if (M.kind === 'boss') {
+      if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = 240; }
+      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { bossAct(w, m, rng); m.cd = m.hp < m.maxHp / 2 ? 1.3 : 1.8; } }
+      else if (m.cd <= 0 && d < 340) { m.windT = 0.55; w.events.push({ type: 'aim', uid: m.uid }); }
+    } else if (M.kind === 'ranged') {
+      if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { enemyShot(w, m, Math.atan2(dy, dx), M.shotSpeed, M.atk); m.cd = 2.2; } }
+      else { if (d < M.range * 0.6) { vx = -vx; vy = -vy; } else if (d < M.range) sp = 0;
         if (m.cd <= 0 && d < 320) { m.windT = 0.45; w.events.push({ type: 'aim', uid: m.uid }); } }
-    }
-    if (M.kind === 'roller') {   // 암모나이트: 웅크렸다가(예고) 정한 방향으로 빠르게 굴러온다
+    } else if (M.kind === 'roller') {   // 암모나이트: 웅크렸다가(예고) 정한 방향으로 빠르게 굴러온다
       if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = M.dashSpeed; }
       else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { m.dash = 0.6; m.cd = 2; } }
       else if (m.cd <= 0 && d < 220) { m.windT = 0.45; m.dashA = Math.atan2(dy, dx); w.events.push({ type: 'aim', uid: m.uid }); }
@@ -165,24 +254,29 @@ function updateMons(w, rng) {
     if (Math.abs(dx) > 2) m.face = dx > 0 ? 1 : -1;
     if (d < 14 + m.r * 0.6 && m.touch <= 0 && M.kind !== 'ranged') { m.touch = 1; hurtPlayer(w, M.atk); }
   }
-  for (const m of w.mons) if (m.hp <= 0) w.events.push({ type: 'kill', uid: m.uid, id: m.id, x: m.x, y: m.y });
+  for (const m of w.mons) if (m.hp <= 0) {
+    w.events.push({ type: 'kill', uid: m.uid, id: m.id, x: m.x, y: m.y });
+    const boss = MONSTERS[m.id].kind === 'boss';
+    if (boss) w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y });
+    else if (rng.chance(w.mods.scavenger ? 0.55 : 0.35)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
+    if (w.mods.scavenger) w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 6);
+  }
   w.mons = w.mons.filter(m => m.hp > 0);
 }
 
-// ---------- 직업 스킬(마우스 오른쪽) ----------
-function hitMon(w, m, dmg, kx = 0, ky = 0) { m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: dmg, x: m.x, y: m.y }); }
-function nearestTo(w, x, y, range) { let best = null, bd = range; for (const m of w.mons) { const d = Math.hypot(m.x - x, m.y - y); if (d < bd) { bd = d; best = m; } } return best; }
+// ---------- 직업 스킬(마우스 오른쪽). 스킬 강화 특수능력이면 효과 1.5배 ----------
 function useSkill(w) {
-  const p = w.player, S = JOBS[p.job].skill;
-  p.skillCd = Math.round(S.cd * TICK_HZ); w.events.push({ type: 'skill', id: S.id });
+  const p = w.player, S = JOBS[p.job].skill, k = w.mods.skillPower;
+  p.skillCd = Math.round(S.cd * TICK_HZ * w.mods.skillCdMul); w.events.push({ type: 'skill', id: S.id });
+  if (w.mods.skillCharge) { p.energy = Math.min(p.maxEnergy, p.energy + 40); p.shield = Math.min(p.maxShield, p.shield + 1); }
   switch (S.id) {
-    case 'regen': p.dashT = Math.round(0.3 * TICK_HZ); p.dashA = p.moving ? p.lastDir : p.aim; p.dashDist = 0; p.dashHit = []; p.invuln = Math.max(p.invuln, p.dashT + 4); break;
-    case 'strata': w.scanT = 5 * TICK_HZ; for (const r of w.rooms) r.seen = true; break;
-    case 'biocontrol': for (let i = 0; i < 3; i++) w.allies.push({ kind: 'hawk', x: p.x + (i - 1) * 14, y: p.y - 20, t: 8 * TICK_HZ, cd: i * 5 }); break;
+    case 'regen': p.dashT = Math.round(0.3 * TICK_HZ * k); p.dashA = p.moving ? p.lastDir : p.aim; p.dashDist = 0; p.dashHit = []; p.invuln = Math.max(p.invuln, p.dashT + 4); break;
+    case 'strata': w.scanT = Math.round(5 * TICK_HZ * k); for (const r of w.rooms) r.seen = true; break;
+    case 'biocontrol': for (let i = 0; i < Math.round(3 * k); i++) w.allies.push({ kind: 'hawk', x: p.x + (i - 1) * 14, y: p.y - 20, t: 8 * TICK_HZ, cd: i * 5 }); break;
     case 'neutral': { const t = nearestTo(w, p.x, p.y, 300), tx = t ? t.x : p.x + Math.cos(p.aim) * 120, ty = t ? t.y : p.y + Math.sin(p.aim) * 120;
-      w.bombs.push({ sx: p.x, sy: p.y - 10, tx, ty, x: p.x, y: p.y - 10, t: 0, T: 15 }); break; }
-    case 'warning': for (const m of w.mons) m.stun = Math.max(m.stun || 0, 2.5); w.eshots = []; w.hazardOffT = 5 * TICK_HZ; break;
-    case 'firstaid': p.hp = Math.min(p.maxHp, p.hp + 3); w.zones.push({ kind: 'heal', x: p.x, y: p.y, r: 50, t: 4 * TICK_HZ, acc: 0 }); break;
+      w.bombs.push({ sx: p.x, sy: p.y - 10, tx, ty, x: p.x, y: p.y - 10, t: 0, T: 15, dmg: 14 * k }); break; }
+    case 'warning': for (const m of w.mons) m.stun = Math.max(m.stun || 0, 2.5 * k); w.eshots = []; w.hazardOffT = Math.round(5 * TICK_HZ * k); break;
+    case 'firstaid': p.hp = Math.min(p.maxHp, p.hp + Math.round(3 * k)); w.zones.push({ kind: 'heal', x: p.x, y: p.y, r: 50, t: Math.round(4 * TICK_HZ * k), acc: 0 }); break;
   }
 }
 function updateSkills(w, input) {
@@ -191,7 +285,7 @@ function updateSkills(w, input) {
   if (input & INPUT.SKILL) { if (!p.skillHeld && p.skillCd <= 0) useSkill(w); p.skillHeld = true; } else p.skillHeld = false;
   if (w.scanT > 0) w.scanT--; if (w.hazardOffT > 0) w.hazardOffT--;
   if (p.dashT > 0) {   // 회생 제동: 돌진 중 부딪힌 적을 밀치고, 멈출 때 달린 거리만큼 방어막(운동 에너지 → 전기 에너지)
-    for (const m of w.mons) if (!p.dashHit.includes(m.uid) && Math.hypot(m.x - p.x, m.y - p.y) < 18 + m.r) { p.dashHit.push(m.uid); hitMon(w, m, 4, Math.cos(p.dashA) * 10, Math.sin(p.dashA) * 10); }
+    for (const m of w.mons) if (!p.dashHit.includes(m.uid) && Math.hypot(m.x - p.x, m.y - p.y) < 18 + m.r) { p.dashHit.push(m.uid); hitMon(w, m, 4 * w.mods.skillPower, Math.cos(p.dashA) * 10, Math.sin(p.dashA) * 10); }
     if (--p.dashT === 0) { const gain = Math.min(p.maxShield - p.shield, Math.max(1, Math.ceil(p.dashDist / 50))); p.shield += gain; w.events.push({ type: 'charge', amount: gain }); }
   }
   for (const a of w.allies) {   // 생물적 방제: 풀어 준 천적(매)이 가까운 적을 쫓아가 공격
@@ -204,11 +298,13 @@ function updateSkills(w, input) {
   for (const b of w.bombs) {   // 중화제 플라스크: 포물선으로 날아가 떨어지면 터진다
     b.t++; const k = b.t / b.T; b.x = b.sx + (b.tx - b.sx) * k; b.y = b.sy + (b.ty - b.sy) * k;
     if (b.t >= b.T) { b.done = true; w.events.push({ type: 'splash', x: b.tx, y: b.ty, r: 55 });
-      for (const m of w.mons) if (Math.hypot(m.x - b.tx, m.y - b.ty) < 55 + m.r) hitMon(w, m, 14, Math.sign(m.x - b.tx) * 6, Math.sign(m.y - b.ty) * 3); }
+      for (const m of w.mons) if (Math.hypot(m.x - b.tx, m.y - b.ty) < 55 + m.r) hitMon(w, m, b.dmg, Math.sign(m.x - b.tx) * 6, Math.sign(m.y - b.ty) * 3); }
   }
   w.bombs = w.bombs.filter(b => !b.done);
-  for (const z of w.zones) {   // 응급 처치 구역: 안에 있으면 1초마다 체력 1
-    z.t--; if (z.kind === 'heal' && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 1) { z.acc -= 1; p.hp = Math.min(p.maxHp, p.hp + 1); w.events.push({ type: 'heal' }); }
+  for (const z of w.zones) {
+    z.t--;
+    if (z.kind === 'heal' && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 1) { z.acc -= 1; p.hp = Math.min(p.maxHp, p.hp + 1); w.events.push({ type: 'heal' }); }   // 응급 처치 구역: 1초마다 체력 1
+    if (z.kind === 'acid') for (const m of w.mons) if (Math.hypot(m.x - z.x, m.y - z.y) < z.r + m.r) m.hp -= 3 * DT;   // 산성 웅덩이: 밟은 적에게 초당 3
   }
   w.zones = w.zones.filter(z => z.t > 0);
 }
@@ -220,7 +316,7 @@ export function step(w, input) {
   movePlayer(w, input);
   updatePlayer(w, input, rng);
   updateSkills(w, input);
-  updateShots(w);
+  updateShots(w, rng);
   updateMons(w, rng);
   updateRooms(w, rng);
   w.tick++; w.rng = rng.state();
