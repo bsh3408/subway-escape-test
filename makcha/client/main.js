@@ -63,10 +63,10 @@ function bakeFloor(f) {
 
 // ---------- 몬스터: 구역 1 그림(삼엽충, 암모나이트, 내성균 덩어리, 화석 짜깁기 공룡). 그림은 오른쪽을 보고 있다 ----------
 function drawMon(m, t) {
-  const fr = A.mons[m.id], X = Math.round(m.x), Y = Math.round(m.y);
+  const small = MONSTERS[m.id].small, fr = A.mons[m.id] || A.mons.germ, X = Math.round(m.x), Y = Math.round(m.y);   // 작은 내성균은 내성균 그림을 작게
   const img = m.id === 'fossilrex' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
-  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
   if (game.w?.scanT > 0) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 1; x.strokeRect(X - 4.5, top + img.height * 0.4 - 4.5, 9, 9); x.fillStyle = '#ff4a3a'; x.fillRect(X - 1, top + img.height * 0.4 - 1, 2, 2); }
   if (m.id === 'fossilrex') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
@@ -184,7 +184,8 @@ function drawWorld(w, t) {
   const SHOT = { shotgun: '#ffe08a', hammer: '#d8d8d8', smg: '#9ae05a', sprayer: '#b8f040', beam: '#9ad8ff', medpistol: '#ff9a9a' };
   for (const s of w.shots) { x.fillStyle = SHOT[s.weapon] || '#fff2a0'; x.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4); }
   for (const z of fx.zaps || []) { x.strokeStyle = '#bfefff'; x.lineWidth = 2; x.beginPath(); x.moveTo(z.x1, z.y1); x.lineTo((z.x1 + z.x2) / 2 + 4, (z.y1 + z.y2) / 2 - 5); x.lineTo(z.x2, z.y2); x.stroke(); }
-  for (const e of w.eshots) { x.fillStyle = '#2a0c10'; x.fillRect(Math.round(e.x) - 3, Math.round(e.y) - 3, 7, 7); x.fillStyle = '#ff6a5a'; x.fillRect(Math.round(e.x) - 2, Math.round(e.y) - 2, 5, 5); }
+  const ECOL = { germ: '#8ad050', germlet: '#b8f070', ammonite: '#6a3a8a', fossilrex: '#ff8a3a' };   // 몬스터마다 탄 색과 크기
+  for (const e of w.eshots) { const z = e.size || 3, X = Math.round(e.x), Y = Math.round(e.y); x.fillStyle = '#1a0c10'; x.beginPath(); x.arc(X, Y, z + 1, 0, 7); x.fill(); x.fillStyle = ECOL[e.src] || '#ff6a5a'; x.beginPath(); x.arc(X, Y, z, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(X - 1, Y - 1, 1, 1); }
   for (const f of fx.flashes) { x.save(); x.translate(f.x, f.y); x.rotate(f.a); x.fillStyle = '#ffd040'; x.beginPath(); x.moveTo(0, -4); x.lineTo(10, 0); x.lineTo(0, 4); x.fill(); x.restore(); }
   for (const q of fx.parts) { x.fillStyle = q.c; x.fillRect(Math.round(q.x), Math.round(q.y), 2, 2); }
   x.textAlign = 'center'; x.font = 'bold 10px sans-serif'; x.lineWidth = 3;

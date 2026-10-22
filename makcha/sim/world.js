@@ -210,12 +210,12 @@ function updateShots(w, rng) {
   for (const e of w.eshots) {
     e.x += e.vx * DT; e.y += e.vy * DT; e.life--;
     if (solidAt(w, e.x, e.y)) e.life = 0;
-    else if (Math.hypot(w.player.x - e.x, w.player.y - 10 - e.y) < 7) { e.life = 0; hurtPlayer(w, e.dmg); }
+    else if (Math.hypot(w.player.x - e.x, w.player.y - 10 - e.y) < 4 + (e.size || 3)) { e.life = 0; hurtPlayer(w, e.dmg); }
   }
   w.eshots = w.eshots.filter(e => e.life > 0);
 }
 
-function enemyShot(w, m, a, sp, dmg) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg }); }
+function enemyShot(w, m, a, sp, dmg, size = 3) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg, size, src: m.id }); }
 
 // ---------- 보스 패턴: 원형 탄막, 부채꼴 조준 사격, 돌진, 화석 소환을 돌아가며(체력 절반 아래면 더 세게) ----------
 const BOSS_PATTERNS = ['ring', 'fan', 'charge', 'summon'];
@@ -240,22 +240,27 @@ function updateMons(w, rng) {
       if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = 240; }
       else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { bossAct(w, m, rng); m.cd = m.hp < m.maxHp / 2 ? 1.3 : 1.8; } }
       else if (m.cd <= 0 && d < 340) { m.windT = 0.55; w.events.push({ type: 'aim', uid: m.uid }); }
-    } else if (M.kind === 'ranged') {
-      if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { enemyShot(w, m, Math.atan2(dy, dx), M.shotSpeed, M.atk); m.cd = 2.2; } }
+    } else if (M.kind === 'ranged') {   // 몬스터마다 정한 수·퍼짐·속도·크기로 쏜다
+      const A = M.attack;
+      if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { const a0 = Math.atan2(dy, dx);
+        for (let i = 0; i < A.n; i++) enemyShot(w, m, a0 + (A.n > 1 ? (i / (A.n - 1) - 0.5) * A.spread : 0), A.speed, M.atk, A.size); m.cd = A.cd; } }
       else { if (d < M.range * 0.6) { vx = -vx; vy = -vy; } else if (d < M.range) sp = 0;
-        if (m.cd <= 0 && d < 320) { m.windT = 0.45; w.events.push({ type: 'aim', uid: m.uid }); } }
-    } else if (M.kind === 'roller') {   // 암모나이트: 웅크렸다가(예고) 정한 방향으로 빠르게 굴러온다
-      if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = M.dashSpeed; }
-      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { m.dash = 0.6; m.cd = 2; } }
-      else if (m.cd <= 0 && d < 220) { m.windT = 0.45; m.dashA = Math.atan2(dy, dx); w.events.push({ type: 'aim', uid: m.uid }); }
+        if (m.cd <= 0 && d < 320) { m.windT = A.wind; w.events.push({ type: 'aim', uid: m.uid }); } }
+    } else if (M.kind === 'roller' || M.attack?.type === 'lunge') {   // 암모나이트·삼엽충: 웅크렸다가(예고) 정한 방향으로 돌진
+      const A = M.attack;
+      if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = A.dashSpeed || M.dashSpeed;
+        if (m.dash <= 0 && A.ink) for (let i = 0; i < A.ink.n; i++) enemyShot(w, m, i / A.ink.n * Math.PI * 2, A.ink.speed, M.atk, A.ink.size); }   // 멈추면 먹물
+      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { m.dash = A.dash; m.cd = A.cd; } }
+      else if (m.cd <= 0 && d < A.reach) { m.windT = A.wind; m.dashA = Math.atan2(dy, dx); w.events.push({ type: 'aim', uid: m.uid }); }
     }
     if (d < 14 + m.r * 0.5 && !(m.dash > 0)) sp = 0;
     moveBody(w, m, vx * sp * DT + m.kx, vy * sp * DT + m.ky, Math.min(6, m.r * 0.6)); m.kx *= 0.75; m.ky *= 0.75;
     if (Math.abs(dx) > 2) m.face = dx > 0 ? 1 : -1;
     if (d < 14 + m.r * 0.6 && m.touch <= 0 && M.kind !== 'ranged') { m.touch = 1; hurtPlayer(w, M.atk); }
   }
-  for (const m of w.mons) if (m.hp <= 0) {
+  for (const m of [...w.mons]) if (m.hp <= 0) {
     w.events.push({ type: 'kill', uid: m.uid, id: m.id, x: m.x, y: m.y });
+    const sp = MONSTERS[m.id].split; if (sp) for (const o of [-12, 12]) addMon(w, m.room, sp, m.x + o, m.y, rng);   // 내성균: 둘로 나뉜다
     const boss = MONSTERS[m.id].kind === 'boss';
     if (boss) w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y });
     else if (rng.chance(w.mods.scavenger ? 0.55 : 0.35)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });

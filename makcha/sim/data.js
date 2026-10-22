@@ -20,10 +20,16 @@ export const WEAPONS = {
 // cy: 발밑에서 몸 가운데까지 높이(총알이 맞는 곳)
 // 구역 1 몬스터: 근접(삼엽충, 고생대 표준화석), 돌진(암모나이트, 중생대 표준화석), 원거리(내성균 덩어리), 보스(화석 짜깁기 공룡)
 export const MONSTERS = {
-  trilobite: { name: '삼엽충', hp: 10, speed: 70, r: 9, cy: 6, kind: 'melee', atk: 1 },
-  germ:      { name: '내성균 덩어리', hp: 12, speed: 40, r: 9, cy: 8, kind: 'ranged', atk: 1, range: 170, shotSpeed: 150 },
-  ammonite:  { name: '암모나이트', hp: 9, speed: 50, r: 9, cy: 10, kind: 'roller', atk: 1, dashSpeed: 260 },
-  fossilrex: { name: '화석 짜깁기 공룡', hp: 240, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140 },
+  trilobite: { name: '삼엽충', hp: 10, speed: 70, r: 9, cy: 6, kind: 'melee', atk: 1,
+    attack: { type: 'lunge', wind: 0.4, dash: 0.3, dashSpeed: 210, reach: 90, cd: 1.6 }, attackText: '웅크렸다가 짧게 뛰어든다' },
+  germ:      { name: '내성균 덩어리', hp: 12, speed: 40, r: 9, cy: 8, kind: 'ranged', atk: 1, range: 170, split: 'germlet',
+    attack: { type: 'shoot', n: 3, spread: 0.55, speed: 90, size: 5, wind: 0.5, cd: 2.4 }, attackText: '느리고 큰 균 덩어리를 3방향으로, 쓰러지면 둘로 나뉜다(살아남은 내성균이 늘어남)' },
+  germlet:   { name: '작은 내성균', hp: 4, speed: 75, r: 6, cy: 5, kind: 'ranged', atk: 1, range: 130, small: true,
+    attack: { type: 'shoot', n: 1, spread: 0, speed: 175, size: 3, wind: 0.3, cd: 1.5 }, attackText: '작고 빠른 균 한 발' },
+  ammonite:  { name: '암모나이트', hp: 9, speed: 50, r: 9, cy: 10, kind: 'roller', atk: 1, dashSpeed: 260,
+    attack: { type: 'roll', wind: 0.45, dash: 0.6, reach: 220, cd: 2.2, ink: { n: 8, speed: 120, size: 4 } }, attackText: '웅크렸다 굴러오고, 멈추면 먹물을 사방으로 뿜는다' },
+  fossilrex: { name: '화석 짜깁기 공룡', hp: 240, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140,
+    attack: { type: 'boss', speed: 140 }, attackText: '원형 탄막, 부채꼴 사격, 돌진, 화석 소환을 번갈아 쓴다' },
 };
 // 방마다 물결 목록, 물결은 [몬스터, 마리 수] 묶음 목록
 export const WAVES = { battle: [[['trilobite', 3]], [['ammonite', 2], ['germ', 1]]], elite: [[['trilobite', 4], ['ammonite', 1]], [['germ', 3], ['ammonite', 2]]], boss: [[['fossilrex', 1]]] };
