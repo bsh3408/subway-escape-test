@@ -11,11 +11,11 @@ const DASH_SPEED = 420, PLAYER_SPEED = 140, ROLL_SPEED = 330, ROLL_T = 8, ROLL_C
 const MAT_IDS = Object.keys(MATS);
 
 // 특수능력을 무기·몸·스킬 수치로 바꾼다
-function modsOf(ab) {
+function modsOf(ab, skillLv = 1) {
   const has = id => ab.includes(id);
   return { extraShot: has('extraShot') ? 1 : 0, pierce: has('pierceUp') ? 1 : 0, bounce: has('bounce') ? 1 : 0, homing: has('homing'), boom: has('boom'),
-    rateMul: has('rapid') ? 1.25 : 1, dmgMul: has('bigShot') ? 1.3 : 1, speedMul: has('swift') ? 1.12 : 1, rollCdMul: has('rollMaster') ? 0.5 : 1,
-    scavenger: has('scavenger'), skillCdMul: has('skillCd') ? 0.7 : 1, skillPower: has('skillPower') ? 1.5 : 1, skillCharge: has('skillCharge') };
+    rateMul: has('rapid') ? 1.25 : 1, spreadMul: has('focus') ? 0.35 : 1, dmgMul: has('bigShot') ? 1.3 : 1, speedMul: has('swift') ? 1.12 : 1, rollCdMul: has('rollMaster') ? 0.5 : 1,
+    scavenger: has('scavenger'), skillCdMul: (has('skillCd') ? 0.7 : 1) * (1 - 0.15 * (skillLv - 1)), skillPower: (has('skillPower') ? 1.5 : 1) * (1 + 0.3 * (skillLv - 1)), skillCharge: has('skillCharge') };
 }
 
 export function createWorld({ seed, job, line, order, loadout }) {
@@ -24,12 +24,13 @@ export function createWorld({ seed, job, line, order, loadout }) {
     stats: { hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy }, ...(loadout || {}) };   // 넘겨받지 않은 항목은 직업 기본값
   const bonusShield = Object.values(L.gear).reduce((a, g) => a + (g && GEAR[g].shield || 0), 0);
   // 상자: 전투·엘리트 방마다 2~3개, 부수면 부품·재료가 나온다
-  const props = [];
-  for (const r of floor.rooms) if (r.type === 'battle' || r.type === 'elite') for (let i = 0, n = 2 + rng.int(2); i < n; i++) {
+  // 부서지는 기물: 상자(부품·재료), 바위(탄을 막는 엄폐물, 부수면 고철), 드럼통(터지면 둘레에 큰 피해)
+  const props = [], PROP = { crate: { hp: 6, r: 8 }, rock: { hp: 14, r: 9 }, barrel: { hp: 3, r: 7 } };
+  for (const r of floor.rooms) if (r.type === 'battle' || r.type === 'elite') for (const [kind, n] of [['crate', 1 + rng.int(3)], ['rock', 1 + rng.int(3)], ['barrel', rng.int(3)]]) for (let i = 0; i < n; i++) {
     for (let k = 0; k < 30; k++) {
       const tx = r.x0 + 1 + rng.int(r.w - 2), ty = r.y0 + 1 + rng.int(r.h - 2);
-      if (Math.abs(tx - r.cx) < 3 || Math.abs(ty - r.cy) < 3 || isSolid(floor, tx, ty) || props.some(o => Math.hypot(o.x - (tx + 0.5) * TILE, o.y - (ty + 0.5) * TILE) < 30)) continue;
-      props.push({ kind: 'crate', room: r.id, x: (tx + 0.5) * TILE, y: (ty + 0.7) * TILE, hp: 6, r: 8 }); break;
+      if (Math.abs(tx - r.cx) < 3 || Math.abs(ty - r.cy) < 3 || isSolid(floor, tx, ty) || isSolid(floor, tx - 1, ty) || isSolid(floor, tx + 1, ty) || props.some(o => Math.hypot(o.x - (tx + 0.5) * TILE, o.y - (ty + 0.5) * TILE) < 28)) continue;
+      props.push({ kind, room: r.id, x: (tx + 0.5) * TILE, y: (ty + 0.7) * TILE, ...PROP[kind] }); break;
     }
   }
   // 호선별 함정: 전투·엘리트·보스 방마다 그 호선의 함정을 놓는다
@@ -41,7 +42,7 @@ export function createWorld({ seed, job, line, order, loadout }) {
     for (let i = 0; i < 2; i++) { const p = freeSpot(r); if (p) traps.push({ kind, mode, room: r.id, x: p[0], y: p[1], r: mode === 'pool' ? 20 : 18, t: 1.5 + rng.next() * 3, warn: 0, on: false }); }
   }
   return {
-    line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
+    bossId: rng.pick(LINES[line].bosses), line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities, L.skillLv || 1), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
       ...L.stats, maxShield: L.stats.maxShield + bonusShield, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
@@ -122,12 +123,12 @@ function addMon(w, rid, id, x, y, rng) {
 }
 function spawnWave(w, rng, rid) {
   const r = w.floor.rooms[rid], st = w.rooms[rid], wave = WAVES[r.type][st.wave++], p = w.player;
-  for (const [id, count] of wave) for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {
+  for (const [id0, count] of wave) { const id = id0 === 'BOSS' ? w.bossId : id0; for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {
     let x, y, k = 0;
     do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 40 && (Math.hypot(x - p.x, y - p.y) < 90 || solidAt(w, x, y)));
     if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
     addMon(w, rid, id, x, y, rng);
-  }
+  } }
   w.events.push({ type: 'wave', room: rid, index: st.wave });
 }
 
@@ -136,7 +137,7 @@ function nearestTo(w, x, y, range, skip) { let best = null, bd = range; for (con
 // ---------- 무기: 강화 단계와 특수능력을 얹은 수치 ----------
 export function weaponStat(w, slot) {
   const it = w.player.weapons[slot], W = WEAPONS[it.id], M = w.mods;
-  return { ...W, dmg: W.dmg * (1 + 0.2 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.05 * it.lv) * M.rateMul, count: W.count + M.extraShot, spread: W.spread + (M.extraShot ? 0.12 : 0) };
+  return { ...W, dmg: W.dmg * (1 + 0.3 * it.lv) * M.dmgMul, rate: W.rate * (1 + 0.08 * it.lv) * M.rateMul, count: W.count + M.extraShot, spread: (W.spread + (M.extraShot ? 0.12 : 0)) * M.spreadMul };
 }
 
 function updatePlayer(w, input, rng) {
@@ -183,10 +184,18 @@ export function hurtPlayer(w, amount) {
   if (p.hp <= 0) { w.done = 'dead'; w.events.push({ type: 'dead' }); }
 }
 
-function hitMon(w, m, dmg, kx = 0, ky = 0) { dmg = Math.round(dmg * 10) / 10; m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: Math.round(dmg), x: m.x, y: m.y }); }
+function hitMon(w, m, dmg, kx = 0, ky = 0) { if (m.invuln) dmg = 0; dmg = Math.round(dmg * 10) / 10; m.hp -= dmg; m.flash = 3; m.kx += kx; m.ky += ky; w.events.push({ type: 'hit', uid: m.uid, amount: Math.round(dmg), x: m.x, y: m.y }); }
 
 function breakProp(w, o, rng) {
-  o.hp = 0; w.events.push({ type: 'propBreak', x: o.x, y: o.y });
+  o.hp = 0; w.events.push({ type: 'propBreak', x: o.x, y: o.y, kind: o.kind });
+  if (o.kind === 'barrel') {   // 드럼통: 터지며 둘레 40에 큰 피해(나도 맞는다)
+    w.events.push({ type: 'splash', x: o.x, y: o.y, r: 40 });
+    for (const m of w.mons) if (Math.hypot(m.x - o.x, m.y - o.y) < 40 + m.r) hitMon(w, m, 10, Math.sign(m.x - o.x) * 8, Math.sign(m.y - o.y) * 4);
+    if (Math.hypot(w.player.x - o.x, w.player.y - o.y) < 40) hurtPlayer(w, 1);
+    for (const q of w.props) if (q !== o && q.hp > 0 && Math.hypot(q.x - o.x, q.y - o.y) < 40) { q.hp -= 10; if (q.hp <= 0) breakProp(w, q, rng); }   // 옆 기물도 연쇄로
+    return;
+  }
+  if (o.kind === 'rock') { if (rng.chance(0.5)) w.pickups.push({ kind: 'mat', id: 'scrap', x: o.x, y: o.y }); return; }
   w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
   if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
 }
@@ -229,16 +238,18 @@ function updateShots(w, rng) {
 function enemyShot(w, m, a, sp, dmg, size = 3) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg, size, src: m.id }); }
 
 // ---------- 보스 패턴: 원형·이중 탄막, 회오리 탄, 부채꼴 사격, 돌진, 화석 소환, 운석 낙하 중 직전과 다른 것을 무작위로 ----------
-const BOSS_PATTERNS = ['ring', 'double', 'spiral', 'fan', 'charge', 'summon', 'meteor'];
 function bossAct(w, m, rng) {
   const p = w.player, M = MONSTERS[m.id], a = Math.atan2(p.y - m.y, p.x - m.x), rage = m.hp < m.maxHp / 2;
-  const pool = BOSS_PATTERNS.filter(x => x !== m.pat); m.pat = rng.pick(pool); w.events.push({ type: 'pattern', name: m.pat, uid: m.uid });
+  const pool = M.patterns.filter(x => x !== m.pat); m.pat = rng.pick(pool); w.events.push({ type: 'pattern', name: m.pat, uid: m.uid });
   if (m.pat === 'ring') { const n = rage ? 22 : 16; for (let i = 0; i < n; i++) enemyShot(w, m, a + i / n * Math.PI * 2, M.shotSpeed, 1, 4); }
   if (m.pat === 'double') { for (let i = 0; i < 14; i++) enemyShot(w, m, a + i / 14 * Math.PI * 2, M.shotSpeed * 0.9, 1, 4); m.ringLater = 0.35; }
   if (m.pat === 'spiral') { m.spiralT = rage ? 2.4 : 1.8; m.spiralA = a; }
   if (m.pat === 'fan') { const n = rage ? 9 : 7; for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) enemyShot(w, m, a + (i / (n - 1) - 0.5) * 1.0 + k * 0.07, M.shotSpeed * (1.3 + k * 0.25), 2, 3); }
   if (m.pat === 'charge') { m.dash = rage ? 0.9 : 0.7; m.dashA = a; }
-  if (m.pat === 'summon') for (let i = 0; i < (rage ? 4 : 3); i++) addMon(w, m.room, ['trilobite', 'ammonite', 'germ'][i % 3], m.x + (i - 1.5) * 26, m.y + 30, rng);
+  if (m.pat === 'summon' || m.pat === 'brood') for (let i = 0; i < (m.pat === 'brood' ? 5 : rage ? 4 : 3); i++) { const x = m.x + (i - 2) * 22, y = m.y + 30; addMon(w, m.room, M.minions[i % M.minions.length], blocked(w, x, y, 5) ? m.x : x, blocked(w, x, y, 5) ? m.y : y, rng); }
+  if (m.pat === 'erupt') for (let i = 0; i < (rage ? 6 : 4); i++) { const x = p.x + rng.range(-90, 90), y = p.y + rng.range(-60, 60); w.falls.push({ kind: 'vent', x, y, t: 0.7 + i * 0.15, r: 26 }); }
+  if (m.pat === 'slam') { m.slamN = rage ? 3 : 2; m.slamT = 0; }
+  if (m.pat === 'shell') { m.shellT = 1.6; m.invuln = true; }
   if (m.pat === 'meteor') for (let i = 0; i < (rage ? 7 : 5); i++) w.falls.push({ kind: 'meteor', x: p.x + rng.range(-70, 70), y: p.y + rng.range(-50, 50), t: 0.8 + i * 0.12, r: 22 });
 }
 
@@ -253,6 +264,8 @@ function updateMons(w, rng) {
     let vx = dx / d, vy = dy / d, sp = m.speed * (m.slowT > 0 ? 0.5 : 1);
     if (M.kind === 'boss') {
       if (m.spiralT > 0) { m.spiralT -= DT; if (Math.floor(m.spiralT * 30) % 3 === 0) { m.spiralA += 0.32; for (const o of [0, Math.PI]) enemyShot(w, m, m.spiralA + o, M.shotSpeed * 1.1, 1, 3); } }
+      if (m.slamN > 0 && (m.slamT -= DT) <= 0) { m.slamN--; m.slamT = 0.45; w.events.push({ type: 'splash', x: m.x, y: m.y, r: 50 }); for (let i = 0; i < 20; i++) enemyShot(w, m, i / 20 * Math.PI * 2 + m.slamN * 0.15, 100 + m.slamN * 30, 1, 4); }   // 땅 내려치기: 충격파 고리 여러 겹
+      if (m.shellT > 0 && (m.shellT -= DT) <= 0) { m.invuln = false; for (let i = 0; i < 24; i++) enemyShot(w, m, i / 24 * Math.PI * 2, 160, 1, 3); }   // 껍데기 웅크리기: 무적 뒤 사방 발사
       if (m.ringLater > 0 && (m.ringLater -= DT) <= 0) for (let i = 0; i < 14; i++) enemyShot(w, m, i / 14 * Math.PI * 2 + Math.PI / 14, M.shotSpeed * 1.2, 1, 4);
       if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = 240; }
       else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { bossAct(w, m, rng); m.cd = m.hp < m.maxHp / 2 ? 0.9 : 1.3; } }

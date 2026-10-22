@@ -1,6 +1,6 @@
 // 막차: 화면(입력·그리기·미니맵·직업 고르기). 게임 규칙은 sim/에만 있고, 여기서는 그리기만 한다
 import { step } from '../sim/world.js';
-import { createRun, offerLines, enterLine, finishLine, RUN_LINES, offerAbilities, applyAbility, ABILITIES, enhanceWeapon, ENHANCE_COST, MAX_LV, GEAR, canCraft, craftGear } from '../sim/run.js';
+import { createRun, offerLines, enterLine, finishLine, RUN_LINES, offerAbilities, applyAbility, ABILITIES, enhanceWeapon, ENHANCE_COST, MAX_LV, GEAR, canCraft, craftGear, upgradeSkill, SKILL_COST, SKILL_MAX } from '../sim/run.js';
 import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
 import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS } from '../sim/data.js';
@@ -63,13 +63,13 @@ function bakeFloor(f) {
 
 // ---------- 몬스터: 구역 1 그림(삼엽충, 암모나이트, 내성균 덩어리, 화석 짜깁기 공룡). 그림은 오른쪽을 보고 있다 ----------
 function drawMon(m, t) {
-  const small = MONSTERS[m.id].small, fr = A.mons[m.id] || A.mons.germ, X = Math.round(m.x), Y = Math.round(m.y);   // 작은 내성균은 내성균 그림을 작게
-  const img = m.id === 'fossilrex' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
+  const M = MONSTERS[m.id], small = M.small, fr = A.mons[m.id] || A.mons[M.sprite] || A.mons.germ, X = Math.round(m.x), Y = Math.round(m.y);   // 작은 내성균은 내성균 그림을 작게, 그림 없는 보스는 색을 입혀 임시로
+  const img = M.kind === 'boss' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
-  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.invuln) x.filter = 'grayscale(1) brightness(.7)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; else if (M.tint) x.filter = M.tint; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
   if (game.w?.scanT > 0) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 1; x.strokeRect(X - 4.5, top + img.height * 0.4 - 4.5, 9, 9); x.fillStyle = '#ff4a3a'; x.fillRect(X - 1, top + img.height * 0.4 - 1, 2, 2); }
-  if (m.id === 'fossilrex') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
+  if (M.kind === 'boss') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
   if (m.windT > 0) { x.font = 'bold 14px sans-serif'; x.textAlign = 'center'; x.lineWidth = 3; x.strokeStyle = '#000'; x.strokeText('!', X, top - 10); x.fillStyle = '#ff3a2a'; x.fillText('!', X, top - 10); }
 }
 
@@ -101,11 +101,8 @@ function feed(w) {
     else if (e.type === 'fire') { fx.flashes.push({ x: p.x + p.face * 4 + Math.cos(p.aim) * 12, y: p.y - 9 + Math.sin(p.aim) * 12, a: p.aim, t: 0.05 }); fx.shake = Math.max(fx.shake, WEAPONS[e.weapon].kick * 1.5); }
     else if (e.type === 'hurt') { fx.shake = Math.max(fx.shake, 4); fx.nums.push({ x: p.x, y: p.y - 34, v: '-' + e.amount, t: 0.8, red: true }); }
     else if (e.type === 'spark') fx.parts.push({ x: e.x, y: e.y, vx: 0, vy: -20, t: 0.15, c: '#fff' });
-    else if (e.type === 'lock') tip('🚪 문이 잠겼다! 적을 모두 쓰러뜨려라', 2);
-    else if (e.type === 'clear') tip('✅ 방을 정리했다. 문이 열렸다', 2);
-    else if (e.type === 'chest') tip('📦 보급 상자를 열었다: 재료와 부품, 가끔 무기', 2.5);
     else if (e.type === 'pickup') fx.nums.push({ x: p.x, y: p.y - 36, v: e.kind === 'mat' ? `+${MATS[e.id]}` : `+부품 ${e.n}`, t: 0.8, gold: true });
-    else if (e.type === 'getWeapon') tip(`🔫 ${josa(WEAPONS[e.id].name, '을', '를')} 들었다 · ${WEAPONS[e.id].traitText}`, 2.5);
+    else if (e.type === 'getWeapon') tip(`🔫 ${WEAPONS[e.id].name}`, 1.5);
     else if (e.type === 'swap') tip(`🔁 ${WEAPONS[p.weapons[p.cur].id].name}`, 0.9);
     else if (e.type === 'zap') fx.zaps = (fx.zaps || []).concat([{ ...e, t: 0.12 }]);
     else if (e.type === 'trapHit') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: { vent: '#ff7a2a', meteor: '#ffb060', gas: '#9ad050', heat: '#ffb040', icicle: '#bfe8ff', drip: '#ff9a4a', acidrain: '#b8f040', vine: '#6ac050' }[e.kind] || '#fff' });
@@ -113,8 +110,7 @@ function feed(w) {
     else if (e.type === 'burn') fx.parts.push({ x: e.x + (Math.random() - 0.5) * 8, y: e.y, vx: 0, vy: -30, t: 0.35, c: Math.random() < 0.5 ? '#ff8a3a' : '#ffd060' });
     else if (e.type === 'sleep') { const m = w.mons.find(o => o.uid === e.uid); if (m) fx.nums.push({ x: m.x, y: m.y - 28, v: 'Zz', t: 1.2, blue: true }); }
     else if (e.type === 'propBreak') { for (let i = 0; i < 10; i++) fx.parts.push({ x: e.x, y: e.y - 6, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.7) * 120, t: 0.4, c: i % 2 ? '#b9844a' : '#6a4a2a' }); fx.shake = Math.max(fx.shake, 2); }
-    else if (e.type === 'pattern') { const N = { ring: '원형 탄막', fan: '부채꼴 사격', charge: '돌진', summon: '화석 소환' }; tip(`⚠️ 보스: ${N[e.name] || e.name}`, 1.2); }
-    else if (e.type === 'skill') { fx.skillFlash = 0.35; tip(`✨ ${JOBS[p.job].skill.name}`, 1.2); }
+    else if (e.type === 'skill') fx.skillFlash = 0.35;
     else if (e.type === 'charge') fx.nums.push({ x: p.x, y: p.y - 36, v: `방어막 +${e.amount}`, t: 1, blue: true });
     else if (e.type === 'splash') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: '#7ad0ff' }); for (let i = 0; i < 18; i++) fx.parts.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 220, vy: (Math.random() - 0.5) * 160, t: 0.45, c: i % 2 ? '#bfe8ff' : '#ffffff' }); fx.shake = Math.max(fx.shake, 3); }
     else if (e.type === 'heal') fx.nums.push({ x: p.x, y: p.y - 34, v: '+1', t: 0.7, green: true });
@@ -170,7 +166,10 @@ function drawWorld(w, t) {
     else if (k.kind === 'mat') { const C = { cloth: '#d8c8a8', rubber: '#3a3a3a', glass: '#9ad8f0', filter: '#e8e8e8', scrap: '#8a8f98', leather: '#8a5a3a' }[k.id]; x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 9); x.fillStyle = C; x.fillRect(X - 4, Y - 6, 8, 7); }
     else { x.fillStyle = '#111'; x.fillRect(X - 5, Y - 7, 10, 10); x.fillStyle = '#c8ccd2'; x.fillRect(X - 4, Y - 6, 8, 8); x.fillStyle = '#5a5f68'; x.fillRect(X - 1, Y - 3, 3, 3); }
   }
-  for (const o of w.props) { const X = Math.round(o.x), Y = Math.round(o.y); x.fillStyle = 'rgba(0,0,0,.3)'; x.fillRect(X - 9, Y - 1, 18, 3); x.fillStyle = '#2a1c10'; x.fillRect(X - 9, Y - 15, 18, 15); x.fillStyle = '#a8743a'; x.fillRect(X - 8, Y - 14, 16, 13); x.fillStyle = '#7a5028'; x.fillRect(X - 8, Y - 9, 16, 2); x.fillRect(X - 1, Y - 14, 2, 13); x.fillStyle = '#c8945a'; x.fillRect(X - 8, Y - 14, 16, 2); }
+  for (const o of w.props) { const X = Math.round(o.x), Y = Math.round(o.y); x.fillStyle = 'rgba(0,0,0,.3)'; x.fillRect(X - 9, Y - 1, 18, 3);
+    if (o.kind === 'rock') { x.fillStyle = '#18161a'; x.fillRect(X - 10, Y - 14, 20, 14); x.fillStyle = '#6a6460'; x.fillRect(X - 9, Y - 13, 18, 12); x.fillStyle = '#8a847c'; x.fillRect(X - 8, Y - 13, 9, 4); x.fillStyle = '#4a4642'; x.fillRect(X + 2, Y - 7, 6, 5); if (o.hp < 14) { x.fillStyle = '#18161a'; x.fillRect(X - 2, Y - 12, 1, 7); x.fillRect(X - 1, Y - 6, 3, 1); } continue; }
+    if (o.kind === 'barrel') { x.fillStyle = '#18161a'; x.fillRect(X - 7, Y - 16, 14, 16); x.fillStyle = '#c83a2a'; x.fillRect(X - 6, Y - 15, 12, 14); x.fillStyle = '#e8c040'; x.fillRect(X - 6, Y - 10, 12, 3); x.fillStyle = '#1c1c1c'; x.fillRect(X - 2, Y - 10, 4, 3); x.fillStyle = '#e86a5a'; x.fillRect(X - 6, Y - 15, 12, 2); continue; }
+    x.fillStyle = '#2a1c10'; x.fillRect(X - 9, Y - 15, 18, 15); x.fillStyle = '#a8743a'; x.fillRect(X - 8, Y - 14, 16, 13); x.fillStyle = '#7a5028'; x.fillRect(X - 8, Y - 9, 16, 2); x.fillRect(X - 1, Y - 14, 2, 13); x.fillStyle = '#c8945a'; x.fillRect(X - 8, Y - 14, 16, 2); }
   if (p.dashT > 0) fx.trail.push({ x: p.x, y: p.y, t: 0.25 });
   for (const q of fx.trail) { x.globalAlpha = q.t * 2; x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(q.x) - 6, Math.round(q.y) - 22, 12, 22); } x.globalAlpha = 1;
   const list = [...w.mons.map(m => ({ y: m.y, d: () => drawMon(m, t) })), { y: p.y, d: () => drawPlayer(p, t) }];
@@ -206,7 +205,7 @@ function hud(w, dt) {
   if (tipT > 0 && (tipT -= dt) <= 0) $('tip').classList.remove('on');
   // 무기 칸(웹 글씨): 바뀔 때만 다시 만든다
   const key = p.cur + ':' + p.weapons.map(it => it.id + it.lv).join(',');
-  if (key !== lastSlots) { lastSlots = key; $('wslots').innerHTML = p.weapons.map((it, i) => `<div class="ws ${i === p.cur ? 'on' : ''}"><canvas width="22" height="12" data-w="${it.id}"></canvas><div>${WEAPONS[it.id].name}${it.lv ? ' +' + it.lv : ''}<small>${WEAPONS[it.id].traitText}</small></div></div>`).join('');
+  if (key !== lastSlots) { lastSlots = key; $('wslots').innerHTML = p.weapons.map((it, i) => `<div class="ws ${i === p.cur ? 'on' : ''}"><canvas width="22" height="12" data-w="${it.id}"></canvas><div>${WEAPONS[it.id].name}${it.lv ? ' +' + it.lv : ''}</div></div>`).join('');
     for (const c of $('wslots').querySelectorAll('canvas')) { const g = c.getContext('2d'), im = A.weapons[WEAPONS[c.dataset.w].sprite]; g.imageSmoothingEnabled = false; g.drawImage(im, Math.round((22 - im.width) / 2), Math.round((12 - im.height) / 2)); } }
   $('parts').textContent = `부품 ${game.run.parts + w.loot.parts}`;
   const near = w.pickups.find(k => k.kind === 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < 22);
@@ -223,8 +222,8 @@ const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0'
 async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
 function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; $('loadout').hidden = true; }
 function jobSelect() {
-  menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 마우스 오른쪽(또는 K)으로 직업 스킬, Shift로 구르기(구르는 동안 공격을 피함), Q로 무기 바꾸기, E로 무기 줍기(무기는 2개까지). 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
-    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>${WEAPONS[JOBS[j].weapon].traitText}<br>우클릭: ${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
+  menu(`<h1>🚇 막차: 지하 생존기</h1><p>호선 ${RUN_LINES}개를 지나 탈출하라.</p><p style="font-size:13px">이동 WASD · 쏘기 마우스 왼쪽 · 스킬 마우스 오른쪽 · 구르기 Shift · 무기 바꾸기 Q · 줍기 E</p>
+    <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
   for (const c of document.querySelectorAll('[data-c]')) { const g = c.getContext('2d'), im = A.chars[+c.dataset.c][0]; c.width = im.width; c.height = im.height; g.drawImage(im, 0, 0); }
   for (const b of document.querySelectorAll('[data-j]')) b.onclick = () => { document.documentElement.requestFullscreen?.().catch(() => {}); game.run = createRun({ seed: (Date.now() ^ (Math.random() * 2 ** 31)) >>> 0, job: b.dataset.j }); transfer(); };
 }
@@ -232,35 +231,37 @@ const matText = m => Object.entries(m).filter(([, v]) => v > 0).map(([k, v]) => 
 function abilityPick() {
   const r = game.run, offer = offerAbilities(r), KIND = { gun: '🔫 총', body: '💪 몸', skill: '✨ 스킬' };
   if (!offer.length) return workshop();
-  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>${r.visited.map(n => n + '호선').join(' → ')}을 지났다. ⏱ ${clock(Math.floor(r.ticks / 30))} · 하나를 골라 가져간다.</p>
-    <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(id => { const a = ABILITIES[id]; return `<button class="job" data-a="${id}" style="text-align:left"><small style="color:var(--acc)">${KIND[a.kind]}</small><br><b>${a.name}</b><br><small style="color:var(--sub)">${a.text}</small></button>`; }).join('')}</div>
+  menu(`<h1>🔁 환승역 · 특수능력 고르기</h1><p>⏱ ${clock(Math.floor(r.ticks / 30))}</p>
+    <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(id => { const a = ABILITIES[id]; return `<button class="job" data-a="${id}" style="text-align:left"><small style="color:var(--acc)">${KIND[a.kind]}</small><br><b style="font-size:17px">${a.name}</b></button>`; }).join('')}</div>
     ${r.abilities.length ? `<p style="margin-top:10px">가진 특수능력: ${r.abilities.map(id => ABILITIES[id].name).join(', ')}</p>` : ''}`);
   for (const b of document.querySelectorAll('[data-a]')) b.onclick = () => { applyAbility(r, b.dataset.a); workshop(); };
 }
 function workshop(msg = '') {
   const r = game.run, slots = ['head', 'body', 'feet'], SL = { head: '머리', body: '몸', feet: '발' };
   menu(`<h1>🔧 정비소</h1><p>부품 <b>${r.parts}</b> · 재료: ${matText(r.mats)} · 장비: ${slots.map(sl => `${SL[sl]} ${r.gear[sl] ? GEAR[r.gear[sl]].name : '없음'}`).join(' · ')}</p>${msg ? `<p style="color:var(--acc)">${msg}</p>` : ''}
-    <h2 style="font-size:16px;margin:10px 0 4px">무기 강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = ENHANCE_COST(it.lv), ok = it.lv < MAX_LV && r.parts >= c;
-      return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} +${it.lv}</b><br><small style="color:var(--sub)">${W.traitText}<br>${it.lv >= MAX_LV ? '최고 단계' : `+${it.lv + 1}로: 피해 +20%, 연사 +5% · 부품 ${c}`}</small></button>`; }).join('')}</div>
+    <h2 style="font-size:16px;margin:10px 0 4px">강화(부품)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${r.weapons.map((it, i) => { const W = WEAPONS[it.id], c = ENHANCE_COST(it.lv), ok = it.lv < MAX_LV && r.parts >= c;
+      return `<button class="job" data-e="${i}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${W.name} +${it.lv}</b><br><small style="color:var(--sub)">${it.lv >= MAX_LV ? '최고 단계' : `→ +${it.lv + 1} · 부품 ${c}`}</small></button>`; }).join('')}
+      ${(() => { const S = JOBS[r.job].skill, c = SKILL_COST(r.skillLv), ok = r.skillLv < SKILL_MAX && r.parts >= c; return `<button class="job" id="skillUp" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>✨ ${S.name} Lv ${r.skillLv}</b><br><small style="color:var(--sub)">${r.skillLv >= SKILL_MAX ? '최고 레벨' : `→ Lv ${r.skillLv + 1} · 부품 ${c}`}</small></button>`; })()}</div>
     <h2 style="font-size:16px;margin:12px 0 4px">장비 만들기(재료)</h2><div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr))">${Object.entries(GEAR).map(([id, g]) => { const ok = canCraft(r, id);
-      return `<button class="job" data-g="${id}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${g.name}</b> <small>(${SL[g.slot]})</small>${r.gear[g.slot] === id ? ' ✔' : ''}<br><small style="color:var(--sub)">${g.text}<br>재료: ${matText(g.recipe)}</small></button>`; }).join('')}</div>
+      return `<button class="job" data-g="${id}" style="text-align:left;opacity:${ok ? 1 : 0.5}"><b>${g.name}</b> <small>(${SL[g.slot]})</small>${r.gear[g.slot] === id ? ' ✔' : ''}<br><small style="color:var(--sub)">${r.gear[g.slot] === id ? g.text + '<br>' : ''}${matText(g.recipe)}</small></button>`; }).join('')}</div>
     <div style="margin-top:14px"><button class="job" id="next" style="background:var(--acc);color:#1a1410;font-weight:800">다음 호선 고르기 →</button></div>`);
   for (const b of document.querySelectorAll('[data-e]')) b.onclick = () => workshop(enhanceWeapon(r, +b.dataset.e) ? `${josa(WEAPONS[r.weapons[+b.dataset.e].id].name, '을', '를')} +${r.weapons[+b.dataset.e].lv}로 강화했다` : '부품이 모자라거나 최고 단계다');
   for (const b of document.querySelectorAll('[data-g]')) b.onclick = () => workshop(craftGear(r, b.dataset.g) ? `${josa(GEAR[b.dataset.g].name, '을', '를')} 만들어 입었다` : '재료가 모자란다');
+  $('skillUp').onclick = () => workshop(upgradeSkill(r) ? `${JOBS[r.job].skill.name} Lv ${r.skillLv}` : '부품이 모자란다');
   $('next').onclick = transfer;
 }
 function transfer() {
   const r = game.run, offer = offerLines(r, game.open), first = r.visited.length === 0;
   game.w = null;
-  menu(`<h1>${first ? '🏠 은신처 역' : '🔁 환승역'} · ${r.visited.length + 1}/${RUN_LINES}번째 호선</h1><p>${first ? '첫 호선을 고르자.' : `지금까지 ${r.visited.map(n => n + '호선').join(' → ')} · ⏱ ${clock(Math.floor(r.ticks / 30))}`} 표지판의 재난을 보고 고르자. 뒤에 들어가는 호선일수록 적이 강해진다.</p>
+  menu(`<h1>${first ? '🏠 은신처 역' : '🔁 환승역'} · ${r.visited.length + 1}/${RUN_LINES}번째 호선</h1><p>${first ? '첫 호선을 고르자.' : `지금까지 ${r.visited.map(n => n + '호선').join(' → ')} · ⏱ ${clock(Math.floor(r.ticks / 30))}`} </p>
     <div class="jobs" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">${offer.map(n => { const L = LINES[n]; return `<button class="job" data-l="${n}" style="text-align:left">
       <span style="display:inline-flex;width:30px;height:30px;border-radius:50%;background:${L.color};color:#fff;font-weight:800;align-items:center;justify-content:center;margin-right:6px">${n}</span><b>${L.name}</b>
-      <br><small style="color:var(--sub)">재난: ${L.hazard}<br>단원: ${L.unit}${r.visited.includes(n) ? '<br>(다시 가는 호선)' : ''}${L.ready ? '' : '<br>그림 준비 중(1호선 몬스터로 시험)'}</small></button>`; }).join('')}</div>`);
+      ${r.visited.includes(n) ? '<br><small style="color:var(--sub)">다시 가는 호선</small>' : ''}</button>`; }).join('')}</div>`);
   for (const b of document.querySelectorAll('[data-l]')) b.onclick = () => startLine(+b.dataset.l);
 }
 function startLine(n) {
   const w = enterLine(game.run, n); game.w = w; game.bg = bakeFloor(w.floor); game.acc = 0;
-  $('menu').hidden = true; $('hud').hidden = false; $('loadout').hidden = false; lastSlots = ''; tip(`🚇 ${n}호선 ${LINES[n].name} · 함정: ${LINES[n].trapText}`, 4);
+  $('menu').hidden = true; $('hud').hidden = false; $('loadout').hidden = false; lastSlots = ''; tip(`🚇 ${n}호선 ${LINES[n].name}`, 2);
 }
 function endLine(w) {
   const r = game.run; finishLine(r, w); game.w = null;

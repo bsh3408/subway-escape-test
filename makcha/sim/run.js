@@ -11,7 +11,7 @@ export function createRun({ seed, job }) {
   const J = JOBS[job];
   return { seed: seed >>> 0, job, visited: [], ticks: 0, escaped: false, dead: false,
     hp: J.hp, maxHp: J.hp, shield: J.shield, maxShield: J.shield, energy: J.energy, maxEnergy: J.energy,
-    weapons: [{ id: J.weapon, lv: 0 }], cur: 0, parts: 0, mats: {}, gear: { head: null, body: null, feet: null }, abilities: [] };
+    weapons: [{ id: J.weapon, lv: 0 }], cur: 0, skillLv: 1, parts: 0, mats: {}, gear: { head: null, body: null, feet: null }, abilities: [] };
 }
 
 export function difficulty(order) { return { hpMul: 1 + 0.25 * order, extra: Math.floor(order / 2) }; }
@@ -27,7 +27,7 @@ export function offerLines(run, open) {
 
 export function enterLine(run, line) {
   return createWorld({ seed: (run.seed + run.visited.length * 7919 + line * 104729) >>> 0, job: run.job, line, order: run.visited.length,
-    loadout: { weapons: run.weapons, cur: run.cur, gear: run.gear, abilities: run.abilities,
+    loadout: { weapons: run.weapons, cur: run.cur, gear: run.gear, abilities: run.abilities, skillLv: run.skillLv,
       stats: { hp: run.hp, maxHp: run.maxHp, shield: run.shield, maxShield: run.maxShield, energy: run.energy, maxEnergy: run.maxEnergy } } });
 }
 
@@ -42,12 +42,19 @@ export function finishLine(run, w) {
   return run;
 }
 
-// ---------- 무기 강화: 부품으로 단계를 올린다(최대 5단계). 단계마다 피해 +20%, 연사 +5% ----------
-export const MAX_LV = 5, ENHANCE_COST = lv => 4 + 3 * lv;
+// ---------- 무기 강화: 부품으로 단계를 올린다(최대 3단계). 단계마다 피해 +30%, 연사 +8% ----------
+export const MAX_LV = 3, ENHANCE_COST = lv => 6 + 6 * lv;
 export function enhanceWeapon(run, slot) {
   const wpn = run.weapons[slot]; if (!wpn || wpn.lv >= MAX_LV) return false;
   const c = ENHANCE_COST(wpn.lv); if (run.parts < c) return false;
   run.parts -= c; wpn.lv++; return true;
+}
+
+// ---------- 스킬 레벨업: 부품으로 2·3레벨. 레벨마다 효과 +30%, 대기 시간 −15% ----------
+export const SKILL_MAX = 3, SKILL_COST = lv => 8 * lv;
+export function upgradeSkill(run) {
+  if (run.skillLv >= SKILL_MAX || run.parts < SKILL_COST(run.skillLv)) return false;
+  run.parts -= SKILL_COST(run.skillLv); run.skillLv++; return true;
 }
 
 // ---------- 장비 만들기: 재료로 머리·몸·발 장비를 만든다. 재난 막기는 호선 재난을 넣을 때 연결한다 ----------
@@ -76,6 +83,7 @@ export const ABILITIES = {
   bounce:     { kind: 'gun', name: '튕김탄', text: '탄이 벽에 맞으면 한 번 튕긴다' },
   homing:     { kind: 'gun', name: '유도탄', text: '탄이 가까운 적 쪽으로 휜다' },
   boom:       { kind: 'gun', name: '폭발탄', text: '맞은 자리에서 작은 폭발이 일어난다' },
+  focus:      { kind: 'gun', name: '집탄', text: '탄이 덜 퍼지고 한곳으로 모인다' },
   rapid:      { kind: 'gun', name: '속사', text: '연사 속도 +25%' },
   bigShot:    { kind: 'gun', name: '강한 탄', text: '모든 무기 피해 +30%' },
   maxHp:      { kind: 'body', name: '튼튼한 몸', text: '최대 체력 +2' },

@@ -8,7 +8,8 @@ export const T = { WALL: 0, FLOOR: 1, DOOR: 2 };
 const SIZE = { start: [11, 9], battle: [19, 13], elite: [19, 13], chest: [11, 9], shop: [13, 9], event: [13, 11], exit: [11, 9], boss: [27, 19] };
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const CORRIDOR = 3;   // 통로 폭(타일)
-const LAYOUTS = ['corners', 'rows', 'bars', 'diagonal', 'scatter'];   // 방 안 지형지물 배치 종류
+const LAYOUTS = ['corners', 'rows', 'bars', 'diagonal', 'scatter', 'walls'];   // 방 안 지형지물 배치 종류(두 가지를 섞음)
+const SHAPES = ['rect', 'notch', 'cross', 'octagon', 'lshape'];   // 방 모양
 
 function layout(rng, order) {
   // 주 경로: 시작 → 전투 방들 → 호선 보스. 뒤에 들어간 호선일수록 전투 방이 하나 더
@@ -71,25 +72,41 @@ export function generateFloor(seed, { line, order }) {
     }
     for (const id of [L.id, R.id]) { for (const k of tilesOf[id]) tiles[k] = T.DOOR; doors.push({ room: id, to: id === L.id ? R.id : L.id, tiles: tilesOf[id] }); }
   }
-  // 지형지물: 전투·엘리트·보스 방마다 배치를 골라 바위·기둥을 놓는다(탄과 몸을 막는 엄폐물)
-  // 규칙: 가운데 십자 길(문으로 이어지는 길)은 비우고, 덩어리끼리·벽과는 한 칸 이상 띄워서 막힌 구석이 생기지 않게 한다
+  // 방 모양: 전투·엘리트 방은 귀퉁이를 깎거나(notch·cross·octagon), 한 귀퉁이를 크게 잘라 ㄱ자로(lshape) 만든다
+  // 가운데 십자 길(문으로 이어지는 길, 폭 5칸)은 깎지 않는다
+  for (const r of rooms) if (r.type === 'battle' || r.type === 'elite') {
+    r.shape = rng.pick(SHAPES);
+    const keep = (x, y) => Math.abs(x - r.cx) <= 2 || Math.abs(y - r.cy) <= 2;
+    const cut = (x0, y0, x1, y1) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) if (!keep(x, y)) set(x, y, T.WALL); };
+    const X1 = r.x0 + r.w - 1, Y1 = r.y0 + r.h - 1, corners = [[0, 0], [1, 0], [0, 1], [1, 1]];
+    const corner = ([cxs, cys], a, b) => cut(cxs ? X1 - a + 1 : r.x0, cys ? Y1 - b + 1 : r.y0, cxs ? X1 : r.x0 + a - 1, cys ? Y1 : r.y0 + b - 1);
+    if (r.shape === 'notch') for (const c of corners) if (rng.chance(0.5)) corner(c, 2 + rng.int(3), 2 + rng.int(2));
+    if (r.shape === 'cross') { const a2 = 3 + rng.int(2), b2 = 2 + rng.int(2); for (const c of corners) corner(c, a2, b2); }
+    if (r.shape === 'octagon') { const k = 3 + rng.int(2); for (const [cxs, cys] of corners) for (let i = 0; i < k; i++) for (let j = 0; j < k - i; j++) { const x = cxs ? X1 - i : r.x0 + i, y = cys ? Y1 - j : r.y0 + j; if (!keep(x, y)) set(x, y, T.WALL); } }
+    if (r.shape === 'lshape') corner(rng.pick(corners), Math.floor(r.w / 2) - 2, Math.floor(r.h / 2) - 2);
+  }
+  // 지형지물: 배치 종류 두 가지를 섞고 크기·개수도 무작위. 덩어리끼리·벽과는 한 칸 이상 띄워 막힌 구석이 없게 한다
   const pillars = [];
   for (const r of rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') {
-    r.layout = r.type === 'boss' ? 'corners' : rng.pick(LAYOUTS);
+    const lay = r.type === 'boss' ? ['corners'] : [rng.pick(LAYOUTS), rng.pick(LAYOUTS)]; r.layout = [...new Set(lay)].join('+');
     const mine = [], place = (x, y, bw, bh) => {
-      if (x < r.x0 + 1 || y < r.y0 + 1 || x + bw > r.x0 + r.w - 1 || y + bh > r.y0 + r.h - 1) return false;
-      for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) if (Math.abs(xx - r.cx) <= 1 || Math.abs(yy - r.cy) <= 1) return false;
-      if (mine.some(p => x <= p.x + p.w && p.x <= x + bw && y <= p.y + p.h && p.y <= y + bh)) return false;   // 한 칸 이상 떨어져 있어야
+      for (let yy = y - 1; yy <= y + bh; yy++) for (let xx = x - 1; xx <= x + bw; xx++) {
+        if (xx < r.x0 || yy < r.y0 || xx >= r.x0 + r.w || yy >= r.y0 + r.h || tiles[yy * w + xx] !== T.FLOOR) return false;   // 둘레 한 칸까지 바닥이어야
+        if (xx >= x && xx < x + bw && yy >= y && yy < y + bh && (Math.abs(xx - r.cx) <= 1 || Math.abs(yy - r.cy) <= 1)) return false;
+      }
       const p = { room: r.id, x, y, w: bw, h: bh }; mine.push(p); pillars.push(p);
       for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) set(xx, yy, T.WALL);
       return true;
     };
-    const qx = Math.floor(r.w / 4), qy = Math.floor(r.h / 4);
-    if (r.layout === 'corners') for (const [px, py] of [[r.x0 + qx - 1, r.y0 + qy - 1], [r.x0 + r.w - qx - 1, r.y0 + qy - 1], [r.x0 + qx - 1, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1, r.y0 + r.h - qy - 1]]) place(px, py, 2, 2);
-    if (r.layout === 'rows') for (const yy of [r.cy - 3, r.cy + 3]) for (let xx = r.x0 + 2; xx < r.x0 + r.w - 2; xx += 3) place(xx, yy, 1, 1);
-    if (r.layout === 'bars') for (const [px, py] of [[r.x0 + 3, r.y0 + 2], [r.x0 + r.w - 4, r.y0 + 2], [r.x0 + 3, r.cy + 2], [r.x0 + r.w - 4, r.cy + 2]]) place(px, py, 1, 3);
-    if (r.layout === 'diagonal') for (const [dx, dy] of [[-4, -3], [3, -3], [-4, 2], [3, 2], [-7, -4], [6, 3]]) place(r.cx + dx, r.cy + dy, 2, 2);
-    if (r.layout === 'scatter') for (let k = 0, n = 6 + rng.int(4); k < 60 && mine.length < n; k++) { const bw = 1 + rng.int(2); place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), bw, bw === 2 ? 1 : 1 + rng.int(2)); }
+    const qx = Math.floor(r.w / 4), qy = Math.floor(r.h / 4), j = () => rng.int(3) - 1;
+    for (const L of lay) {
+      if (L === 'corners') for (const [px, py] of [[r.x0 + qx - 1, r.y0 + qy - 1], [r.x0 + r.w - qx - 1, r.y0 + qy - 1], [r.x0 + qx - 1, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1, r.y0 + r.h - qy - 1]]) place(px + j(), py + j(), 2, 2);
+      if (L === 'rows') { const gap = 2 + rng.int(3); for (const yy of [r.cy - 3 - rng.int(2), r.cy + 3 + rng.int(2)]) for (let xx = r.x0 + 2 + rng.int(2); xx < r.x0 + r.w - 2; xx += gap) place(xx, yy, 1, 1); }
+      if (L === 'bars') for (const [px, py] of [[r.x0 + 3, r.y0 + 2], [r.x0 + r.w - 4, r.y0 + 2], [r.x0 + 3, r.cy + 2], [r.x0 + r.w - 4, r.cy + 2]]) if (rng.chance(0.75)) place(px + j(), py, 1, 2 + rng.int(2));
+      if (L === 'diagonal') for (const [dx, dy] of [[-4, -3], [3, -3], [-4, 2], [3, 2], [-7, -4], [6, 3]]) place(r.cx + dx + j(), r.cy + dy, 2, 1 + rng.int(2));
+      if (L === 'scatter') for (let k = 0, n = 4 + rng.int(6); k < 60 && mine.length < n + 2; k++) { const bw = 1 + rng.int(3); place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), bw, bw === 3 ? 1 : 1 + rng.int(2)); }
+      if (L === 'walls') for (const [px, py, bw, bh] of [[r.x0 + 2, r.cy - 4, 4, 1], [r.x0 + r.w - 6, r.cy + 3, 4, 1], [r.cx + 3, r.y0 + 2, 1, 3], [r.cx - 4, r.y0 + r.h - 5, 1, 3]]) if (rng.chance(0.7)) place(px + j(), py, bw, bh);
+    }
   }
   const doorOwner = {}; for (const d of doors) for (const k of d.tiles) doorOwner[k] = d.room;
   return { line, order, w, h, tiles, rooms, links, doors, doorOwner, pillars };
