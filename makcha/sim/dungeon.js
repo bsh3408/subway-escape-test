@@ -8,6 +8,7 @@ export const T = { WALL: 0, FLOOR: 1, DOOR: 2 };
 const SIZE = { start: [11, 9], battle: [19, 13], elite: [19, 13], chest: [11, 9], shop: [13, 9], event: [13, 11], exit: [11, 9], boss: [27, 19] };
 const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const CORRIDOR = 3;   // 통로 폭(타일)
+const LAYOUTS = ['corners', 'rows', 'bars', 'diagonal', 'scatter'];   // 방 안 지형지물 배치 종류
 
 function layout(rng, order) {
   // 주 경로: 시작 → 전투 방들 → 호선 보스. 뒤에 들어간 호선일수록 전투 방이 하나 더
@@ -70,14 +71,25 @@ export function generateFloor(seed, { line, order }) {
     }
     for (const id of [L.id, R.id]) { for (const k of tilesOf[id]) tiles[k] = T.DOOR; doors.push({ room: id, to: id === L.id ? R.id : L.id, tiles: tilesOf[id] }); }
   }
-  // 지형지물: 전투·엘리트·보스 방에 2×2 기둥 4개(방 네 귀퉁이 쪽, 가운데 십자 길은 비워 둠). 탄과 몸을 막는 엄폐물
+  // 지형지물: 전투·엘리트·보스 방마다 배치를 골라 바위·기둥을 놓는다(탄과 몸을 막는 엄폐물)
+  // 규칙: 가운데 십자 길(문으로 이어지는 길)은 비우고, 덩어리끼리·벽과는 한 칸 이상 띄워서 막힌 구석이 생기지 않게 한다
   const pillars = [];
   for (const r of rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') {
-    const qx = Math.floor(r.w / 4), qy = Math.floor(r.h / 4), inset = rng.int(2);
-    for (const [px, py] of [[r.x0 + qx - 1 + inset, r.y0 + qy - 1], [r.x0 + r.w - qx - 1 - inset, r.y0 + qy - 1], [r.x0 + qx - 1 + inset, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1 - inset, r.y0 + r.h - qy - 1]]) {
-      pillars.push({ room: r.id, x: px, y: py });
-      for (const [dx, dy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) set(px + dx, py + dy, T.WALL);
-    }
+    r.layout = r.type === 'boss' ? 'corners' : rng.pick(LAYOUTS);
+    const mine = [], place = (x, y, bw, bh) => {
+      if (x < r.x0 + 1 || y < r.y0 + 1 || x + bw > r.x0 + r.w - 1 || y + bh > r.y0 + r.h - 1) return false;
+      for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) if (Math.abs(xx - r.cx) <= 1 || Math.abs(yy - r.cy) <= 1) return false;
+      if (mine.some(p => x <= p.x + p.w && p.x <= x + bw && y <= p.y + p.h && p.y <= y + bh)) return false;   // 한 칸 이상 떨어져 있어야
+      const p = { room: r.id, x, y, w: bw, h: bh }; mine.push(p); pillars.push(p);
+      for (let yy = y; yy < y + bh; yy++) for (let xx = x; xx < x + bw; xx++) set(xx, yy, T.WALL);
+      return true;
+    };
+    const qx = Math.floor(r.w / 4), qy = Math.floor(r.h / 4);
+    if (r.layout === 'corners') for (const [px, py] of [[r.x0 + qx - 1, r.y0 + qy - 1], [r.x0 + r.w - qx - 1, r.y0 + qy - 1], [r.x0 + qx - 1, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1, r.y0 + r.h - qy - 1]]) place(px, py, 2, 2);
+    if (r.layout === 'rows') for (const yy of [r.cy - 3, r.cy + 3]) for (let xx = r.x0 + 2; xx < r.x0 + r.w - 2; xx += 3) place(xx, yy, 1, 1);
+    if (r.layout === 'bars') for (const [px, py] of [[r.x0 + 3, r.y0 + 2], [r.x0 + r.w - 4, r.y0 + 2], [r.x0 + 3, r.cy + 2], [r.x0 + r.w - 4, r.cy + 2]]) place(px, py, 1, 3);
+    if (r.layout === 'diagonal') for (const [dx, dy] of [[-4, -3], [3, -3], [-4, 2], [3, 2], [-7, -4], [6, 3]]) place(r.cx + dx, r.cy + dy, 2, 2);
+    if (r.layout === 'scatter') for (let k = 0, n = 6 + rng.int(4); k < 60 && mine.length < n; k++) { const bw = 1 + rng.int(2); place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), bw, bw === 2 ? 1 : 1 + rng.int(2)); }
   }
   const doorOwner = {}; for (const d of doors) for (const k of d.tiles) doorOwner[k] = d.room;
   return { line, order, w, h, tiles, rooms, links, doors, doorOwner, pillars };

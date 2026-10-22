@@ -4,7 +4,7 @@
 import { createRng } from './rng.js';
 import { generateFloor, isSolid, T } from './dungeon.js';
 import { INPUT, TILE, DT, TICK_HZ } from './constants.js';
-import { JOBS, WEAPONS, MONSTERS, WAVES, MATS } from './data.js';
+import { JOBS, WEAPONS, MONSTERS, WAVES, MATS, LINES, TRAPS } from './data.js';
 import { difficulty, GEAR } from './run.js';
 
 const DASH_SPEED = 420, PLAYER_SPEED = 140, ROLL_SPEED = 330, ROLL_T = 8, ROLL_CD = 24, INVULN = 18, REGEN_WAIT = 3 * TICK_HZ, REGEN_EVERY = 30, AIM_RANGE = 300, PICK_R = 14;
@@ -32,13 +32,21 @@ export function createWorld({ seed, job, line, order, loadout }) {
       props.push({ kind: 'crate', room: r.id, x: (tx + 0.5) * TILE, y: (ty + 0.7) * TILE, hp: 6, r: 8 }); break;
     }
   }
+  // 호선별 함정: 전투·엘리트·보스 방마다 그 호선의 함정을 놓는다
+  const traps = [], freeSpot = r => { for (let k = 0; k < 40; k++) { const tx = r.x0 + 1 + rng.int(r.w - 2), ty = r.y0 + 1 + rng.int(r.h - 2);
+    if (!isSolid(floor, tx, ty) && Math.hypot(tx - r.cx, ty - r.cy) > 3 && !traps.some(t => t.room === r.id && Math.hypot(t.x - (tx + 0.5) * TILE, t.y - (ty + 0.5) * TILE) < 40)) return [(tx + 0.5) * TILE, (ty + 0.5) * TILE]; } return null; };
+  for (const r of floor.rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') for (const kind of LINES[line].traps) {
+    const mode = TRAPS[kind].mode;
+    if (mode === 'drop') { traps.push({ kind, mode, room: r.id, t: 2 + rng.next() * 2 }); continue; }
+    for (let i = 0; i < 2; i++) { const p = freeSpot(r); if (p) traps.push({ kind, mode, room: r.id, x: p[0], y: p[1], r: mode === 'pool' ? 20 : 18, t: 1.5 + rng.next() * 3, warn: 0, on: false }); }
+  }
   return {
-    line, order, diff: difficulty(order), mods: modsOf(L.abilities), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
+    line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities), tick: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
       ...L.stats, maxShield: L.stats.maxShield + bonusShield, weapons: L.weapons.map(x => ({ ...x })), cur: Math.min(L.cur, L.weapons.length - 1), gear: { ...L.gear },
       cool: 0, kick: 0, invuln: 0, sinceHit: 99, regen: 0, skillCd: 0, skillHeld: false, swapHeld: false, itemHeld: false, rollHeld: false,
-      rollT: 0, rollCd: 0, rollA: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
+      rollT: 0, rollCd: 0, rollA: 0, slowT: 0, rootT: 0, rootCd: 0, dashT: 0, dashA: 0, dashDist: 0, dashHit: [] },
     mons: [], shots: [], eshots: [], allies: [], bombs: [], zones: [], props, pickups: [], loot: { parts: 0, mats: {} }, scanT: 0, hazardOffT: 0,
   };
 }
@@ -74,8 +82,9 @@ function movePlayer(w, input) {
   if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
     const x0 = p.x, y0 = p.y, d = DASH_SPEED * DT; moveBody(w, p, Math.cos(p.dashA) * d, Math.sin(p.dashA) * d, 5); p.dashDist += Math.hypot(p.x - x0, p.y - y0); return;
   }
-  if (p.rollT > 0) { p.rollT--; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
-  const sp = PLAYER_SPEED * w.mods.speedMul * DT;
+  if (p.rollT > 0) { p.rollT--; p.rootT = 0; const d = ROLL_SPEED * DT; moveBody(w, p, Math.cos(p.rollA) * d, Math.sin(p.rollA) * d, 5); return; }
+  if (p.rootT > 0) { p.rootT -= DT; return; }   // 덩굴에 묶임
+  const sp = PLAYER_SPEED * w.mods.speedMul * (p.slowT > 0 ? 0.6 : 1) * DT; if (p.slowT > 0) p.slowT--;
   moveBody(w, p, mx * sp, my * sp, 5);
 }
 
@@ -219,15 +228,18 @@ function updateShots(w, rng) {
 
 function enemyShot(w, m, a, sp, dmg, size = 3) { w.eshots.push({ x: m.x, y: m.y - MONSTERS[m.id].cy, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 3 * TICK_HZ, dmg, size, src: m.id }); }
 
-// ---------- 보스 패턴: 원형 탄막, 부채꼴 조준 사격, 돌진, 화석 소환을 돌아가며(체력 절반 아래면 더 세게) ----------
-const BOSS_PATTERNS = ['ring', 'fan', 'charge', 'summon'];
+// ---------- 보스 패턴: 원형·이중 탄막, 회오리 탄, 부채꼴 사격, 돌진, 화석 소환, 운석 낙하 중 직전과 다른 것을 무작위로 ----------
+const BOSS_PATTERNS = ['ring', 'double', 'spiral', 'fan', 'charge', 'summon', 'meteor'];
 function bossAct(w, m, rng) {
   const p = w.player, M = MONSTERS[m.id], a = Math.atan2(p.y - m.y, p.x - m.x), rage = m.hp < m.maxHp / 2;
-  m.pat = BOSS_PATTERNS[m.pattern++ % BOSS_PATTERNS.length]; w.events.push({ type: 'pattern', name: m.pat, uid: m.uid });
-  if (m.pat === 'ring') { const n = rage ? 16 : 11; for (let i = 0; i < n; i++) enemyShot(w, m, a + i / n * Math.PI * 2, M.shotSpeed, 1); }
-  if (m.pat === 'fan') { const n = rage ? 7 : 5; for (let i = 0; i < n; i++) enemyShot(w, m, a + (i / (n - 1) - 0.5) * 0.9, M.shotSpeed * 1.4, 1); }
-  if (m.pat === 'charge') { m.dash = 0.7; m.dashA = a; }
-  if (m.pat === 'summon') for (let i = 0; i < (rage ? 3 : 2); i++) addMon(w, m.room, i % 2 ? 'ammonite' : 'trilobite', m.x + (i - 1) * 30, m.y + 30, rng);
+  const pool = BOSS_PATTERNS.filter(x => x !== m.pat); m.pat = rng.pick(pool); w.events.push({ type: 'pattern', name: m.pat, uid: m.uid });
+  if (m.pat === 'ring') { const n = rage ? 22 : 16; for (let i = 0; i < n; i++) enemyShot(w, m, a + i / n * Math.PI * 2, M.shotSpeed, 1, 4); }
+  if (m.pat === 'double') { for (let i = 0; i < 14; i++) enemyShot(w, m, a + i / 14 * Math.PI * 2, M.shotSpeed * 0.9, 1, 4); m.ringLater = 0.35; }
+  if (m.pat === 'spiral') { m.spiralT = rage ? 2.4 : 1.8; m.spiralA = a; }
+  if (m.pat === 'fan') { const n = rage ? 9 : 7; for (let k = 0; k < 2; k++) for (let i = 0; i < n; i++) enemyShot(w, m, a + (i / (n - 1) - 0.5) * 1.0 + k * 0.07, M.shotSpeed * (1.3 + k * 0.25), 2, 3); }
+  if (m.pat === 'charge') { m.dash = rage ? 0.9 : 0.7; m.dashA = a; }
+  if (m.pat === 'summon') for (let i = 0; i < (rage ? 4 : 3); i++) addMon(w, m.room, ['trilobite', 'ammonite', 'germ'][i % 3], m.x + (i - 1.5) * 26, m.y + 30, rng);
+  if (m.pat === 'meteor') for (let i = 0; i < (rage ? 7 : 5); i++) w.falls.push({ kind: 'meteor', x: p.x + rng.range(-70, 70), y: p.y + rng.range(-50, 50), t: 0.8 + i * 0.12, r: 22 });
 }
 
 function updateMons(w, rng) {
@@ -240,8 +252,10 @@ function updateMons(w, rng) {
     m.cd -= DT; m.touch -= DT;
     let vx = dx / d, vy = dy / d, sp = m.speed * (m.slowT > 0 ? 0.5 : 1);
     if (M.kind === 'boss') {
+      if (m.spiralT > 0) { m.spiralT -= DT; if (Math.floor(m.spiralT * 30) % 3 === 0) { m.spiralA += 0.32; for (const o of [0, Math.PI]) enemyShot(w, m, m.spiralA + o, M.shotSpeed * 1.1, 1, 3); } }
+      if (m.ringLater > 0 && (m.ringLater -= DT) <= 0) for (let i = 0; i < 14; i++) enemyShot(w, m, i / 14 * Math.PI * 2 + Math.PI / 14, M.shotSpeed * 1.2, 1, 4);
       if (m.dash > 0) { m.dash -= DT; vx = Math.cos(m.dashA); vy = Math.sin(m.dashA); sp = 240; }
-      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { bossAct(w, m, rng); m.cd = m.hp < m.maxHp / 2 ? 1.3 : 1.8; } }
+      else if (m.windT > 0) { sp = 0; m.windT -= DT; if (m.windT <= 0) { bossAct(w, m, rng); m.cd = m.hp < m.maxHp / 2 ? 0.9 : 1.3; } }
       else if (m.cd <= 0 && d < 340) { m.windT = 0.55; w.events.push({ type: 'aim', uid: m.uid }); }
     } else if (M.kind === 'ranged') {   // 몬스터마다 정한 수·퍼짐·속도·크기로 쏜다
       const A = M.attack;
@@ -263,7 +277,9 @@ function updateMons(w, rng) {
   }
   for (const m of [...w.mons]) if (m.hp <= 0) {
     w.events.push({ type: 'kill', uid: m.uid, id: m.id, x: m.x, y: m.y });
-    const sp = MONSTERS[m.id].split; if (sp) for (const o of [-12, 12]) addMon(w, m.room, sp, m.x + o, m.y, rng);   // 내성균: 둘로 나뉜다
+    const sp = MONSTERS[m.id].split;   // 내성균: 둘로 나뉜다. 벽·기둥·상자에 끼지 않는 자리를 골라서
+    if (sp) { const spots = [[-12, 0], [12, 0], [0, -10], [0, 10], [-8, -8], [8, 8]].map(([dx, dy]) => [m.x + dx, m.y + dy]).filter(([x, y]) => !blocked(w, x, y, 5));
+      for (let i = 0; i < 2; i++) { const [x, y] = spots[i] || [m.x, m.y]; addMon(w, m.room, sp, x, y, rng); } }
     const boss = MONSTERS[m.id].kind === 'boss';
     if (boss) w.pickups.push({ kind: 'parts', n: 6, x: m.x, y: m.y });
     else if (rng.chance(w.mods.scavenger ? 0.55 : 0.35)) w.pickups.push({ kind: 'parts', n: 1, x: m.x, y: m.y });
@@ -312,9 +328,43 @@ function updateSkills(w, input) {
   for (const z of w.zones) {
     z.t--;
     if (z.kind === 'heal' && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 1) { z.acc -= 1; p.hp = Math.min(p.maxHp, p.hp + 1); w.events.push({ type: 'heal' }); }   // 응급 처치 구역: 1초마다 체력 1
+    if ((z.kind === 'lava' || z.kind === 'fire' || z.kind === 'gas' || z.kind === 'acidpool') && Math.hypot(p.x - z.x, p.y - z.y) < z.r && (z.acc += DT) >= 0.8) { z.acc = 0; hurtPlayer(w, 1); }   // 함정 장판은 0.8초마다 피해 1
     if (z.kind === 'acid') for (const m of w.mons) if (Math.hypot(m.x - z.x, m.y - z.y) < z.r + m.r) m.hp -= 3 * DT;   // 산성 웅덩이: 밟은 적에게 초당 3
   }
   w.zones = w.zones.filter(z => z.t > 0);
+}
+
+// ---------- 함정: 그 방에서 싸우는 동안만 움직인다(바닥형 함정은 늘 켜져 있음) ----------
+function trapBlast(w, x, y, r, kind) {
+  const p = w.player; w.events.push({ type: 'trapHit', kind, x, y, r });
+  if (Math.hypot(p.x - x, p.y - y) < r) hurtPlayer(w, 1);
+  for (const m of w.mons) if (Math.hypot(m.x - x, m.y - y) < r + m.r) hitMon(w, m, 6);
+}
+function updateTraps(w, rng) {
+  const p = w.player, here = roomOf(w, p.x, p.y), fighting = here >= 0 && w.rooms[here].locked;
+  if (p.rootCd > 0) p.rootCd -= DT;
+  for (const t of w.traps) {
+    if (t.room !== here) continue;
+    if (t.mode === 'pool') { if (Math.hypot(p.x - t.x, p.y - t.y) < t.r) {
+      if (TRAPS[t.kind].slow) p.slowT = 2;
+      if (TRAPS[t.kind].root && p.rootCd <= 0 && p.rollT <= 0) { p.rootT = 0.7; p.rootCd = 3; w.events.push({ type: 'trapHit', kind: t.kind, x: t.x, y: t.y, r: t.r }); } } continue; }
+    if (!fighting) continue;
+    t.t -= DT;
+    if (t.mode === 'vent') {
+      if (t.warn > 0) { if ((t.warn -= DT) <= 0) { trapBlast(w, t.x, t.y, 26, t.kind); const z = TRAPS[t.kind].zone; if (z) w.zones.push({ kind: z, x: t.x, y: t.y, r: 20, t: Math.round(2.5 * TICK_HZ), acc: 0.5 }); t.t = 4 + rng.next() * 3; } }
+      else if (t.t <= 0) { t.warn = 1; w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: 26 }); }
+    } else if (t.mode === 'drop' && t.t <= 0) {
+      for (let i = 0, n = 1 + (w.order >= 2 ? 1 : 0); i < n; i++) { let x = p.x, y = p.y;
+        for (let k = 0; k < 10; k++) { x = p.x + rng.range(-45, 45); y = p.y + rng.range(-35, 35); if (!solidAt(w, x, y)) break; }
+        w.falls.push({ kind: t.kind, x, y, t: 0.9, r: 20 }); w.events.push({ type: 'trapWarn', kind: t.kind, x, y, r: 20 }); }
+      t.t = 2.5 + rng.next() * 2;
+    } else if (t.mode === 'pulse') {
+      if (t.t <= 0) { t.on = !t.on; t.t = 2; if (t.on) w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: t.r }); }
+      if (t.on && Math.hypot(p.x - t.x, p.y - t.y) < t.r) { hurtPlayer(w, 1); }
+    }
+  }
+  for (const d of w.falls) if ((d.t -= DT) <= 0) { trapBlast(w, d.x, d.y, d.r, d.kind); const z = TRAPS[d.kind].zone; if (z) w.zones.push({ kind: z, x: d.x, y: d.y, r: 18, t: Math.round(3 * TICK_HZ), acc: 0.5 }); }
+  w.falls = w.falls.filter(d => d.t > 0);
 }
 
 export function step(w, input) {
@@ -327,6 +377,7 @@ export function step(w, input) {
   updateShots(w, rng);
   updateMons(w, rng);
   updateRooms(w, rng);
+  updateTraps(w, rng);
   w.tick++; w.rng = rng.state();
 }
 export { T };

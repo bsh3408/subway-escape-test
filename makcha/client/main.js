@@ -108,6 +108,8 @@ function feed(w) {
     else if (e.type === 'getWeapon') tip(`🔫 ${josa(WEAPONS[e.id].name, '을', '를')} 들었다 · ${WEAPONS[e.id].traitText}`, 2.5);
     else if (e.type === 'swap') tip(`🔁 ${WEAPONS[p.weapons[p.cur].id].name}`, 0.9);
     else if (e.type === 'zap') fx.zaps = (fx.zaps || []).concat([{ ...e, t: 0.12 }]);
+    else if (e.type === 'trapHit') { fx.rings.push({ x: e.x, y: e.y, r: e.r, t: 0.35, c: { vent: '#ff7a2a', meteor: '#ffb060', gas: '#9ad050', heat: '#ffb040', icicle: '#bfe8ff', drip: '#ff9a4a', acidrain: '#b8f040', vine: '#6ac050' }[e.kind] || '#fff' });
+      for (let i = 0; i < 14; i++) fx.parts.push({ x: e.x, y: e.y - 4, vx: (Math.random() - 0.5) * 200, vy: (Math.random() - 0.8) * 160, t: 0.45, c: { vent: '#ff8a3a', meteor: '#8a6a4a', icicle: '#e8f8ff' }[e.kind] || '#ffd060' }); if (e.kind === 'meteor' || e.kind === 'vent') fx.shake = Math.max(fx.shake, 4); }
     else if (e.type === 'burn') fx.parts.push({ x: e.x + (Math.random() - 0.5) * 8, y: e.y, vx: 0, vy: -30, t: 0.35, c: Math.random() < 0.5 ? '#ff8a3a' : '#ffd060' });
     else if (e.type === 'sleep') { const m = w.mons.find(o => o.uid === e.uid); if (m) fx.nums.push({ x: m.x, y: m.y - 28, v: 'Zz', t: 1.2, blue: true }); }
     else if (e.type === 'propBreak') { for (let i = 0; i < 10; i++) fx.parts.push({ x: e.x, y: e.y - 6, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.7) * 120, t: 0.4, c: i % 2 ? '#b9844a' : '#6a4a2a' }); fx.shake = Math.max(fx.shake, 2); }
@@ -122,23 +124,6 @@ function updateFx(dt) {
   fx.skillFlash = Math.max(0, fx.skillFlash - dt); fx.zaps = (fx.zaps || []).filter(z => (z.t -= dt) > 0);
   for (const L of [fx.nums, fx.parts, fx.flashes, fx.rings, fx.trail]) { for (const o of L) { o.t -= dt; if (o.vx !== undefined) { o.x += o.vx * dt; o.y += o.vy * dt; } } for (let i = L.length - 1; i >= 0; i--) if (L[i].t <= 0) L.splice(i, 1); }
   fx.shake = Math.max(0, fx.shake - dt * 20);
-}
-
-// ---------- 스킬 칸(오른쪽 아래): 이름과 남은 대기 시간 ----------
-function drawWeaponHud(w) {
-  const p = w.player, X = VIEW_W - 170, Y = VIEW_H - 50;
-  p.weapons.forEach((it, i) => { const on = i === p.cur, W = WEAPONS[it.id], g = A.weapons[W.sprite], y = Y + (i - (p.weapons.length - 1)) * 22 + 10;
-    x.fillStyle = on ? 'rgba(224,176,74,.35)' : 'rgba(10,12,16,.7)'; x.fillRect(X, y, 104, 20); x.strokeStyle = on ? '#e0b04a' : '#3a3e46'; x.lineWidth = 1; x.strokeRect(X + 0.5, y + 0.5, 103, 19);
-    x.drawImage(g, X + 4, y + 10 - Math.round(g.height / 2)); x.font = 'bold 8px sans-serif'; x.textAlign = 'left'; x.fillStyle = '#fff'; x.fillText(`${W.name}${it.lv ? ' +' + it.lv : ''}`, X + 26, y + 13); });
-  x.font = '7px sans-serif'; x.fillStyle = '#c8c2b0'; x.textAlign = 'left'; x.fillText(`Q 바꾸기 · 부품 ${w.loot.parts}`, X, Y + 40);
-}
-function drawSkillHud(w) {
-  const p = w.player, S = JOBS[p.job].skill, X = VIEW_W - 58, Y = VIEW_H - 58, k = p.skillCd / (S.cd * 30);
-  x.fillStyle = 'rgba(10,12,16,.7)'; x.beginPath(); x.arc(X + 24, Y + 24, 24, 0, 7); x.fill();
-  if (k > 0) { x.fillStyle = 'rgba(0,0,0,.55)'; x.beginPath(); x.moveTo(X + 24, Y + 24); x.arc(X + 24, Y + 24, 24, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * k); x.fill(); }
-  x.strokeStyle = k > 0 ? '#5a5f68' : '#e0b04a'; x.lineWidth = 2; x.beginPath(); x.arc(X + 24, Y + 24, 24, 0, 7); x.stroke();
-  x.textAlign = 'center'; x.fillStyle = '#fff'; x.font = 'bold 9px sans-serif'; x.fillText(S.name, X + 24, Y + 22);
-  x.font = 'bold 8px sans-serif'; x.fillStyle = k > 0 ? '#ffb070' : '#e0b04a'; x.fillText(k > 0 ? Math.ceil(p.skillCd / 30) + '초' : '우클릭', X + 24, Y + 33);
 }
 
 // ---------- 미니맵: 지나간 방과 문 너머로 본 방만 ----------
@@ -165,7 +150,18 @@ function drawWorld(w, t) {
     if (r.type === 'exit' || (r.type === 'boss' && st.cleared)) { const g = 0.5 + Math.sin(t * 4) * 0.2; x.fillStyle = `rgba(120,200,255,${g})`; x.beginPath(); x.ellipse(X, Y, 14, 7, 0, 0, 7); x.fill(); x.fillStyle = '#e8f6ff'; x.font = 'bold 9px sans-serif'; x.textAlign = 'center'; x.fillText('다음 역', X, Y - 12); }
   }
   // 스킬 효과(바닥): 응급 처치 회복 구역, 돌진 잔상
-  for (const z of w.zones) { const acid = z.kind === 'acid'; x.fillStyle = acid ? `rgba(170,220,60,${0.35 + 0.08 * Math.sin(t * 8)})` : `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); if (!acid) { x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); } }
+  for (const z of w.zones) { const acid = z.kind !== 'heal', ZC = { acid: '170,220,60', acidpool: '190,240,70', lava: '255,110,30', fire: '255,170,60', gas: '140,190,80' }[z.kind]; x.fillStyle = acid ? `rgba(${ZC},${0.35 + 0.08 * Math.sin(t * 8)})` : `rgba(90,220,120,${0.18 + 0.06 * Math.sin(t * 6)})`; x.beginPath(); x.ellipse(z.x, z.y, z.r, z.r * 0.55, 0, 0, 7); x.fill(); if (!acid) { x.strokeStyle = 'rgba(140,255,170,.7)'; x.stroke(); } }
+  // 함정: 분화구·분출구(경고 중이면 붉게 깜빡), 웅덩이·덩굴, 전기 바닥, 떨어질 자리 표시
+  for (const tr of w.traps) { if (tr.x === undefined) continue; const X = Math.round(tr.x), Y = Math.round(tr.y);
+    if (tr.mode === 'vent') { const C = { vent: ['#2a1a14', '#ff7a2a'], gas: ['#1e2a1a', '#9ad050'], heat: ['#3a2a1a', '#ffb040'] }[tr.kind]; x.fillStyle = C[0]; x.beginPath(); x.ellipse(X, Y, 10, 6, 0, 0, 7); x.fill(); x.fillStyle = C[1]; x.globalAlpha = 0.5 + 0.3 * Math.sin(t * 5 + X); x.beginPath(); x.ellipse(X, Y, 5, 3, 0, 0, 7); x.fill(); x.globalAlpha = 1;
+      if (tr.warn > 0) { x.strokeStyle = `rgba(255,60,40,${0.5 + 0.5 * Math.abs(Math.sin(t * 20))})`; x.lineWidth = 2; x.beginPath(); x.ellipse(X, Y, 26, 15, 0, 0, 7); x.stroke(); } }
+    else if (tr.mode === 'pool') { x.fillStyle = tr.kind === 'vine' ? 'rgba(70,140,50,.55)' : 'rgba(80,140,210,.45)'; x.beginPath(); x.ellipse(X, Y, tr.r, tr.r * 0.55, 0, 0, 7); x.fill();
+      if (tr.kind === 'vine') { x.strokeStyle = '#3a7a2a'; x.lineWidth = 1; for (let i = 0; i < 4; i++) { x.beginPath(); x.arc(X + (i - 1.5) * 8, Y, 4, Math.PI, 0); x.stroke(); } } }
+    else if (tr.mode === 'pulse') { x.fillStyle = tr.on ? 'rgba(255,230,80,.55)' : 'rgba(90,95,104,.6)'; x.fillRect(X - tr.r, Y - tr.r * 0.5, tr.r * 2, tr.r); x.strokeStyle = '#2a2d33'; x.strokeRect(X - tr.r + 0.5, Y - tr.r * 0.5 + 0.5, tr.r * 2 - 1, tr.r - 1);
+      if (tr.on && Math.random() < 0.5) fx.parts.push({ x: X + (Math.random() - 0.5) * tr.r * 2, y: Y + (Math.random() - 0.5) * tr.r, vx: 0, vy: -40, t: 0.15, c: '#fff6a0' }); } }
+  for (const d of w.falls) { const k = Math.max(0, d.t / 0.9), X = Math.round(d.x), Y = Math.round(d.y); x.fillStyle = `rgba(0,0,0,${0.45 - 0.3 * k})`; x.beginPath(); x.ellipse(X, Y, d.r * (1 - k * 0.6), d.r * 0.55 * (1 - k * 0.6), 0, 0, 7); x.fill();
+    x.strokeStyle = 'rgba(255,60,40,.85)'; x.lineWidth = 1.5; x.beginPath(); x.ellipse(X, Y, d.r, d.r * 0.55, 0, 0, 7); x.stroke();
+    const FC = { meteor: '#5a3a2a', icicle: '#bfe8ff', drip: '#c86a2a', acidrain: '#b8f040' }[d.kind] || '#888'; const h = k * 90; x.fillStyle = FC; x.fillRect(X - 3, Y - 6 - h, 6, 6); if (d.kind === 'meteor') { x.fillStyle = 'rgba(255,140,40,.7)'; x.fillRect(X - 2, Y - 12 - h, 4, 6); } }
   for (const k of w.pickups) {   // 떨어진 물건: 무기(그림), 재료(색 주머니), 부품(톱니)
     const X = Math.round(k.x), Y = Math.round(k.y + Math.sin(t * 4 + k.x) * 1.5);
     x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(X - 5, Math.round(k.y) + 3, 10, 2);
@@ -197,8 +193,6 @@ function drawWorld(w, t) {
   for (const n of fx.nums) { const up = (0.7 - n.t) * 24; x.strokeStyle = '#000'; x.strokeText(n.v, n.x, n.y - up); x.fillStyle = n.red ? '#ff5a4a' : n.blue ? '#8ad0ff' : n.green ? '#7ae08a' : n.gold ? '#ffd060' : '#fff'; x.fillText(n.v, n.x, n.y - up); }
   x.restore();
   if (w.hazardOffT > 0 || fx.skillFlash > 0) { x.fillStyle = w.hazardOffT > 0 ? 'rgba(170,220,255,.10)' : `rgba(255,255,255,${fx.skillFlash * 0.4})`; x.fillRect(0, 0, VIEW_W, VIEW_H); }
-  drawWeaponHud(w);
-  drawSkillHud(w);
   drawMinimap(w);
 }
 
@@ -210,14 +204,24 @@ function hud(w, dt) {
   const sec = Math.floor((game.run.ticks + w.tick) / 30);
   $('where').textContent = `${w.line}호선 ${LINES[w.line].name} · ${w.order + 1}/${RUN_LINES} · ⏱ ${clock(sec)}`;
   if (tipT > 0 && (tipT -= dt) <= 0) $('tip').classList.remove('on');
+  // 무기 칸(웹 글씨): 바뀔 때만 다시 만든다
+  const key = p.cur + ':' + p.weapons.map(it => it.id + it.lv).join(',');
+  if (key !== lastSlots) { lastSlots = key; $('wslots').innerHTML = p.weapons.map((it, i) => `<div class="ws ${i === p.cur ? 'on' : ''}"><canvas width="22" height="12" data-w="${it.id}"></canvas><div>${WEAPONS[it.id].name}${it.lv ? ' +' + it.lv : ''}<small>${WEAPONS[it.id].traitText}</small></div></div>`).join('');
+    for (const c of $('wslots').querySelectorAll('canvas')) { const g = c.getContext('2d'), im = A.weapons[WEAPONS[c.dataset.w].sprite]; g.imageSmoothingEnabled = false; g.drawImage(im, Math.round((22 - im.width) / 2), Math.round((12 - im.height) / 2)); } }
+  $('parts').textContent = `부품 ${game.run.parts + w.loot.parts}`;
+  const near = w.pickups.find(k => k.kind === 'weapon' && Math.hypot(k.x - p.x, k.y - p.y) < 22);
+  $('pickhint').textContent = near ? `E 줍기: ${WEAPONS[near.id].name}${near.lv ? ' +' + near.lv : ''}` : '';
+  const S = JOBS[p.job].skill, k = p.skillCd / Math.max(1, Math.round(S.cd * 30 * w.mods.skillCdMul));
+  $('skill').classList.toggle('cd', k > 0); $('skillFill').style.height = Math.min(100, k * 100) + '%'; $('skillName').textContent = S.name; $('skillCd').textContent = k > 0 ? Math.ceil(p.skillCd / 30) + '초' : '우클릭';
 }
+let lastSlots = '';
 
 // ---------- 흐름: 직업 고르기 → 환승역(열린 호선 중 3개) → 호선 던전 → … 5개 → 지상 출구 ----------
 const game = { w: null, bg: null, acc: 0, run: null, open: [1, 2, 3, 4, 5, 6, 7, 8, 9] };
 const clock = sec => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, '0')}`;
 // 교사가 열어 둔 호선(연구소에 연결되어 있을 때만 서버에서 읽고, 아니면 모두 열림)
 async function loadOpenLines() { try { if (typeof supaRpc === 'function') { const o = await supaRpc('subway_lines_get', {}); if (o?.open?.length) game.open = o.open; } } catch (e) {} }
-function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; }
+function menu(html) { $('card').innerHTML = html; $('menu').hidden = false; $('hud').hidden = true; $('loadout').hidden = true; }
 function jobSelect() {
   menu(`<h1>🚇 막차: 지하 생존기</h1><p>환승역마다 호선 3개 중 하나를 골라 <b>호선 ${RUN_LINES}개</b>를 지나면 탈출한다. 걸린 시간이 기록된다. WASD로 이동, 마우스 왼쪽(또는 J)으로 가까운 적을 자동 조준해 쏜다, 마우스 오른쪽(또는 K)으로 직업 스킬, Shift로 구르기(구르는 동안 공격을 피함), Q로 무기 바꾸기, E로 무기 줍기(무기는 2개까지). 방에 들어가면 문이 잠기고, 적을 모두 쓰러뜨리면 열린다. 호선 끝의 보스를 쓰러뜨리면 다음 환승역으로 가는 포털이 열린다.</p>
     <div class="jobs">${JOB_ORDER.map(j => `<button class="job" data-j="${j}"><canvas width="19" height="30" data-c="${JOBS[j].sprite}"></canvas>${JOBS[j].name}<br><small style="color:var(--sub)">${WEAPONS[JOBS[j].weapon].name}<br>${WEAPONS[JOBS[j].weapon].traitText}<br>우클릭: ${JOBS[j].skill.name}</small></button>`).join('')}</div>`);
@@ -256,7 +260,7 @@ function transfer() {
 }
 function startLine(n) {
   const w = enterLine(game.run, n); game.w = w; game.bg = bakeFloor(w.floor); game.acc = 0;
-  $('menu').hidden = true; $('hud').hidden = false; tip(`🚇 ${n}호선 ${LINES[n].name} · 재난: ${LINES[n].hazard}`, 3);
+  $('menu').hidden = true; $('hud').hidden = false; $('loadout').hidden = false; lastSlots = ''; tip(`🚇 ${n}호선 ${LINES[n].name} · 함정: ${LINES[n].trapText}`, 4);
 }
 function endLine(w) {
   const r = game.run; finishLine(r, w); game.w = null;

@@ -28,22 +28,28 @@ export const MONSTERS = {
     attack: { type: 'shoot', n: 1, spread: 0, speed: 175, size: 3, wind: 0.3, cd: 1.5 }, attackText: '작고 빠른 균 한 발' },
   ammonite:  { name: '암모나이트', hp: 9, speed: 50, r: 9, cy: 10, kind: 'roller', atk: 1, dashSpeed: 260,
     attack: { type: 'roll', wind: 0.45, dash: 0.6, reach: 220, cd: 2.2, ink: { n: 8, speed: 120, size: 4 } }, attackText: '웅크렸다 굴러오고, 멈추면 먹물을 사방으로 뿜는다' },
-  fossilrex: { name: '화석 짜깁기 공룡', hp: 240, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140,
-    attack: { type: 'boss', speed: 140 }, attackText: '원형 탄막, 부채꼴 사격, 돌진, 화석 소환을 번갈아 쓴다' },
+  fossilrex: { name: '화석 짜깁기 공룡', hp: 330, speed: 45, r: 24, cy: 30, kind: 'boss', atk: 2, shotSpeed: 140,
+    attack: { type: 'boss', speed: 140 }, attackText: '원형·이중 탄막, 회오리 탄, 부채꼴 사격, 돌진, 화석 소환, 운석 낙하를 불규칙하게 쓴다' },
 };
 // 방마다 물결 목록, 물결은 [몬스터, 마리 수] 묶음 목록
 export const WAVES = { battle: [[['trilobite', 3]], [['ammonite', 2], ['germ', 1]]], elite: [[['trilobite', 4], ['ammonite', 1]], [['germ', 3], ['ammonite', 2]]], boss: [[['fossilrex', 1]]] };
 // 9개 호선(혼합안). 실내 모습·몬스터·보스·재난은 1호선부터 차례로 채운다. 지금은 1호선 몬스터를 모든 호선에 임시로 쓴다
 export const LINES = {
-  1: { name: '지층 공사선', color: '#0052A4', unit: '지질시대, 대멸종', hazard: '낙석·먼지', ready: true },
-  2: { name: '진화 실험선', color: '#00A84D', unit: '자연선택, 생물다양성', hazard: '감염 구름' },
-  3: { name: '텃밭 마을선', color: '#EF7C1C', unit: '생태계 구성, 먹이 관계', hazard: '생태 교란' },
-  4: { name: '녹슨 침수선', color: '#00A5DE', unit: '산화·환원', hazard: '침수·부식' },
-  5: { name: '산성비 매연선', color: '#996CAC', unit: '산·염기, 중화', hazard: '산성비' },
-  6: { name: '냉동 창고선', color: '#CD7C2F', unit: '에너지 출입', hazard: '한파' },
-  7: { name: '폭염 지상선', color: '#747F00', unit: '온난화, 엘니뇨, 사막화', hazard: '폭염·모래 폭풍' },
-  8: { name: '정전 발전소선', color: '#E6186C', unit: '태양 에너지, 발전, 효율', hazard: '정전' },
-  9: { name: '관제 센터선', color: '#BDB092', unit: '감염병, 빅데이터·AI', hazard: '감염병·데이터 교란' },
+  1: { name: '지층 공사선', color: '#0052A4', unit: '지질시대, 대멸종', hazard: '낙석·먼지', traps: ['vent', 'meteor'], trapText: '화산 분화구가 경고 뒤 분출해 용암을 남기고, 표시된 자리에 운석이 떨어진다(대멸종의 원인 가설)', ready: true },
+  2: { name: '진화 실험선', color: '#00A84D', unit: '자연선택, 생물다양성', hazard: '감염 구름', traps: ['gas', 'spark'], trapText: '배양 탱크에서 감염 구름이 새어 나오고, 고장 난 실험 장비 바닥에 전기가 흐른다' },
+  3: { name: '텃밭 마을선', color: '#EF7C1C', unit: '생태계 구성, 먹이 관계', hazard: '생태 교란', traps: ['vine', 'puddle'], trapText: '밟으면 덩굴이 발을 묶고, 연못에서는 느려진다' },
+  4: { name: '녹슨 침수선', color: '#00A5DE', unit: '산화·환원', hazard: '침수·부식', traps: ['puddle', 'drip'], trapText: '물웅덩이에서 느려지고, 녹슨 천장에서 쇳물이 떨어진다' },
+  5: { name: '산성비 매연선', color: '#996CAC', unit: '산·염기, 중화', hazard: '산성비', traps: ['acidrain', 'gas'], trapText: '표시된 자리에 산성비가 떨어져 웅덩이를 남기고, 매연이 뿜어 나온다' },
+  6: { name: '냉동 창고선', color: '#CD7C2F', unit: '에너지 출입', hazard: '한파', traps: ['icicle', 'puddle'], trapText: '천장에서 고드름이 떨어지고, 얼음 바닥에서 느려진다' },
+  7: { name: '폭염 지상선', color: '#747F00', unit: '온난화, 엘니뇨, 사막화', hazard: '폭염·모래 폭풍', traps: ['heat', 'meteor'], trapText: '뜨거운 지면이 분출하고, 모래 폭풍에 돌이 날아든다' },
+  8: { name: '정전 발전소선', color: '#E6186C', unit: '태양 에너지, 발전, 효율', hazard: '정전', traps: ['spark', 'heat'], trapText: '전기 바닥이 번갈아 켜지고, 과열된 발전기가 열기를 뿜는다' },
+  9: { name: '관제 센터선', color: '#BDB092', unit: '감염병, 빅데이터·AI', hazard: '감염병·데이터 교란', traps: ['spark', 'gas'], trapText: '보안 전기 바닥과 오염된 공기 정화 장치' },
 };
 // 장비 재료(아이템 방·상자·적에게서 나옴)
 export const MATS = { cloth: '천', rubber: '고무', glass: '유리', filter: '필터', scrap: '고철', leather: '가죽' };
+// 함정 종류: vent 분출구(경고 뒤 분출, 자리에 장판), drop 떨어짐(플레이어 근처 표시 뒤 충돌), pool 상시 바닥(느려짐·묶임), pulse 깜빡이는 전기 바닥
+export const TRAPS = {
+  vent: { mode: 'vent', name: '화산 분화구', zone: 'lava' }, gas: { mode: 'vent', name: '가스 분출구', zone: 'gas' }, heat: { mode: 'vent', name: '뜨거운 지면', zone: 'fire' },
+  meteor: { mode: 'drop', name: '운석' }, acidrain: { mode: 'drop', name: '산성비', zone: 'acidpool' }, icicle: { mode: 'drop', name: '고드름' }, drip: { mode: 'drop', name: '쇳물' },
+  puddle: { mode: 'pool', name: '물웅덩이', slow: true }, vine: { mode: 'pool', name: '덩굴', root: true }, spark: { mode: 'pulse', name: '전기 바닥' },
+};

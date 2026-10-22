@@ -16,7 +16,15 @@ canvas{image-rendering:pixelated;display:block}
 .bar i{display:block;height:100%}.bar span{position:absolute;inset:0;text-align:center;font-size:clamp(11px,1.2vw,15px);font-weight:800;line-height:clamp(14px,1.7vw,22px);text-shadow:0 0 3px #000}
 #hp i{background:#d84a3a}#sh i{background:#8aa8c8}#en i{background:#5ab0e0}
 #where{background:var(--panel);border-radius:10px;padding:4px 10px;font-size:14px;align-self:flex-start}
-#tip{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
+#loadout{position:fixed;right:max(14px,env(safe-area-inset-right,0px));bottom:14px;display:flex;gap:10px;align-items:flex-end;pointer-events:none}
+#loadout[hidden]{display:none}
+.wslots{display:grid;gap:5px;min-width:clamp(170px,17vw,240px)}
+.ws{display:flex;align-items:center;gap:8px;background:var(--panel);border:2px solid rgba(255,255,255,.12);border-radius:9px;padding:5px 9px;font-size:clamp(13px,1.3vw,16px);font-weight:700}
+.ws.on{border-color:var(--acc);background:rgba(224,176,74,.22)}.ws canvas{image-rendering:pixelated;width:40px;height:22px}.ws small{display:block;font-weight:400;color:var(--sub);font-size:.78em}
+.whelp{font-size:12px;color:var(--sub);text-align:right}#pickhint{font-size:13px;color:#ffe9a0;font-weight:700;text-align:right}
+.skill{width:clamp(70px,7vw,96px);height:clamp(70px,7vw,96px);border-radius:50%;background:var(--panel);border:3px solid var(--acc);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-weight:800;font-size:clamp(12px,1.2vw,15px);position:relative;overflow:hidden}
+.skill i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}.skill b,.skill span{position:relative}.skill span{font-size:.85em;color:var(--acc)}.skill.cd{border-color:#5a5f68}.skill.cd span{color:#ffb070}
+#tip{position:fixed;left:50%;top:clamp(56px,7vw,84px);transform:translateX(-50%);max-width:min(70vw,720px);text-align:center;background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
 #tip.on{opacity:1}
 #menu{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(8,9,12,.88)}
 #menu[hidden]{display:none}
@@ -34,6 +42,8 @@ canvas{image-rendering:pixelated;display:block}
   <div class="bars"><div class="bar" id="hp"><i></i><span></span></div><div class="bar" id="sh"><i></i><span></span></div><div class="bar" id="en"><i></i><span></span></div></div>
   <div id="where"></div>
 </div>
+<div id="loadout" hidden><div class="wslots"><div id="pickhint"></div><div id="wslots"></div><div class="whelp">Q 바꾸기 · E 줍기 · <span id="parts"></span></div></div>
+  <div class="skill" id="skill"><i id="skillFill"></i><b id="skillName"></b><span id="skillCd"></span></div></div>
 <div id="tip"></div>
 <div id="menu"><div class="card" id="card"></div></div>
 <script type="module" src="client/main.js"></script>
