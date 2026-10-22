@@ -5,12 +5,14 @@ import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
 import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS, STATUS, RELICS, GRADES } from '../sim/data.js';
 
-const cv = document.getElementById('cv'), x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
+// 화면은 4배 해상도로 그린다(게임 좌표는 그대로 640×360). 캐릭터 그림을 원본 도트 그대로 보여 주기 위해
+const RES = 4, cv = document.getElementById('cv'); cv.width = 640 * RES; cv.height = 360 * RES;
+const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
 // 받침이 있으면 앞 조사, 없으면 뒤 조사(을/를, 이/가)
 const stars = (lv, max = 0) => '★'.repeat(lv) + '☆'.repeat(Math.max(0, max - lv));   // 강화 단계는 별 개수로
 const josa = (w, a, b) => { const c = w.charCodeAt(w.length - 1) - 0xac00; return w + (c >= 0 && c < 11172 && c % 28 ? a : b); };
-const A = { chars: [], weapons: [], mons: {} };
+const A = { chars: [], weapons: [], mons: {}, charRes: 1 };
 const load = src => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.src = src; });
 
 // ---------- 입력: WASD·방향키, 마우스 왼쪽 공격, 왼쪽 Shift 달리기 ----------
@@ -80,7 +82,8 @@ function drawPlayer(p, t) {
   if (p.rollT > 0) {   // 구르기: 몸을 굴리고 먼지를 남긴다(총은 잠깐 숨김)
     const a = (1 - p.rollT / 8) * Math.PI * 2 * (Math.cos(p.rollA) >= 0 ? 1 : -1);
     x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(p.x, p.y, 7, 3, 0, 0, 7); x.fill();
-    x.save(); x.translate(Math.round(p.x), Math.round(p.y - img.height / 2)); x.rotate(a); x.scale(0.9, 0.9); x.drawImage(img, -Math.round(img.width / 2), -Math.round(img.height / 2)); x.restore();
+    const cw = img.width / A.charRes, ch = img.height / A.charRes;
+    x.save(); x.translate(Math.round(p.x), Math.round(p.y - ch / 2)); x.rotate(a); x.scale(0.9, 0.9); x.drawImage(img, -cw / 2, -ch / 2, cw, ch); x.restore();
     if (Math.random() < 0.6) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 8, y: p.y - 1, vx: -Math.cos(p.rollA) * 30, vy: -10, t: 0.3, c: '#a89a84' });
     return;
   }
@@ -88,7 +91,7 @@ function drawPlayer(p, t) {
   const blink = p.invuln > 0 && Math.floor(p.invuln / 3) % 2;
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(bx, by, 7, 3, 0, 0, 7); x.fill();
   const sts = Object.keys(p.st || {}), SF = { infect: 'sepia(1) hue-rotate(50deg) saturate(2.5)', burn: 'sepia(1) saturate(4) hue-rotate(-20deg)', wet: 'hue-rotate(180deg) saturate(1.6)', corrode: 'sepia(1) hue-rotate(30deg) saturate(3)', frost: 'saturate(.3) brightness(1.4) hue-rotate(160deg)', shock: 'brightness(2)', root: 'hue-rotate(60deg)', poison: 'hue-rotate(250deg) saturate(1.8)' };
-  if (!blink) { x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(img.width / 2), -img.height); x.restore(); }
+  if (!blink) { const cw = img.width / A.charRes, ch = img.height / A.charRes; x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(cw / 2), -ch, cw, ch); x.restore(); }
   for (const id of sts) if (Math.random() < 0.25) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 12, y: p.y - 8 - Math.random() * 14, vx: 0, vy: id === 'wet' ? 25 : -25, t: 0.4, c: STATUS[id].color });
   const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
   const sw = p.swingT > 0 ? (p.swingT / 8 - 0.5) * -2.2 : 0; x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k + sw * p.face); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
@@ -342,6 +345,7 @@ function frame(now) {
     if (w.done) setTimeout(() => endLine(w), w.done === 'dead' ? 800 : 150);
   }
   updateFx(dt);
+  x.setTransform(RES, 0, 0, RES, 0, 0);
   if (game.w) { drawWorld(game.w, t); hud(game.w, dt); }
   drawTimer();
   requestAnimationFrame(frame);
@@ -349,7 +353,7 @@ function frame(now) {
 
 (async () => {
   const m = await fetch('assets/manifest.json').then(r => r.json());
-  A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s)))));
+  A.chars = await Promise.all(m.chars.map(f => Promise.all(f.map(s => load('assets/' + s))))); A.charRes = m.charRes || 1;
   A.weapons = await Promise.all(m.weapons.map(s => load('assets/' + s)));
   const sprite = (w0, h0, rows, pal) => { const c = document.createElement('canvas'); c.width = w0; c.height = h0; const g = c.getContext('2d');
     rows.forEach((row, y) => [...row].forEach((ch, x0) => { if (pal[ch]) { g.fillStyle = pal[ch]; g.fillRect(x0, y, 1, 1); } })); return c; };
