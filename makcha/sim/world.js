@@ -145,7 +145,7 @@ function updatePlayer(w, input, rng) {
     for (let i = 0; i < st.count; i++) {
       const a = p.aim + (st.count > 1 ? (i / (st.count - 1) - 0.5) * st.spread : (rng.next() - 0.5) * st.spread);
       w.shots.push({ x: mx, y: my, vx: Math.cos(a) * st.speed, vy: Math.sin(a) * st.speed, life: Math.round(st.range / st.speed * TICK_HZ), dmg: st.dmg, weapon: st.id || p.weapons[p.cur].id,
-        trait: st.trait, pierce: (st.trait === 'pierce' ? 2 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
+        trait: st.trait, size: st.size, pierce: (st.trait === 'pierce' ? 3 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
     }
     w.events.push({ type: 'fire', weapon: p.weapons[p.cur].id });
   }
@@ -195,12 +195,14 @@ function updateShots(w, rng) {
     if (s.life <= 0) continue;
     for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
       s.hit.push(m.uid);
-      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1), boss = MONSTERS[m.id].kind === 'boss', k = (boss ? 0.1 : 1) * (s.trait === 'knock' ? 3 : 1);   // 지층 판독: 약점이 드러나 피해 +30%
+      const dmg = s.dmg * (w.scanT > 0 ? 1.3 : 1), boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1;   // 지층 판독: 약점이 드러나 피해 +30%
       hitMon(w, m, dmg, s.vx * 0.01 * k, s.vy * 0.01 * k);
-      if (s.trait === 'slow') m.slowT = 1.2;   // 씨앗탄: 덩굴이 감아 느려짐
+      if (s.trait === 'slow') { m.slowT = 1.2; if ((m.darts = (m.darts || 0) + 1) >= 3) { m.darts = 0; m.stun = Math.max(m.stun, boss ? 0.4 : 1.5); w.events.push({ type: 'sleep', uid: m.uid }); } }   // 마취 다트: 느려지고 3번이면 잠듦
+      if (s.trait === 'burn') m.burnT = 3;   // 신호 홍염: 불이 붙어 3초 동안 탄다
+      if (s.trait === 'shock') m.stun = Math.max(m.stun, boss ? 0.1 : 0.35);   // 제세동 충격: 잠깐 기절
       if (s.trait === 'acid' && !w.zones.some(z => z.kind === 'acid' && Math.hypot(z.x - m.x, z.y - m.y) < 14)) w.zones.push({ kind: 'acid', x: m.x, y: m.y, r: 16, t: 2 * TICK_HZ, acc: 0 });
       if (s.trait === 'chain') { const o = nearestTo(w, m.x, m.y, 90, m); if (o) { hitMon(w, o, dmg * 0.5); w.events.push({ type: 'zap', x1: m.x, y1: m.y - MONSTERS[m.id].cy, x2: o.x, y2: o.y - MONSTERS[o.id].cy }); } }
-      if (s.trait === 'heal' && m.hp <= 0 && rng.chance(0.2)) { w.player.hp = Math.min(w.player.maxHp, w.player.hp + 1); w.events.push({ type: 'heal' }); }
+      if (s.trait === 'shock' && m.hp <= 0 && rng.chance(0.25)) { w.player.hp = Math.min(w.player.maxHp, w.player.hp + 1); w.events.push({ type: 'heal' }); }
       if (w.mods.boom) { w.events.push({ type: 'splash', x: m.x, y: m.y, r: 26 }); for (const o of w.mons) if (o !== m && Math.hypot(o.x - m.x, o.y - m.y) < 26 + o.r) hitMon(w, o, dmg * 0.4); }
       if (!(--s.pierce > 0)) { s.life = 0; break; }
     }
@@ -233,6 +235,7 @@ function updateMons(w, rng) {
   for (const m of w.mons) {
     const M = MONSTERS[m.id], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy) || 1;
     m.t += DT; if (m.flash > 0) m.flash--; if (m.slowT > 0) m.slowT -= DT;
+    if (m.burnT > 0) { m.burnT -= DT; m.hp -= 2 * DT; if (Math.floor(m.t * 4) !== Math.floor((m.t - DT) * 4)) w.events.push({ type: 'burn', x: m.x, y: m.y - MONSTERS[m.id].cy }); }   // 타는 동안 초당 2
     if (m.stun > 0) { m.stun -= DT; continue; }   // 얼거나 기절하면 움직이지도 공격하지도 못한다
     m.cd -= DT; m.touch -= DT;
     let vx = dx / d, vy = dy / d, sp = m.speed * (m.slowT > 0 ? 0.5 : 1);

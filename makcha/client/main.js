@@ -108,6 +108,8 @@ function feed(w) {
     else if (e.type === 'getWeapon') tip(`🔫 ${josa(WEAPONS[e.id].name, '을', '를')} 들었다 · ${WEAPONS[e.id].traitText}`, 2.5);
     else if (e.type === 'swap') tip(`🔁 ${WEAPONS[p.weapons[p.cur].id].name}`, 0.9);
     else if (e.type === 'zap') fx.zaps = (fx.zaps || []).concat([{ ...e, t: 0.12 }]);
+    else if (e.type === 'burn') fx.parts.push({ x: e.x + (Math.random() - 0.5) * 8, y: e.y, vx: 0, vy: -30, t: 0.35, c: Math.random() < 0.5 ? '#ff8a3a' : '#ffd060' });
+    else if (e.type === 'sleep') { const m = w.mons.find(o => o.uid === e.uid); if (m) fx.nums.push({ x: m.x, y: m.y - 28, v: 'Zz', t: 1.2, blue: true }); }
     else if (e.type === 'propBreak') { for (let i = 0; i < 10; i++) fx.parts.push({ x: e.x, y: e.y - 6, vx: (Math.random() - 0.5) * 140, vy: (Math.random() - 0.7) * 120, t: 0.4, c: i % 2 ? '#b9844a' : '#6a4a2a' }); fx.shake = Math.max(fx.shake, 2); }
     else if (e.type === 'pattern') { const N = { ring: '원형 탄막', fan: '부채꼴 사격', charge: '돌진', summon: '화석 소환' }; tip(`⚠️ 보스: ${N[e.name] || e.name}`, 1.2); }
     else if (e.type === 'skill') { fx.skillFlash = 0.35; tip(`✨ ${JOBS[p.job].skill.name}`, 1.2); }
@@ -181,8 +183,11 @@ function drawWorld(w, t) {
   for (const a of w.allies) { const f = Math.floor(t * 10) % 2, X = Math.round(a.x), Y = Math.round(a.y); x.fillStyle = '#3a2a1a'; x.fillRect(X - 5, Y - 2, 10, 4); x.fillStyle = '#8a5a2a'; x.fillRect(X - 4, Y - 1, 8, 2); x.fillStyle = '#5a3a1a'; x.fillRect(X - 9, Y - (f ? 4 : 0), 5, 2); x.fillRect(X + 4, Y - (f ? 4 : 0), 5, 2); x.fillStyle = '#ffd040'; x.fillRect(X + 3, Y - 2, 2, 1); }
   for (const b of w.bombs) { const k = b.t / b.T, z = Math.sin(k * Math.PI) * 26; x.fillStyle = 'rgba(0,0,0,.25)'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y) + 6, 6, 2); x.fillStyle = '#1c2a3a'; x.fillRect(Math.round(b.x) - 3, Math.round(b.y - z) - 4, 7, 8); x.fillStyle = '#7ad0ff'; x.fillRect(Math.round(b.x) - 2, Math.round(b.y - z) - 1, 5, 4); x.fillStyle = '#e8e8e8'; x.fillRect(Math.round(b.x) - 1, Math.round(b.y - z) - 6, 3, 3); }
   for (const r of fx.rings) { x.globalAlpha = r.t / 0.35; x.strokeStyle = r.c; x.lineWidth = 2; const k = 1.15 - r.t; x.beginPath(); x.ellipse(r.x, r.y, r.r * k, r.r * 0.55 * k, 0, 0, 7); x.stroke(); } x.globalAlpha = 1;
-  const SHOT = { shotgun: '#ffe08a', hammer: '#d8d8d8', smg: '#9ae05a', sprayer: '#b8f040', beam: '#9ad8ff', medpistol: '#ff9a9a' };
-  for (const s of w.shots) { x.fillStyle = SHOT[s.weapon] || '#fff2a0'; x.fillRect(Math.round(s.x) - 2, Math.round(s.y) - 2, 4, 4); }
+  // 무기마다 탄 모양: 신호탄(붉은 불꽃), 드릴 날(회색 쐐기), 다트(가는 침), 시약(초록 방울), 번개(하늘빛), 전기 충격(노란 불꽃)
+  for (const s of w.shots) { const X = Math.round(s.x), Y = Math.round(s.y), a = Math.atan2(s.vy, s.vx);
+    if (s.weapon === 'flare') { x.fillStyle = 'rgba(255,120,40,.35)'; x.beginPath(); x.arc(X, Y, 5, 0, 7); x.fill(); x.fillStyle = '#ffdd60'; x.fillRect(X - 2, Y - 2, 4, 4); }
+    else if (s.weapon === 'drill' || s.weapon === 'dart') { x.save(); x.translate(X, Y); x.rotate(a); x.fillStyle = s.weapon === 'drill' ? '#c8ccd2' : '#e8e0c8'; x.fillRect(-4, -1, 7, 2); x.fillStyle = s.weapon === 'drill' ? '#7a7f88' : '#8ac850'; x.fillRect(-5, -2, 2, 4); x.restore(); }
+    else { x.fillStyle = { reagent: '#b8f040', rod: '#9ad8ff', defib: '#ffe860' }[s.weapon] || '#fff2a0'; x.fillRect(X - 2, Y - 2, 4, 4); } }
   for (const z of fx.zaps || []) { x.strokeStyle = '#bfefff'; x.lineWidth = 2; x.beginPath(); x.moveTo(z.x1, z.y1); x.lineTo((z.x1 + z.x2) / 2 + 4, (z.y1 + z.y2) / 2 - 5); x.lineTo(z.x2, z.y2); x.stroke(); }
   const ECOL = { germ: '#8ad050', germlet: '#b8f070', ammonite: '#6a3a8a', fossilrex: '#ff8a3a' };   // 몬스터마다 탄 색과 크기
   for (const e of w.eshots) { const z = e.size || 3, X = Math.round(e.x), Y = Math.round(e.y); x.fillStyle = '#1a0c10'; x.beginPath(); x.arc(X, Y, z + 1, 0, 7); x.fill(); x.fillStyle = ECOL[e.src] || '#ff6a5a'; x.beginPath(); x.arc(X, Y, z, 0, 7); x.fill(); x.fillStyle = 'rgba(255,255,255,.5)'; x.fillRect(X - 1, Y - 1, 1, 1); }
