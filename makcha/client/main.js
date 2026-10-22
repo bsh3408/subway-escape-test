@@ -5,8 +5,8 @@ import { T, tileAt } from '../sim/dungeon.js';
 import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
 import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS, STATUS, RELICS, GRADES } from '../sim/data.js';
 
-// 화면은 4배 해상도로 그린다(게임 좌표는 그대로 640×360). 캐릭터 그림을 원본 도트 그대로 보여 주기 위해
-const RES = 4, cv = document.getElementById('cv'); cv.width = 640 * RES; cv.height = 360 * RES;
+// 화면은 2배 해상도로 그린다(게임 좌표는 그대로 640×360). 캐릭터 그림을 원본 도트 그대로 보여 주기 위해
+const RES = 2, cv = document.getElementById('cv'); cv.width = 640 * RES; cv.height = 360 * RES;
 const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
 // 받침이 있으면 앞 조사, 없으면 뒤 조사(을/를, 이/가)
@@ -93,7 +93,7 @@ function drawPlayer(p, t) {
   const sts = Object.keys(p.st || {}), SF = { infect: 'sepia(1) hue-rotate(50deg) saturate(2.5)', burn: 'sepia(1) saturate(4) hue-rotate(-20deg)', wet: 'hue-rotate(180deg) saturate(1.6)', corrode: 'sepia(1) hue-rotate(30deg) saturate(3)', frost: 'saturate(.3) brightness(1.4) hue-rotate(160deg)', shock: 'brightness(2)', root: 'hue-rotate(60deg)', poison: 'hue-rotate(250deg) saturate(1.8)' };
   if (!blink) { const cw = img.width / A.charRes, ch = img.height / A.charRes; x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(cw / 2), -ch, cw, ch); x.restore(); }
   for (const id of sts) if (Math.random() < 0.25) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 12, y: p.y - 8 - Math.random() * 14, vx: 0, vy: id === 'wet' ? 25 : -25, t: 0.4, c: STATUS[id].color });
-  const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 4, gy = by - 9 + bob;
+  const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 7, gy = by - 6 + bob;
   const sw = p.swingT > 0 ? (p.swingT / 8 - 0.5) * -2.2 : 0; x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k + sw * p.face); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
 }
 
@@ -104,7 +104,7 @@ function feed(w) {
   for (const e of w.events) {
     if (e.type === 'hit') { fx.nums.push({ x: e.x + (Math.random() - 0.5) * 10, y: e.y - 22, v: e.amount, t: 0.6 }); for (let i = 0; i < 4; i++) fx.parts.push({ x: e.x, y: e.y - 8, vx: (Math.random() - 0.5) * 120, vy: (Math.random() - 0.5) * 120, t: 0.3, c: '#ffe9a8' }); }
     else if (e.type === 'kill') { for (let i = 0; i < 12; i++) fx.parts.push({ x: e.x, y: e.y - 8, vx: (Math.random() - 0.5) * 160, vy: (Math.random() - 0.5) * 160, t: 0.45, c: '#d9d4c4' }); fx.shake = Math.max(fx.shake, 2); }
-    else if (e.type === 'fire') { fx.flashes.push({ x: p.x + p.face * 4 + Math.cos(p.aim) * 12, y: p.y - 9 + Math.sin(p.aim) * 12, a: p.aim, t: 0.05 }); fx.shake = Math.max(fx.shake, WEAPONS[e.weapon].kick * 1.5); }
+    else if (e.type === 'fire') { fx.flashes.push({ x: p.x + p.face * 7 + Math.cos(p.aim) * 12, y: p.y - 6 + Math.sin(p.aim) * 12, a: p.aim, t: 0.05 }); fx.shake = Math.max(fx.shake, WEAPONS[e.weapon].kick * 1.5); }
     else if (e.type === 'hurt') { if (!e.dot) fx.shake = Math.max(fx.shake, 4); if (e.amount) fx.nums.push({ x: p.x, y: p.y - 34, v: '-' + e.amount, t: 0.8, red: true }); }
     else if (e.type === 'status') pop(`${STATUS[e.id].icon} ${STATUS[e.id].name}!`, STATUS[e.id].color);
     else if (e.type === 'revive') { pop('💉 백신 앰플! 다시 일어났다', '#7ae08a'); fx.skillFlash = 0.6; }
