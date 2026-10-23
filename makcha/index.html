@@ -26,6 +26,24 @@ canvas{image-rendering:pixelated;display:block}
 .skill i{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6)}.skill b,.skill span{position:relative}.skill span{font-size:.85em;color:var(--acc)}.skill.cd{border-color:#5a5f68}.skill.cd span{color:#ffb070}
 #tip{position:fixed;left:50%;top:clamp(92px,10vw,120px);transform:translateX(-50%);max-width:min(70vw,720px);text-align:center;background:var(--panel);border:1px solid var(--acc);border-radius:8px;padding:8px 14px;font-size:clamp(14px,1.4vw,18px);opacity:0;transition:opacity .3s;pointer-events:none}
 #tip.on{opacity:1}
+#puzzle{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(6,8,12,.86);z-index:8}#puzzle[hidden]{display:none}
+.pz-card{background:#1c1f26;border:2px solid var(--acc);border-radius:14px;padding:18px 20px;width:min(92vw,820px);max-height:92vh;overflow:auto;display:grid;gap:10px}
+.pz-card h2{margin:0;font-size:22px}.pz-tip{margin:0;color:var(--sub);font-size:14px;line-height:1.5}.pz-q{margin:0;font-size:17px;font-weight:700}.pz-hint{margin:0;color:var(--sub);font-size:12px}
+.pz-cards{display:flex;flex-wrap:wrap;gap:8px;min-height:44px;padding:8px;border:1px dashed #3a4050;border-radius:10px}
+.pz-chip{background:#2e3440;border:2px solid #4a5260;border-radius:8px;padding:6px 10px;cursor:grab;user-select:none;font-size:14px}.pz-chip.sel{border-color:var(--acc)}.pz-chip.tag{background:#3a2e1c;border-color:var(--acc)}
+.pz-slots{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px}
+.pz-slot{min-height:70px;background:#262a33;border:2px solid #3a4050;border-radius:10px;padding:8px;display:flex;flex-wrap:wrap;gap:6px;align-content:flex-start}.pz-slot>b{width:100%;color:var(--acc)}
+.pz-net{position:relative;display:flex;flex-wrap:wrap;gap:22px 34px;justify-content:center;padding:18px 8px;min-height:120px}.pz-svg{position:absolute;inset:0;width:100%;height:100%;color:#ffd060;stroke:#ffd060;stroke-width:3}.pz-svg line{cursor:pointer;pointer-events:stroke}
+.pz-node{position:relative;z-index:1;background:#2b4a2e;border:2px solid #6ac050;border-radius:20px;padding:8px 14px;cursor:crosshair;user-select:none;touch-action:none}
+.pz-net.ring{display:block;height:260px}.pz-net.ring .pz-node{position:absolute;transform:translate(-50%,-50%);white-space:nowrap}
+.pz-ele{gap:60px}.pz-obj{position:relative;z-index:1;min-width:150px;min-height:90px;justify-content:center}.pz-obj>b{text-align:center;font-size:22px}
+.pz-e{background:#5ad0ff;color:#0a1a2a;border-radius:50%;width:30px;height:30px;display:inline-flex;align-items:center;justify-content:center;font-weight:900;cursor:grab;touch-action:none;margin:0 auto}
+.pz-ions{display:grid;gap:4px;font-size:14px}.pz-ions span{display:flex;gap:8px;align-items:center;letter-spacing:2px}.pz-ions i{font-style:normal;min-width:36px;font-weight:800;color:var(--acc)}
+#pz-num{font-size:22px;width:140px;padding:6px 10px;border-radius:8px;border:2px solid #4a5260;background:#262a33;color:var(--ink)}
+.pz-choices{display:grid;gap:8px}.pz-opt{background:#262a33;border:2px solid #3a4050;border-radius:10px;padding:10px;color:var(--ink);font:inherit;text-align:left;cursor:pointer}.pz-opt.on{border-color:var(--acc);background:#3a2e1c}
+.pz-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}.pz-foot small{color:var(--sub)}
+#pz-ok,#pz-go{background:var(--acc);color:#1a1410;border:0;border-radius:10px;padding:10px 22px;font:inherit;font-weight:800;cursor:pointer}#pz-ok:disabled{opacity:.5}
+#pz-result .good{color:#7ae08a;font-size:18px}#pz-result .bad{color:#ff7a5a;font-size:18px}#pz-result p{margin:6px 0 10px;color:var(--ink)}
 #timer{position:fixed;left:50%;top:10px;transform:translateX(-50%);text-align:center;pointer-events:none;z-index:4}#timer[hidden]{display:none}
 #timer b{display:inline-block;background:var(--panel);border:2px solid var(--acc);border-radius:10px;padding:3px 14px;font-size:clamp(18px,2.2vw,28px);font-variant-numeric:tabular-nums}
 #timer.stop b{border-color:#7ae08a;color:#a8f0b0}#timer div{display:flex;gap:4px;justify-content:center;margin-top:4px;flex-wrap:wrap}
@@ -60,6 +78,7 @@ canvas{image-rendering:pixelated;display:block}
   <div class="skill" id="skill"><i id="skillFill"></i><b id="skillName"></b><span id="skillCd"></span></div></div>
 <div id="tip"></div>
 <div id="timer" hidden></div>
+<div id="puzzle" hidden></div>
 <div id="menu"><div class="card" id="card"></div></div>
 <script type="module" src="client/main.js"></script>
 </body>

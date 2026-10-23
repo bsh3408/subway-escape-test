@@ -45,6 +45,9 @@ function layout(rng, order) {
   throw new Error('던전을 만들지 못했다');
 }
 
+// 호선마다 지형지물 배치(1 유적, 2 미로, 3 산울타리, 4 배관, 5 폐허, 6 설산, 7 사막 모래성, 8 공장, 9 서버실)
+export const LINE_TERRAIN = { 1: 'ruins', 2: 'maze', 3: 'hedges', 4: 'pipes', 5: 'rubble', 6: 'mounds', 7: 'castles', 8: 'machines', 9: 'racks' };
+
 export function generateFloor(seed, { line, order }) {
   const rng = createRng(seed).fork('floor' + line + ':' + order);
   const { rooms, links } = layout(rng, order);
@@ -88,7 +91,7 @@ export function generateFloor(seed, { line, order }) {
   // 지형지물: 배치 종류 두 가지를 섞고 크기·개수도 무작위. 덩어리끼리·벽과는 한 칸 이상 띄워 막힌 구석이 없게 한다
   const pillars = [];
   for (const r of rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') {
-    const lay = r.type === 'boss' ? ['corners'] : [rng.pick(LAYOUTS), rng.pick(LAYOUTS)]; r.layout = [...new Set(lay)].join('+');
+    const lay = r.type === 'boss' ? ['corners'] : [LINE_TERRAIN[line] || rng.pick(LAYOUTS)]; r.layout = lay.join('+');
     const mine = [], place = (x, y, bw, bh) => {
       for (let yy = y - 1; yy <= y + bh; yy++) for (let xx = x - 1; xx <= x + bw; xx++) {
         if (xx < r.x0 || yy < r.y0 || xx >= r.x0 + r.w || yy >= r.y0 + r.h || tiles[yy * w + xx] !== T.FLOOR) return false;   // 둘레 한 칸까지 바닥이어야
@@ -105,6 +108,46 @@ export function generateFloor(seed, { line, order }) {
       if (L === 'bars') for (const [px, py] of [[r.x0 + 3, r.y0 + 2], [r.x0 + r.w - 4, r.y0 + 2], [r.x0 + 3, r.cy + 2], [r.x0 + r.w - 4, r.cy + 2]]) if (rng.chance(0.75)) place(px + j(), py, 1, 2 + rng.int(2));
       if (L === 'diagonal') for (const [dx, dy] of [[-4, -3], [3, -3], [-4, 2], [3, 2], [-7, -4], [6, 3]]) place(r.cx + dx + j(), r.cy + dy, 2, 1 + rng.int(2));
       if (L === 'scatter') for (let k = 0, n = 4 + rng.int(6); k < 60 && mine.length < n + 2; k++) { const bw = 1 + rng.int(3); place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), bw, bw === 3 ? 1 : 1 + rng.int(2)); }
+      if (L === 'ruins') {   // 유적: 돌기둥이 두 줄로 늘어선 회랑 + 쓰러진 기둥
+        const gap = 3 + rng.int(2), off = rng.int(gap);
+        for (const yy of [r.cy - 3 - rng.int(2), r.cy + 3 + rng.int(2)]) for (let xx = r.x0 + 2 + off; xx < r.x0 + r.w - 2; xx += gap) if (rng.chance(0.85)) place(xx, yy, 1, 1);
+        for (let k = 0; k < 3; k++) place(r.x0 + 2 + rng.int(r.w - 6), r.y0 + 2 + rng.int(r.h - 4), rng.chance(0.5) ? 3 : 1, 1);
+      }
+      if (L === 'maze') {   // 미로: 3칸 간격 격자 위에 짧은 칸막이를 가로·세로로 엇갈리게
+        for (let yy = r.y0 + 2; yy < r.y0 + r.h - 2; yy += 3) for (let xx = r.x0 + 2; xx < r.x0 + r.w - 2; xx += 3) {
+          if (rng.chance(0.25)) continue;
+          if (rng.chance(0.5)) place(xx, yy, 2 + rng.int(2), 1); else place(xx, yy, 1, 2 + rng.int(2));
+        }
+      }
+      if (L === 'hedges') {   // 산울타리: 길게 늘어선 덤불 줄(중간중간 틈)
+        for (let yy = r.y0 + 2 + rng.int(2); yy < r.y0 + r.h - 2; yy += 3) { let xx = r.x0 + 2 + rng.int(3);
+          while (xx < r.x0 + r.w - 3) { const len = 3 + rng.int(4); place(xx, yy, Math.min(len, r.x0 + r.w - 2 - xx), 1); xx += len + 2 + rng.int(2); } }
+      }
+      if (L === 'pipes') {   // 배관: 세로 파이프 기둥이 줄지어 서고 물탱크 몇 개
+        const gap = 4 + rng.int(2);
+        for (let xx = r.x0 + 2 + rng.int(3); xx < r.x0 + r.w - 2; xx += gap) { const y = r.y0 + 2 + rng.int(3); place(xx, y, 1, 3 + rng.int(3)); place(xx, r.y0 + r.h - 3 - rng.int(4), 1, 2 + rng.int(2)); }
+        for (let k = 0; k < 2; k++) place(r.x0 + 2 + rng.int(r.w - 5), r.y0 + 2 + rng.int(r.h - 5), 2, 2);
+      }
+      if (L === 'rubble') {   // 폐허: 크기가 제각각인 콘크리트 잔해 + 굴뚝
+        for (let k = 0, n = 7 + rng.int(5); k < 80 && mine.length < n; k++) { const bw = 1 + rng.int(3), bh = 1 + rng.int(2); place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), bw, bh); }
+        for (let k = 0; k < 2; k++) place(r.x0 + 2 + rng.int(r.w - 4), r.y0 + 2 + rng.int(r.h - 5), 1, 3);
+      }
+      if (L === 'mounds') {   // 설산: 눈 쌓인 바위 언덕(넓은 덩어리) + 침엽수(한 칸)
+        for (let k = 0, n = 4 + rng.int(3); k < 60 && mine.length < n; k++) place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), 2 + rng.int(3), 2);
+        for (let k = 0, n = mine.length + 4 + rng.int(4); k < 60 && mine.length < n; k++) place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), 1, 1);
+      }
+      if (L === 'castles') {   // 사막: 네 귀퉁이 쪽에 모래성(3×3), 사이사이 작은 모래 언덕
+        for (const [px, py] of [[r.x0 + qx - 2, r.y0 + qy - 2], [r.x0 + r.w - qx - 1, r.y0 + qy - 2], [r.x0 + qx - 2, r.y0 + r.h - qy - 1], [r.x0 + r.w - qx - 1, r.y0 + r.h - qy - 1]]) if (rng.chance(0.85)) place(px + j(), py + j(), 3, 3);
+        for (let k = 0, n = mine.length + 3 + rng.int(3); k < 50 && mine.length < n; k++) place(r.x0 + 1 + rng.int(r.w - 2), r.y0 + 1 + rng.int(r.h - 2), 2, 1);
+      }
+      if (L === 'machines') {   // 공장: 기계가 바둑판처럼(2×2, 5칸 간격)
+        const ox = rng.int(3), oy = rng.int(3);
+        for (let yy = r.y0 + 2 + oy; yy < r.y0 + r.h - 3; yy += 5) for (let xx = r.x0 + 2 + ox; xx < r.x0 + r.w - 3; xx += 5) if (rng.chance(0.8)) place(xx, yy, 2, 2);
+      }
+      if (L === 'racks') {   // 서버실: 세로로 긴 서버 랙이 줄지어 통로를 만든다
+        const gap = 3 + rng.int(2);
+        for (let xx = r.x0 + 2 + rng.int(2); xx < r.x0 + r.w - 2; xx += gap) { place(xx, r.y0 + 2, 1, Math.max(2, r.cy - 2 - (r.y0 + 2) - rng.int(2))); place(xx, r.cy + 2 + rng.int(2), 1, Math.max(2, r.y0 + r.h - 2 - (r.cy + 2) - 1 - rng.int(2))); }
+      }
       if (L === 'walls') for (const [px, py, bw, bh] of [[r.x0 + 2, r.cy - 4, 4, 1], [r.x0 + r.w - 6, r.cy + 3, 4, 1], [r.cx + 3, r.y0 + 2, 1, 3], [r.cx - 4, r.y0 + r.h - 5, 1, 3]]) if (rng.chance(0.7)) place(px + j(), py, bw, bh);
     }
   }

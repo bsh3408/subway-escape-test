@@ -93,7 +93,616 @@
    "mons/trilomother_1.png",
    "mons/trilomother_2.png",
    "mons/trilomother_3.png"
+  ],
+  "mammoth": [
+   "mons/mammoth_0.png",
+   "mons/mammoth_1.png",
+   "mons/mammoth_2.png",
+   "mons/mammoth_3.png"
+  ],
+  "finch": [
+   "mons/finch_0.png",
+   "mons/finch_1.png",
+   "mons/finch_2.png",
+   "mons/finch_3.png"
+  ],
+  "moth": [
+   "mons/moth_0.png",
+   "mons/moth_1.png",
+   "mons/moth_2.png",
+   "mons/moth_3.png"
+  ],
+  "grasshopper": [
+   "mons/grasshopper_0.png",
+   "mons/grasshopper_1.png",
+   "mons/grasshopper_2.png",
+   "mons/grasshopper_3.png"
+  ],
+  "frog": [
+   "mons/frog_0.png",
+   "mons/frog_1.png",
+   "mons/frog_2.png",
+   "mons/frog_3.png"
+  ],
+  "snake": [
+   "mons/snake_0.png",
+   "mons/snake_1.png",
+   "mons/snake_2.png",
+   "mons/snake_3.png"
+  ],
+  "vine": [
+   "mons/vine_0.png",
+   "mons/vine_1.png",
+   "mons/vine_2.png",
+   "mons/vine_3.png"
+  ],
+  "ironrobot": [
+   "mons/ironrobot_0.png",
+   "mons/ironrobot_1.png",
+   "mons/ironrobot_2.png",
+   "mons/ironrobot_3.png"
+  ],
+  "copperslime": [
+   "mons/copperslime_0.png",
+   "mons/copperslime_1.png",
+   "mons/copperslime_2.png",
+   "mons/copperslime_3.png"
+  ],
+  "charcoal": [
+   "mons/charcoal_0.png",
+   "mons/charcoal_1.png",
+   "mons/charcoal_2.png",
+   "mons/charcoal_3.png"
+  ],
+  "acidslime": [
+   "mons/acidslime_0.png",
+   "mons/acidslime_1.png",
+   "mons/acidslime_2.png",
+   "mons/acidslime_3.png"
+  ],
+  "baseslime": [
+   "mons/baseslime_0.png",
+   "mons/baseslime_1.png",
+   "mons/baseslime_2.png",
+   "mons/baseslime_3.png"
+  ],
+  "smog": [
+   "mons/smog_0.png",
+   "mons/smog_1.png",
+   "mons/smog_2.png",
+   "mons/smog_3.png"
+  ],
+  "icechunk": [
+   "mons/icechunk_0.png",
+   "mons/icechunk_1.png",
+   "mons/icechunk_2.png",
+   "mons/icechunk_3.png"
+  ],
+  "coldpack": [
+   "mons/coldpack_0.png",
+   "mons/coldpack_1.png",
+   "mons/coldpack_2.png",
+   "mons/coldpack_3.png"
+  ],
+  "frostcrystal": [
+   "mons/frostcrystal_0.png",
+   "mons/frostcrystal_1.png",
+   "mons/frostcrystal_2.png",
+   "mons/frostcrystal_3.png"
+  ],
+  "heatblob": [
+   "mons/heatblob_0.png",
+   "mons/heatblob_1.png",
+   "mons/heatblob_2.png",
+   "mons/heatblob_3.png"
+  ],
+  "sandwhirl": [
+   "mons/sandwhirl_0.png",
+   "mons/sandwhirl_1.png",
+   "mons/sandwhirl_2.png",
+   "mons/sandwhirl_3.png"
+  ],
+  "scorpion": [
+   "mons/scorpion_0.png",
+   "mons/scorpion_1.png",
+   "mons/scorpion_2.png",
+   "mons/scorpion_3.png"
+  ],
+  "sparkdrone": [
+   "mons/sparkdrone_0.png",
+   "mons/sparkdrone_1.png",
+   "mons/sparkdrone_2.png",
+   "mons/sparkdrone_3.png"
+  ],
+  "coil": [
+   "mons/coil_0.png",
+   "mons/coil_1.png",
+   "mons/coil_2.png",
+   "mons/coil_3.png"
+  ],
+  "heatflame": [
+   "mons/heatflame_0.png",
+   "mons/heatflame_1.png",
+   "mons/heatflame_2.png",
+   "mons/heatflame_3.png"
+  ],
+  "droplet": [
+   "mons/droplet_0.png",
+   "mons/droplet_1.png",
+   "mons/droplet_2.png",
+   "mons/droplet_3.png"
+  ],
+  "handle": [
+   "mons/handle_0.png",
+   "mons/handle_1.png",
+   "mons/handle_2.png",
+   "mons/handle_3.png"
+  ],
+  "errordrone": [
+   "mons/errordrone_0.png",
+   "mons/errordrone_1.png",
+   "mons/errordrone_2.png",
+   "mons/errordrone_3.png"
+  ],
+  "b2_colony": [
+   "mons/b2_colony_0.png",
+   "mons/b2_colony_1.png",
+   "mons/b2_colony_2.png",
+   "mons/b2_colony_3.png"
+  ],
+  "b2_finch_flock": [
+   "mons/b2_finch_flock_0.png",
+   "mons/b2_finch_flock_1.png",
+   "mons/b2_finch_flock_2.png",
+   "mons/b2_finch_flock_3.png"
+  ],
+  "b2_moth_swarm": [
+   "mons/b2_moth_swarm_0.png",
+   "mons/b2_moth_swarm_1.png",
+   "mons/b2_moth_swarm_2.png",
+   "mons/b2_moth_swarm_3.png"
+  ],
+  "b3_bullfrog": [
+   "mons/b3_bullfrog_0.png",
+   "mons/b3_bullfrog_1.png",
+   "mons/b3_bullfrog_2.png",
+   "mons/b3_bullfrog_3.png"
+  ],
+  "b3_nutria": [
+   "mons/b3_nutria_0.png",
+   "mons/b3_nutria_1.png",
+   "mons/b3_nutria_2.png",
+   "mons/b3_nutria_3.png"
+  ],
+  "b3_locust_outbreak": [
+   "mons/b3_locust_outbreak_0.png",
+   "mons/b3_locust_outbreak_1.png",
+   "mons/b3_locust_outbreak_2.png",
+   "mons/b3_locust_outbreak_3.png"
+  ],
+  "b4_rust_golem": [
+   "mons/b4_rust_golem_0.png",
+   "mons/b4_rust_golem_1.png",
+   "mons/b4_rust_golem_2.png",
+   "mons/b4_rust_golem_3.png"
+  ],
+  "b4_furnace_giant": [
+   "mons/b4_furnace_giant_0.png",
+   "mons/b4_furnace_giant_1.png",
+   "mons/b4_furnace_giant_2.png",
+   "mons/b4_furnace_giant_3.png"
+  ],
+  "b4_flame_giant": [
+   "mons/b4_flame_giant_0.png",
+   "mons/b4_flame_giant_1.png",
+   "mons/b4_flame_giant_2.png",
+   "mons/b4_flame_giant_3.png"
+  ],
+  "b5_acidrain_cloud": [
+   "mons/b5_acidrain_cloud_0.png",
+   "mons/b5_acidrain_cloud_1.png",
+   "mons/b5_acidrain_cloud_2.png",
+   "mons/b5_acidrain_cloud_3.png"
+  ],
+  "b5_marble_statue": [
+   "mons/b5_marble_statue_0.png",
+   "mons/b5_marble_statue_1.png",
+   "mons/b5_marble_statue_2.png",
+   "mons/b5_marble_statue_3.png"
+  ],
+  "b5_chimney": [
+   "mons/b5_chimney_0.png",
+   "mons/b5_chimney_1.png",
+   "mons/b5_chimney_2.png",
+   "mons/b5_chimney_3.png"
+  ],
+  "b6_container": [
+   "mons/b6_container_0.png",
+   "mons/b6_container_1.png",
+   "mons/b6_container_2.png",
+   "mons/b6_container_3.png"
+  ],
+  "b6_dryice": [
+   "mons/b6_dryice_0.png",
+   "mons/b6_dryice_1.png",
+   "mons/b6_dryice_2.png",
+   "mons/b6_dryice_3.png"
+  ],
+  "b6_refrigerator": [
+   "mons/b6_refrigerator_0.png",
+   "mons/b6_refrigerator_1.png",
+   "mons/b6_refrigerator_2.png",
+   "mons/b6_refrigerator_3.png"
+  ],
+  "b7_sandstorm": [
+   "mons/b7_sandstorm_0.png",
+   "mons/b7_sandstorm_1.png",
+   "mons/b7_sandstorm_2.png",
+   "mons/b7_sandstorm_3.png"
+  ],
+  "b7_elnino": [
+   "mons/b7_elnino_0.png",
+   "mons/b7_elnino_1.png",
+   "mons/b7_elnino_2.png",
+   "mons/b7_elnino_3.png"
+  ],
+  "b7_glacier": [
+   "mons/b7_glacier_0.png",
+   "mons/b7_glacier_1.png",
+   "mons/b7_glacier_2.png",
+   "mons/b7_glacier_3.png"
+  ],
+  "b8_generator": [
+   "mons/b8_generator_0.png",
+   "mons/b8_generator_1.png",
+   "mons/b8_generator_2.png",
+   "mons/b8_generator_3.png"
+  ],
+  "b8_solar": [
+   "mons/b8_solar_0.png",
+   "mons/b8_solar_1.png",
+   "mons/b8_solar_2.png",
+   "mons/b8_solar_3.png"
+  ],
+  "b8_boiler": [
+   "mons/b8_boiler_0.png",
+   "mons/b8_boiler_1.png",
+   "mons/b8_boiler_2.png",
+   "mons/b8_boiler_3.png"
+  ],
+  "b9_ai_system": [
+   "mons/b9_ai_system_0.png",
+   "mons/b9_ai_system_1.png",
+   "mons/b9_ai_system_2.png",
+   "mons/b9_ai_system_3.png"
+  ],
+  "b9_virus": [
+   "mons/b9_virus_0.png",
+   "mons/b9_virus_1.png",
+   "mons/b9_virus_2.png",
+   "mons/b9_virus_3.png"
+  ],
+  "b9_camera_drone": [
+   "mons/b9_camera_drone_0.png",
+   "mons/b9_camera_drone_1.png",
+   "mons/b9_camera_drone_2.png",
+   "mons/b9_camera_drone_3.png"
   ]
  },
- "charRes": 2
+ "charRes": 2,
+ "charsOrig": [
+  [
+   "chars_orig/c0_0.png",
+   "chars_orig/c0_1.png",
+   "chars_orig/c0_2.png",
+   "chars_orig/c0_3.png",
+   "chars_orig/c0_4.png",
+   "chars_orig/c0_5.png"
+  ],
+  [
+   "chars_orig/c1_0.png",
+   "chars_orig/c1_1.png",
+   "chars_orig/c1_2.png",
+   "chars_orig/c1_3.png",
+   "chars_orig/c1_4.png",
+   "chars_orig/c1_5.png"
+  ],
+  [
+   "chars_orig/c2_0.png",
+   "chars_orig/c2_1.png",
+   "chars_orig/c2_2.png",
+   "chars_orig/c2_3.png",
+   "chars_orig/c2_4.png",
+   "chars_orig/c2_5.png"
+  ],
+  [
+   "chars_orig/c3_0.png",
+   "chars_orig/c3_1.png",
+   "chars_orig/c3_2.png",
+   "chars_orig/c3_3.png",
+   "chars_orig/c3_4.png",
+   "chars_orig/c3_5.png"
+  ],
+  [
+   "chars_orig/c4_0.png",
+   "chars_orig/c4_1.png",
+   "chars_orig/c4_2.png",
+   "chars_orig/c4_3.png",
+   "chars_orig/c4_4.png",
+   "chars_orig/c4_5.png"
+  ],
+  [
+   "chars_orig/c5_0.png",
+   "chars_orig/c5_1.png",
+   "chars_orig/c5_2.png",
+   "chars_orig/c5_3.png",
+   "chars_orig/c5_4.png",
+   "chars_orig/c5_5.png"
+  ]
+ ],
+ "weapons2": [
+  "weapons/w10.png",
+  "weapons/w11.png",
+  "weapons/w12.png",
+  "weapons/w13.png",
+  "weapons/w14.png",
+  "weapons/w15.png",
+  "weapons/w16.png",
+  "weapons/w17.png",
+  "weapons/w18.png",
+  "weapons/w19.png",
+  "weapons/w20.png",
+  "weapons/w21.png",
+  "weapons/w22.png",
+  "weapons/w23.png",
+  "weapons/w24.png",
+  "weapons/w25.png",
+  "weapons/w26.png",
+  "weapons/w27.png",
+  "weapons/w28.png",
+  "weapons/w29.png",
+  "weapons/w30.png",
+  "weapons/w31.png",
+  "weapons/w32.png",
+  "weapons/w33.png",
+  "weapons/w34.png",
+  "weapons/w35.png",
+  "weapons/w36.png"
+ ],
+ "props": {
+  "1": [
+   {
+    "src": "props/p1_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p1_1.png",
+    "wide": true
+   },
+   {
+    "src": "props/p1_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p1_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p1_4.png",
+    "wide": true
+   },
+   {
+    "src": "props/p1_5.png",
+    "wide": false
+   }
+  ],
+  "2": [
+   {
+    "src": "props/p2_0.png",
+    "wide": true
+   },
+   {
+    "src": "props/p2_1.png",
+    "wide": false
+   },
+   {
+    "src": "props/p2_2.png",
+    "wide": true
+   },
+   {
+    "src": "props/p2_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p2_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p2_5.png",
+    "wide": false
+   }
+  ],
+  "3": [
+   {
+    "src": "props/p3_0.png",
+    "wide": true
+   },
+   {
+    "src": "props/p3_1.png",
+    "wide": true
+   },
+   {
+    "src": "props/p3_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p3_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p3_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p3_5.png",
+    "wide": false
+   }
+  ],
+  "4": [
+   {
+    "src": "props/p4_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p4_1.png",
+    "wide": false
+   },
+   {
+    "src": "props/p4_2.png",
+    "wide": true
+   },
+   {
+    "src": "props/p4_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p4_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p4_5.png",
+    "wide": false
+   }
+  ],
+  "5": [
+   {
+    "src": "props/p5_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p5_1.png",
+    "wide": false
+   },
+   {
+    "src": "props/p5_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p5_3.png",
+    "wide": true
+   },
+   {
+    "src": "props/p5_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p5_5.png",
+    "wide": false
+   }
+  ],
+  "6": [
+   {
+    "src": "props/p6_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p6_1.png",
+    "wide": false
+   },
+   {
+    "src": "props/p6_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p6_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p6_4.png",
+    "wide": true
+   },
+   {
+    "src": "props/p6_5.png",
+    "wide": false
+   }
+  ],
+  "7": [
+   {
+    "src": "props/p7_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p7_1.png",
+    "wide": true
+   },
+   {
+    "src": "props/p7_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p7_3.png",
+    "wide": true
+   },
+   {
+    "src": "props/p7_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p7_5.png",
+    "wide": false
+   }
+  ],
+  "8": [
+   {
+    "src": "props/p8_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p8_1.png",
+    "wide": false
+   },
+   {
+    "src": "props/p8_2.png",
+    "wide": true
+   },
+   {
+    "src": "props/p8_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p8_4.png",
+    "wide": true
+   },
+   {
+    "src": "props/p8_5.png",
+    "wide": false
+   }
+  ],
+  "9": [
+   {
+    "src": "props/p9_0.png",
+    "wide": false
+   },
+   {
+    "src": "props/p9_1.png",
+    "wide": true
+   },
+   {
+    "src": "props/p9_2.png",
+    "wide": false
+   },
+   {
+    "src": "props/p9_3.png",
+    "wide": false
+   },
+   {
+    "src": "props/p9_4.png",
+    "wide": false
+   },
+   {
+    "src": "props/p9_5.png",
+    "wide": false
+   }
+  ]
+ }
 }

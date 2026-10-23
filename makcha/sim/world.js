@@ -46,9 +46,13 @@ export function createWorld({ seed, job, line, order, loadout }) {
   for (const r of floor.rooms) if (r.type === 'battle' || r.type === 'elite' || r.type === 'boss') for (const kind of LINES[line].traps) {
     const mode = TRAPS[kind].mode;
     if (mode === 'drop') { traps.push({ kind, mode, room: r.id, t: 2 + rng.next() * 2 }); continue; }
+    if (mode === 'spike') { for (let i = 0; i < 3; i++) { const p = freeSpot(r); if (p) traps.push({ kind, mode, room: r.id, x: p[0], y: p[1], r: 12, t: 1 + rng.next() * 3, warn: 0, up: 0, on: false }); } continue; }
     for (let i = 0; i < 2; i++) { const p = freeSpot(r); if (p) traps.push({ kind, mode, room: r.id, x: p[0], y: p[1], r: mode === 'pool' ? 20 : 18, t: 1.5 + rng.next() * 3, warn: 0, on: false }); }
   }
+  // 부서지는 지형지물: 작은 장애물(3칸 이하) 절반은 총으로 부술 수 있다(hp). 부서지면 그 칸은 바닥이 된다
+  for (const p of floor.pillars) if (p.w * p.h <= 3 && rng.chance(0.5)) p.hp = 10 + 6 * p.w * p.h;
   return {
+    gate: { room: floor.rooms.findIndex(r => r.type === 'boss'), state: 'closed' }, paused: false, bossHpMul: 1, puzzleBonus: 0,   // 보스방 입구 과학 퍼즐
     bossId: rng.pick(LINES[line].bosses), line, order, diff: difficulty(order), traps, falls: [], mods: modsOf(L.abilities, L.skillLv || 1, L.relics, L.gear), tick: 0, bonusTicks: 0, rng: createRng(seed).fork('world').state(), done: null, events: [], nextId: 1,
     floor, locked: [], rooms: floor.rooms.map(r => ({ visited: false, seen: !!rfx.seeAll, cleared: r.type !== 'battle' && r.type !== 'elite' && r.type !== 'boss', locked: false, wave: 0, opened: false })),
     player: { job, x: (s.cx + 0.5) * TILE, y: (s.cy + 0.5) * TILE, aim: 0, lastDir: 0, face: 1, moving: false,
@@ -64,7 +68,9 @@ export function roomOf(w, x, y) {
   const r = w.floor.rooms.find(r => tx >= r.x0 && tx < r.x0 + r.w && ty >= r.y0 && ty < r.y0 + r.h);
   return r ? r.id : -1;
 }
-const solidAt = (w, px, py) => isSolid(w.floor, Math.floor(px / TILE), Math.floor(py / TILE), w.locked);
+// 퍼즐을 풀기 전에는 보스방 문도 잠겨 있다
+export const gateLocked = w => w.gate && w.gate.state !== 'done' && w.gate.room >= 0 ? [...w.locked, w.gate.room] : w.locked;
+const solidAt = (w, px, py) => isSolid(w.floor, Math.floor(px / TILE), Math.floor(py / TILE), gateLocked(w));
 // 발밑 네모(가로 ±5, 세로 -4~+1)가 벽에 닿으면 그 축으로는 움직이지 않는다. 상자도 몸을 막는다
 function blocked(w, x, y, hw = 5) {
   if (solidAt(w, x - hw, y - 4) || solidAt(w, x + hw, y - 4) || solidAt(w, x - hw, y + 1) || solidAt(w, x + hw, y + 1)) return true;
@@ -85,6 +91,8 @@ function movePlayer(w, input) {
   if (p.moving) p.lastDir = Math.atan2(my, mx);
   if (p.rollCd > 0) p.rollCd--;
   if (input & INPUT.RUN) { if (!p.rollHeld && p.rollCd <= 0 && p.rollT <= 0 && p.dashT <= 0 && !(p.st.shock > 0)) {
+    if (w.eshots.some(e => Math.hypot(e.x - p.x, e.y - (p.y - 10)) < 22) || w.mons.some(m => m.dash > 0 && Math.hypot(m.x - p.x, m.y - p.y) < 30)) {   // 완벽 회피: 맞기 직전에 구르면 에너지와 무적 시간을 더 받는다
+      p.energy = Math.min(p.maxEnergy, p.energy + 25); p.invuln = Math.max(p.invuln, ROLL_T + 14); w.events.push({ type: 'perfect' }); }
     p.rollT = ROLL_T; p.rollCd = Math.round(ROLL_CD * w.mods.rollCdMul) + ROLL_T; p.rollA = p.moving ? p.lastDir : p.aim; p.invuln = Math.max(p.invuln, ROLL_T + 2); w.events.push({ type: 'roll' }); }
     p.rollHeld = true; } else p.rollHeld = false;
   if (p.dashT > 0) {   // 기관사 돌진 중에는 입력 대신 돌진 방향으로
@@ -124,17 +132,19 @@ function updateRooms(w, rng) {
     w.player.energy = Math.min(w.player.maxEnergy, w.player.energy + 30);
     if (w.mods.clearHeal && rng.chance(w.mods.clearHeal) && w.player.hp < w.player.maxHp) { w.player.hp++; w.events.push({ type: 'heal' }); }
     const ty = w.floor.rooms[rid].type; if (ty === 'elite') w.loot.picks++; if (ty === 'boss' && w.clearTick == null) w.clearTick = w.tick;
+    if (!st.hurt) { w.pickups.push({ kind: 'parts', n: 1, x: w.player.x + 12, y: w.player.y }); w.loot.coins += 3; w.events.push({ type: 'nohit' }); }   // 한 번도 맞지 않고 정리하면 부품·토큰
     w.events.push({ type: 'clear', room: rid });
   }
 }
 
 function addMon(w, rid, id, x, y, rng) {
-  const M = MONSTERS[id], hp = Math.round(M.hp * w.diff.hpMul);
+  const M = MONSTERS[id], hp = Math.round(M.hp * w.diff.hpMul * (M.kind === 'boss' ? w.bossHpMul || 1 : 1));
   w.mons.push({ uid: w.nextId++, id, room: rid, x, y, hp, maxHp: hp, speed: M.speed, r: M.r, cd: 1 + rng.next(), windT: 0, stun: 0, slowT: 0, dash: 0, dashA: 0, touch: 0, flash: 0, kx: 0, ky: 0, face: -1, t: 0, pattern: 0, pat: '' });
 }
 function spawnWave(w, rng, rid) {
   const r = w.floor.rooms[rid], st = w.rooms[rid], wave = WAVES[r.type][st.wave++], p = w.player;
-  for (const [id0, count] of wave) { const id = id0 === 'BOSS' ? w.bossId : id0; for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {
+  const mobs = LINES[w.line].mobs || ['trilobite', 'ammonite', 'germ'], ROLE = { A: 0, B: 1, C: 2 };
+  for (const [id0, count] of wave) { const id = id0 === 'BOSS' ? w.bossId : id0 in ROLE ? (ROLE[id0] === 2 && mobs[3] && rng.chance(0.5) ? mobs[3] : mobs[ROLE[id0]]) : id0; for (let i = 0; i < count + (MONSTERS[id].kind === 'boss' ? 0 : w.diff.extra); i++) {   // A·B·C를 호선 몬스터로 바꿈(4번째가 있으면 C 자리에 섞음)
     let x, y, k = 0;
     do { x = (r.x0 + 1.5 + rng.int(r.w - 2)) * TILE; y = (r.y0 + 1.5 + rng.int(r.h - 2)) * TILE; k++; } while (k < 40 && (Math.hypot(x - p.x, y - p.y) < 90 || solidAt(w, x, y)));
     if (MONSTERS[id].kind === 'boss') { x = (r.cx + 0.5) * TILE; y = (r.y0 + 3) * TILE; }
@@ -170,12 +180,12 @@ function updatePlayer(w, input, rng) {
     else for (let i = 0; i < st.count; i++) {
       const a = p.aim + (st.count > 1 ? (i / (st.count - 1) - 0.5) * st.spread : (rng.next() - 0.5) * st.spread);
       w.shots.push({ x: mx, y: my, vx: Math.cos(a) * st.speed, vy: Math.sin(a) * st.speed, life: Math.round(st.range / st.speed * TICK_HZ), dmg: st.dmg, weapon: st.id || p.weapons[p.cur].id,
-        trait: st.trait, size: st.size, pierce: st.trait === 'boomerang' ? 99 : (st.trait === 'pierce' ? 3 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
+        trait: st.trait, freeze: !!st.freeze, size: st.size, pierce: st.trait === 'boomerang' ? 99 : (st.trait === 'pierce' ? 3 : 1) + w.mods.pierce, bounce: w.mods.bounce, hit: [] });
       if (st.trait === 'boomerang') { const s = w.shots[w.shots.length - 1]; s.half = Math.floor(s.life / 2); s.back = false; }
     }
     w.events.push({ type: 'fire', weapon: p.weapons[p.cur].id });
   }
-  if (p.swingT > 0) p.swingT--;
+  if (p.swingT > 0) p.swingT--; if (p.comboT > 0) p.comboT -= DT;
   if (!(input & INPUT.ATTACK) || st.energy === 0) p.energy = Math.min(p.maxEnergy, p.energy + 4 * w.mods.energyRegenMul * DT);
   p.sinceHit++;
   if (p.sinceHit > REGEN_WAIT - w.mods.regenFaster && p.shield < p.maxShield && !(p.st.infect > 0) && !(p.st.corrode > 0) && ++p.regen >= REGEN_EVERY) { p.shield++; p.regen = 0; }   // 감염·부식 중에는 방어막이 안 찬다
@@ -198,7 +208,7 @@ export function hurtPlayer(w, amount) {
   const p = w.player; if (p.invuln > 0 || w.done) return false;
   const had = p.shield, s = Math.min(p.shield, amount); p.shield -= s; p.hp = Math.max(0, p.hp - (amount - s));
   if (w.mods.shieldBurst && had > 0 && p.shield === 0) { w.events.push({ type: 'splash', x: p.x, y: p.y, r: 60 }); for (const m of w.mons) if (Math.hypot(m.x - p.x, m.y - p.y) < 60 + m.r) hitMon(w, m, 8, Math.sign(m.x - p.x) * 12, Math.sign(m.y - p.y) * 6); w.eshots = w.eshots.filter(e => Math.hypot(e.x - p.x, e.y - p.y) > 60); }   // 방어막 폭발
-  p.invuln = INVULN; p.sinceHit = 0; p.regen = 0; w.events.push({ type: 'hurt', amount });
+  p.invuln = INVULN; p.sinceHit = 0; p.regen = 0; w.events.push({ type: 'hurt', amount }); for (const rid of w.locked) w.rooms[rid].hurt = true;
   checkDead(w); return true;
 }
 // 쓰러짐: 백신 앰플이 있으면 한 번 체력 절반으로 일어난다
@@ -243,13 +253,16 @@ function breakProp(w, o, rng) {
     return;
   }
   for (let i = 0; i < w.mods.matBonus && o.kind !== 'barrel'; i++) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x - 8, y: o.y + 4 });   // 목장갑
-  if (o.kind === 'rock') { if (rng.chance(0.5)) w.pickups.push({ kind: 'mat', id: 'scrap', x: o.x, y: o.y }); return; }
-  if (rng.chance(0.35)) w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });
-  if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
+  if (o.kind === 'rock') { if (rng.chance(0.3)) w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y }); return; }   // 바위: 가끔 부품
+  const parts = rng.chance(0.35); if (parts) w.pickups.push({ kind: 'parts', n: 1, x: o.x, y: o.y });   // 상자: 부품은 드물게, 부품이 없으면 재료는 꼭 나온다
+  if (!parts || rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: rng.pick(MAT_IDS), x: o.x + 8, y: o.y + 4 });
 }
 
 // 맞힘 하나: 지층 판독 +30%, 보스 추가 피해, 치명타 2배(피뢰침 조각이면 옆 적에게 번개)
-function strike(w, m, base, rng, kx = 0, ky = 0) {
+function strike(w, m, base, rng, kx = 0, ky = 0, src = null) {
+  const M0 = MONSTERS[m.id], weak = src ? (M0.weak?.[src.weapon] || M0.weakTrait?.[src.trait] || 1) * (M0.rusts && m.wetT > 0 ? 1.5 : 1) : 1;   // 과학 약점(중화·산화·녹음 등)
+  if (weak > 1) w.events.push({ type: 'weak', x: m.x, y: m.y - M0.cy });
+  base *= weak;
   const boss = MONSTERS[m.id].kind === 'boss', k = boss ? 0.1 : 1, crit = w.mods.crit > 0 && rng.chance(w.mods.crit);
   const dmg = base * (w.scanT > 0 ? 1.3 : 1) * (boss ? w.mods.bossMul : 1) * (crit ? 2 : 1);
   hitMon(w, m, dmg, kx * k, ky * k);
@@ -261,7 +274,7 @@ function fireBeam(w, st, x0, y0, a, rng) {
   const dx = Math.cos(a), dy = Math.sin(a); let L = 0;
   while (L < st.range && !solidAt(w, x0 + dx * L, y0 + dy * L)) L += 4;
   const on = (x, y, r) => { const ax = x - x0, ay = y - y0, along = ax * dx + ay * dy; return along > -4 && along < L && Math.abs(ax * dy - ay * dx) < r; };
-  for (const m of w.mons) if (on(m.x, m.y - MONSTERS[m.id].cy, m.r + 4)) strike(w, m, st.dmg, rng, dx * 3, dy * 3);
+  for (const m of w.mons) if (on(m.x, m.y - MONSTERS[m.id].cy, m.r + 4)) { strike(w, m, st.dmg, rng, dx * 3, dy * 3, { weapon: st.id, trait: st.burn ? 'burn' : 'beam' }); if (st.burn) m.burnT = 3; }   // 태양광 집광기: 빛줄기에 불이 붙음
   for (const o of w.props) if (o.hp > 0 && on(o.x, o.y - 6, o.r + 2)) { o.hp -= st.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); }
   w.props = w.props.filter(o => o.hp > 0);
   w.events.push({ type: 'beam', x1: x0, y1: y0, x2: x0 + dx * L, y2: y0 + dy * L });
@@ -271,12 +284,25 @@ function swing(w, st, a, rng) {
   const p = w.player, cx = p.x, cy = p.y - 10, half = st.arc / 2;
   const inArc = (x, y, R) => { const d = Math.hypot(x - cx, y - cy); if (d > R) return false; let da = Math.atan2(y - cy, x - cx) - a; while (da > Math.PI) da -= 2 * Math.PI; while (da < -Math.PI) da += 2 * Math.PI; return d < 8 || Math.abs(da) <= half; };
   for (const m of w.mons) if (inArc(m.x, m.y - MONSTERS[m.id].cy, st.range + m.r)) strike(w, m, st.dmg, rng, Math.cos(a) * 9, Math.sin(a) * 9);
-  const before = w.eshots.length; w.eshots = w.eshots.filter(e => !inArc(e.x, e.y, st.range + 8)); if (w.eshots.length < before) w.events.push({ type: 'parry', x: cx + Math.cos(a) * 16, y: cy + Math.sin(a) * 16 });
+  const before = w.eshots.length, hitBack = w.eshots.filter(e => inArc(e.x, e.y, st.range + 8)); w.eshots = w.eshots.filter(e => !inArc(e.x, e.y, st.range + 8));
+  for (const e of hitBack) { const t = nearestTo(w, e.x, e.y, 300), b = t ? Math.atan2(t.y - MONSTERS[t.id].cy - e.y, t.x - e.x) : a;   // 쳐낸 탄은 가까운 적에게 되돌아간다
+    w.shots.push({ x: e.x, y: e.y, vx: Math.cos(b) * 380, vy: Math.sin(b) * 380, life: TICK_HZ, dmg: 3 * w.mods.dmgMul, weapon: 'reflect', size: 3, pierce: 1, bounce: 0, hit: [] }); } if (w.eshots.length < before) w.events.push({ type: 'parry', x: cx + Math.cos(a) * 16, y: cy + Math.sin(a) * 16 });
   for (const o of w.props) if (o.hp > 0 && inArc(o.x, o.y - 6, st.range + o.r)) { o.hp -= st.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); }
   w.props = w.props.filter(o => o.hp > 0);
   p.swingT = 8; p.swingA = a; w.events.push({ type: 'swing', x: cx, y: cy, a, r: st.range + 6, arc: st.arc });
 }
 
+// 부서지는 지형지물: 탄이 맞으면 hp가 줄고 0이면 칸을 바닥으로 바꾼다(가끔 부품·헝겊)
+function hitTerrain(w, x, y, dmg, rng) {
+  const tx = Math.floor(x / TILE), ty = Math.floor(y / TILE), p = w.floor.pillars.find(p => p.hp > 0 && tx >= p.x && tx < p.x + p.w && ty >= p.y && ty < p.y + p.h); if (!p) return;
+  p.hp -= dmg * w.mods.propMul; w.events.push({ type: 'terrainHit', x, y });
+  if (p.hp > 0) return;
+  p.hp = 0; p.broken = true; for (let yy = p.y; yy < p.y + p.h; yy++) for (let xx = p.x; xx < p.x + p.w; xx++) w.floor.tiles[yy * w.floor.w + xx] = T.FLOOR;
+  const cx = (p.x + p.w / 2) * TILE, cy = (p.y + p.h / 2) * TILE; w.events.push({ type: 'terrainBreak', x: cx, y: cy, w: p.w, h: p.h });
+  if (rng.chance(0.3)) w.pickups.push({ kind: 'parts', n: 1, x: cx, y: cy }); else if (rng.chance(0.4)) w.pickups.push({ kind: 'mat', id: 'cloth', x: cx, y: cy });
+}
+// 점(px, py)과 선분 (ax, ay)-(bx, by) 사이 거리
+function segDist(px, py, ax, ay, bx, by) { const dx = bx - ax, dy = by - ay, L = dx * dx + dy * dy, t = L ? Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / L)) : 0; return Math.hypot(px - ax - dx * t, py - ay - dy * t); }
 function updateShots(w, rng) {
   const p = w.player;
   for (const s of w.shots) {
@@ -284,9 +310,10 @@ function updateShots(w, rng) {
       if (!s.back && s.life <= s.half) { s.back = true; s.hit = []; }
       if (s.back) { const dx = p.x - s.x, dy = p.y - 10 - s.y, d = Math.hypot(dx, dy), sp = Math.hypot(s.vx, s.vy); if (d < 10) { s.life = 0; continue; } s.vx = dx / d * sp; s.vy = dy / d * sp; s.life = Math.max(s.life, 2); }
     }
-    if (w.mods.homing && !s.back) { const t = nearestTo(w, s.x, s.y, 150); if (t) { const want = Math.atan2(t.y - MONSTERS[t.id].cy - s.y, t.x - s.x), cur = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy);
-      let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const a = cur + Math.max(-w.mods.homingTurn, Math.min(w.mods.homingTurn, d)); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; } }
-    s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
+    if ((w.mods.homing || s.trait === 'homing') && !s.back) { const t = nearestTo(w, s.x, s.y, s.trait === 'homing' ? 220 : 150); if (t) { const want = Math.atan2(t.y - MONSTERS[t.id].cy - s.y, t.x - s.x), cur = Math.atan2(s.vy, s.vx), sp = Math.hypot(s.vx, s.vy);
+      let d = want - cur; while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const turn = s.trait === 'homing' ? Math.max(0.2, w.mods.homingTurn) : w.mods.homingTurn, a = cur + Math.max(-turn, Math.min(turn, d)); s.vx = Math.cos(a) * sp; s.vy = Math.sin(a) * sp; } }
+    const x0 = s.x, y0 = s.y; s.x += s.vx * DT; s.y += s.vy * DT; s.life--;
+    if (solidAt(w, s.x, s.y) && !s.back) hitTerrain(w, s.x, s.y, s.dmg, rng);   // 부서지는 지형지물이면 깎인다
     if (solidAt(w, s.x, s.y) && !s.back) {
       if (s.trait === 'boomerang') { s.x -= s.vx * DT; s.y -= s.vy * DT; s.back = true; s.hit = []; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
       if (s.bounce > 0) { s.bounce--; if (w.mods.ricochet) s.dmg *= 1.2; s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(w, s.x + s.vx * DT, s.y)) s.vx = -s.vx; else s.vy = -s.vy; w.events.push({ type: 'spark', x: s.x, y: s.y }); continue; }
@@ -294,10 +321,13 @@ function updateShots(w, rng) {
     }
     if (!s.back) for (const o of w.props) if (o.hp > 0 && Math.hypot(o.x - s.x, o.y - 6 - s.y) < o.r + 3) { o.hp -= s.dmg * w.mods.propMul; if (o.hp <= 0) breakProp(w, o, rng); if (s.trait === 'boomerang') { s.back = true; s.hit = []; } else s.life = 0; break; }
     if (s.life <= 0) continue;
-    for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && Math.hypot(m.x - s.x, m.y - MONSTERS[m.id].cy - s.y) < m.r + 3) {
+    for (const m of w.mons) if (!(s.hit ||= []).includes(m.uid) && segDist(m.x, m.y - MONSTERS[m.id].cy, x0, y0, s.x, s.y) < m.r + 3) {   // 지나온 선 전체로 판정(빠른 탄이 적을 건너뛰지 않게)
       s.hit.push(m.uid);
-      const boss = MONSTERS[m.id].kind === 'boss', dmg = strike(w, m, s.dmg, rng, s.vx * 0.01, s.vy * 0.01);
+      const boss = MONSTERS[m.id].kind === 'boss', wetHit = (s.trait === 'chain' || s.trait === 'shock') && m.wetT > 0;   // 젖은 적은 전기에 약하다
+      const dmg = strike(w, m, s.dmg * (wetHit ? 1.5 : 1), rng, s.vx * (s.trait === 'water' ? 0.05 : 0.01), s.vy * (s.trait === 'water' ? 0.05 : 0.01), { weapon: s.weapon, trait: s.trait });
       if (s.trait === 'slow') { m.slowT = 1.2; if ((m.darts = (m.darts || 0) + 1) >= 3) { m.darts = 0; m.stun = Math.max(m.stun, boss ? 0.4 : 1.5); w.events.push({ type: 'sleep', uid: m.uid }); } }   // 마취 다트: 느려지고 3번이면 잠듦
+      if (s.trait === 'freeze' || s.freeze) { m.slowT = 1.5; if ((m.chill = (m.chill || 0) + 1) >= 2) { m.chill = 0; m.stun = Math.max(m.stun, boss ? 0.3 : 1); w.events.push({ type: 'freeze', uid: m.uid }); } }   // 액체 질소: 두 번이면 얼어붙음
+      if (s.trait === 'water') { m.wetT = 3; m.burnT = 0; }   // 물대포: 적시고 불을 끈다
       if (s.trait === 'burn') m.burnT = 3;   // 신호 홍염: 불이 붙어 3초 동안 탄다
       if (s.trait === 'shock') m.stun = Math.max(m.stun, boss ? 0.1 : 0.35);   // 제세동 충격: 잠깐 기절
       if (s.trait === 'acid' && !w.zones.some(z => z.kind === 'acid' && Math.hypot(z.x - m.x, z.y - m.y) < 14)) w.zones.push({ kind: 'acid', x: m.x, y: m.y, r: 16, t: 2 * TICK_HZ, acc: 0 });
@@ -343,7 +373,7 @@ function updateMons(w, rng) {
   const p = w.player;
   for (const m of w.mons) {
     const M = MONSTERS[m.id], dx = p.x - m.x, dy = p.y - m.y, d = Math.hypot(dx, dy) || 1;
-    m.t += DT; if (m.flash > 0) m.flash--; if (m.slowT > 0) m.slowT -= DT;
+    m.t += DT; if (m.flash > 0) m.flash--; if (m.slowT > 0) m.slowT -= DT; if (m.wetT > 0) m.wetT -= DT;
     if (m.burnT > 0) { m.burnT -= DT; m.hp -= 2 * DT; if (Math.floor(m.t * 4) !== Math.floor((m.t - DT) * 4)) w.events.push({ type: 'burn', x: m.x, y: m.y - MONSTERS[m.id].cy }); }   // 타는 동안 초당 2
     if (m.stun > 0) { m.stun -= DT; continue; }   // 얼거나 기절하면 움직이지도 공격하지도 못한다
     m.cd -= DT; m.touch -= DT;
@@ -372,10 +402,12 @@ function updateMons(w, rng) {
     if (d < 14 + m.r * 0.5 && !(m.dash > 0)) sp = 0;
     moveBody(w, m, vx * sp * DT + m.kx, vy * sp * DT + m.ky, Math.min(6, m.r * 0.6)); m.kx *= 0.75; m.ky *= 0.75;
     if (Math.abs(dx) > 2) m.face = dx > 0 ? 1 : -1;
-    if (d < 14 + m.r * 0.6 && m.touch <= 0 && M.kind !== 'ranged') { m.touch = 1; hurtPlayer(w, M.atk); }
+    if (d < 14 + m.r * 0.6 && m.touch <= 0 && M.kind !== 'ranged') { m.touch = 1; if (hurtPlayer(w, M.atk) && M.touchInflict) inflict(w, M.touchInflict); }   // 닿으면 상태 이상(감염된 손잡이 등)
   }
   for (const m of [...w.mons]) if (m.hp <= 0) {
     w.events.push({ type: 'kill', uid: m.uid, id: m.id, x: m.x, y: m.y });
+    { const p = w.player; p.combo = p.comboT > 0 ? (p.combo || 0) + 1 : 1; p.comboT = 1.5;   // 연속 처치: 1.5초 안에 이어서 잡으면 쌓이고, 5마리마다 에너지·방어막
+      if (p.combo % 5 === 0) { p.energy = Math.min(p.maxEnergy, p.energy + 40); p.shield = Math.min(p.maxShield, p.shield + 1); w.events.push({ type: 'combo', n: p.combo }); } }
     const sp = MONSTERS[m.id].split;   // 내성균: 둘로 나뉜다. 벽·기둥·상자에 끼지 않는 자리를 골라서
     if (sp) { const spots = [[-12, 0], [12, 0], [0, -10], [0, 10], [-8, -8], [8, 8]].map(([dx, dy]) => [m.x + dx, m.y + dy]).filter(([x, y]) => !blocked(w, x, y, 5));
       for (let i = 0; i < 2; i++) { const [x, y] = spots[i] || [m.x, m.y]; addMon(w, m.room, sp, x, y, rng); } }
@@ -459,6 +491,10 @@ function updateTraps(w, rng) {
         for (let k = 0; k < 10; k++) { x = p.x + rng.range(-45, 45); y = p.y + rng.range(-35, 35); if (!solidAt(w, x, y)) break; }
         w.falls.push({ kind: t.kind, x, y, t: 0.9 + w.mods.warnPlus, T: 0.9 + w.mods.warnPlus, r: 20 }); w.events.push({ type: 'trapWarn', kind: t.kind, x, y, r: 20 }); }
       t.t = 2.5 + rng.next() * 2;
+    } else if (t.mode === 'spike') {   // 솟는 바닥: 금이 간 뒤(0.7초) 솟아올라(0.9초) 그 위의 플레이어·적을 다치게 한다
+      if (t.up > 0) { t.up -= DT; if (Math.hypot(p.x - t.x, p.y - t.y) < t.r && p.rollT <= 0) hurtPlayer(w, 1); for (const m of w.mons) if (Math.hypot(m.x - t.x, m.y - t.y) < t.r + 4 && Math.floor(t.up * 10) % 5 === 0) hitMon(w, m, 2); if (t.up <= 0) t.t = 2 + rng.next() * 2; }
+      else if (t.warn > 0) { if ((t.warn -= DT) <= 0) { t.up = 0.9; w.events.push({ type: 'spikeUp', x: t.x, y: t.y }); } }
+      else if (t.t <= 0) t.warn = 0.7 + w.mods.warnPlus;
     } else if (t.mode === 'pulse') {
       if (t.t <= 0) { t.on = !t.on; t.t = 2; if (t.on) w.events.push({ type: 'trapWarn', kind: t.kind, x: t.x, y: t.y, r: t.r }); }
       if (t.on && Math.hypot(p.x - t.x, p.y - t.y) < t.r && !w.mods.immune.includes('shock')) { if (hurtPlayer(w, p.st.wet > 0 ? 2 : 1)) inflict(w, 'shock'); }   // 젖은 채 감전되면 피해 2
@@ -468,8 +504,20 @@ function updateTraps(w, rng) {
   w.falls = w.falls.filter(d => d.t > 0);
 }
 
+// 퍼즐 결과: 맞히면 최대 방어막 +1(판 끝까지)과 방어막 가득, 틀리면 체력 −1(1은 남김)과 보스 체력 +25%. 어느 쪽이든 문이 열린다
+export function resolvePuzzle(w, ok) {
+  const p = w.player; w.gate.state = 'done'; w.paused = false; w.events = [];
+  if (ok) { p.maxShield++; p.shield = p.maxShield; w.puzzleBonus = (w.puzzleBonus || 0) + 1; w.events.push({ type: 'puzzleOk' }); }
+  else { p.hp = Math.max(1, p.hp - 1); w.bossHpMul = 1.25; w.events.push({ type: 'puzzleFail' }); }
+}
+function checkGate(w) {   // 보스방 문 세 칸 안에 오면 멈추고 퍼즐을 낸다
+  const g = w.gate; if (!g || g.state !== 'closed' || g.room < 0) return;
+  const p = w.player, near = w.floor.doors.some(d => d.room === g.room && d.tiles.some(k => Math.hypot(((k % w.floor.w) + 0.5) * TILE - p.x, (Math.floor(k / w.floor.w) + 0.5) * TILE - p.y) < 3 * TILE));
+  if (near) { g.state = 'asking'; w.paused = true; w.events.push({ type: 'puzzleGate', line: w.line }); }
+}
 export function step(w, input) {
   if (w.done) return;
+  if (w.paused) { w.events = []; return; }   // 퍼즐 중: 시간이 멈추고, 퍼즐 열기 알림은 한 번만
   w.events = [];
   const rng = createRng(w.rng);
   movePlayer(w, input);
@@ -480,6 +528,7 @@ export function step(w, input) {
   updateRooms(w, rng);
   updateTraps(w, rng);
   updateStatus(w);
+  checkGate(w);
   w.tick++; w.rng = rng.state();
 }
 export { T };

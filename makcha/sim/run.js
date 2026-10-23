@@ -30,7 +30,7 @@ export function createRun({ seed, job, relics = [] }) {
 }
 const fxOf = run => relicFx(run.relics);
 
-export function difficulty(order) { return { hpMul: 1 + 0.25 * order, extra: Math.floor(order / 2) }; }
+export function difficulty(order) { return { hpMul: 1.2 + 0.3 * order, extra: Math.floor(order / 2) }; }   // 난이도 높게: 첫 호선부터 적 체력 1.2배, 순서마다 +30%
 
 // 열린 호선 중 아직 안 간 호선에서 3개. 모자라면 이미 간 호선도 다시 섞는다(교사가 호선을 적게 열었을 때)
 export function offerLines(run, open) {
@@ -55,6 +55,7 @@ export function finishLine(run, w) {
   run.picks = 1 + (w.loot.picks || 0);   // 환승역에서 고를 특수능력 수: 기본 1 + 정예 방을 정리한 수
   run.lastCoins = Math.floor(((w.loot.coins || 0) + (w.done === 'dead' ? 0 : LINE_COINS)) * (fxOf(run).coinMul || 1)); run.coins = (run.coins || 0) + run.lastCoins;
   run.revive = w.player.revive || 0;
+  run.maxShield += w.puzzleBonus || 0;   // 보스방 퍼즐을 맞히면 최대 방어막이 판 끝까지 늘어난다
   run.parts += w.loot.parts; for (const [k, v] of Object.entries(w.loot.mats)) run.mats[k] = (run.mats[k] || 0) + v;
   if (w.done === 'dead') { run.dead = true; return run; }
   const p = w.player;
@@ -83,20 +84,22 @@ export function upgradeSkill(run) {
 
 // ---------- 장비 만들기: 재료로 머리·몸·발 장비를 만든다. 재난 막기는 호선 재난을 넣을 때 연결한다 ----------
 export const GEAR = {
+  // 재료는 헝겊과 부품 두 가지: 천 장비는 헝겊 위주, 단단한 장비는 부품 위주, 둘을 섞으면 막는 것이 많아진다
   dustMask:    { name: '방진 마스크', slot: 'head', recipe: { cloth: 2 }, text: '중독을 막는다', block: ['poison'] },
-  gasMask:     { name: '방독면', slot: 'head', recipe: { filter: 1, rubber: 1 }, text: '감염·중독을 막는다', block: ['infect', 'poison'] },
-  goggles:     { name: '고글', slot: 'head', recipe: { glass: 1, rubber: 1 }, text: '부식을 막는다', block: ['corrode'] },
-  armorVest:   { name: '방호 조끼', slot: 'body', recipe: { scrap: 2, leather: 1 }, text: '최대 방어막 +1', shield: 1 },
-  coolVest:    { name: '냉각 조끼', slot: 'body', recipe: { cloth: 1, glass: 1 }, text: '화상을 막는다', block: ['burn'] },
-  winterCoat:  { name: '방한복', slot: 'body', recipe: { cloth: 2, leather: 1 }, text: '동상을 막는다', block: ['frost'] },
-  raincoat:    { name: '우비', slot: 'body', recipe: { cloth: 1, rubber: 1 }, text: '젖음·부식을 막는다', block: ['wet', 'corrode'] },
-  rubberBoots: { name: '고무장화', slot: 'feet', recipe: { rubber: 2 }, text: '젖음·감전을 막는다', block: ['wet', 'shock'] },
-  gripShoes:   { name: '미끄럼 방지 신발', slot: 'feet', recipe: { rubber: 1, leather: 1 }, text: '묶임·동상을 막는다', block: ['root', 'frost'] },
+  gasMask:     { name: '방독면', slot: 'head', recipe: { cloth: 1, parts: 3 }, text: '감염·중독을 막는다', block: ['infect', 'poison'] },
+  goggles:     { name: '고글', slot: 'head', recipe: { parts: 3 }, text: '부식을 막는다', block: ['corrode'] },
+  armorVest:   { name: '방호 조끼', slot: 'body', recipe: { cloth: 1, parts: 5 }, text: '최대 방어막 +1', shield: 1 },
+  coolVest:    { name: '냉각 조끼', slot: 'body', recipe: { cloth: 2, parts: 1 }, text: '화상을 막는다', block: ['burn'] },
+  winterCoat:  { name: '방한복', slot: 'body', recipe: { cloth: 3 }, text: '동상을 막는다', block: ['frost'] },
+  raincoat:    { name: '우비', slot: 'body', recipe: { cloth: 2, parts: 2 }, text: '젖음·부식을 막는다', block: ['wet', 'corrode'] },
+  rubberBoots: { name: '고무장화', slot: 'feet', recipe: { cloth: 1, parts: 2 }, text: '젖음·감전을 막는다', block: ['wet', 'shock'] },
+  gripShoes:   { name: '미끄럼 방지 신발', slot: 'feet', recipe: { cloth: 1, parts: 3 }, text: '묶임·동상을 막는다', block: ['root', 'frost'] },
 };
-export function canCraft(run, id) { return Object.entries(GEAR[id].recipe).every(([k, v]) => (run.mats[k] || 0) >= v); }
+const have = (run, k) => k === 'parts' ? run.parts : (run.mats[k] || 0);   // 부품은 run.parts, 헝겊은 run.mats
+export function canCraft(run, id) { return Object.entries(GEAR[id].recipe).every(([k, v]) => have(run, k) >= v); }
 export function craftGear(run, id) {
   if (!canCraft(run, id)) return false;
-  for (const [k, v] of Object.entries(GEAR[id].recipe)) run.mats[k] -= v;
+  for (const [k, v] of Object.entries(GEAR[id].recipe)) if (k === 'parts') run.parts -= v; else run.mats[k] -= v;
   run.gear[GEAR[id].slot] = id; return true;
 }
 
