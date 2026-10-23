@@ -7,7 +7,7 @@ import { INPUT, TILE, DT, VIEW_W, VIEW_H } from '../sim/constants.js';
 import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, MATS, STATUS, RELICS, GRADES } from '../sim/data.js';
 
 // 화면은 2배 해상도로 그린다(게임 좌표는 그대로 640×360). 캐릭터 그림을 원본 도트 그대로 보여 주기 위해
-const RES = 2, cv = document.getElementById('cv'); cv.width = 640 * RES; cv.height = 360 * RES;
+let RES = 2; const cv = document.getElementById('cv'); cv.width = 640 * RES; cv.height = 360 * RES;   // RES: 게임 1칸 = 화면 RES 픽셀(정수, 창 크기에 맞춰 fit에서 정함)
 const x = cv.getContext('2d'); x.imageSmoothingEnabled = false;
 const $ = id => document.getElementById(id);
 // 받침이 있으면 앞 조사, 없으면 뒤 조사(을/를, 이/가)
@@ -27,7 +27,10 @@ addEventListener('blur', () => { keys.clear(); mouseDown = rightDown = false; })
 cv.addEventListener('contextmenu', e => e.preventDefault());
 function readInput() { let b = 0; for (const k of keys) b |= KEY[k]; if (mouseDown) b |= INPUT.ATTACK; if (rightDown) b |= INPUT.SKILL; return b; }
 
-function fit() { const s = Math.min(innerWidth / VIEW_W, innerHeight / VIEW_H); cv.style.width = VIEW_W * s + 'px'; cv.style.height = VIEW_H * s + 'px'; }
+function fit() {   // 화면은 640×360 고정, 기기 픽셀로 정수배만(남는 곳은 검은 테두리). 도트가 줄마다 굵기가 달라지지 않게
+  const dpr = window.devicePixelRatio || 1; RES = Math.max(1, Math.floor(Math.min(innerWidth * dpr / VIEW_W, innerHeight * dpr / VIEW_H)));
+  cv.width = VIEW_W * RES; cv.height = VIEW_H * RES; cv.style.width = VIEW_W * RES / dpr + 'px'; cv.style.height = VIEW_H * RES / dpr + 'px'; x.imageSmoothingEnabled = false;
+}
 addEventListener('resize', fit); fit();
 
 // ---------- 배경: 구역 1 지층 터널. 방 바닥은 자갈, 통로는 선로, 벽 앞면은 지층 단면 ----------
@@ -107,8 +110,8 @@ function bakeFloor(f) {
   // 조형물: 장애물 칸 위에 호선 조형물 그림을 세운다(가로로 긴 칸에는 넓은 조형물). 칸은 바닥으로 덮고 그림자를 깐다
   const PR = A.props?.[f.line];
   if (PR?.length) for (const p of f.pillars) { if (p.broken) continue;   // 부서진 것은 그리지 않는다. 고르는 그림은 자리로 정해 다시 그려도 같게
-    const wide = p.w >= p.h * 2, pool = PR.filter(o => o.wide === wide).length ? PR.filter(o => o.wide === wide) : PR, o = pool[(p.x * 7 + p.y * 13) % pool.length];
-    const X = p.x * TILE, Y = p.y * TILE, W0 = p.w * TILE, H0 = p.h * TILE, k = (W0 + 4) / o.img.width, w2 = Math.round(o.img.width * k), h2 = Math.round(o.img.height * k);
+    const wide = p.w >= p.h * 2, pool0 = PR.filter(o => o.wide === wide).length ? PR.filter(o => o.wide === wide) : PR, pool = [...pool0].sort((a, b) => Math.abs(a.img.width - p.w * TILE - 4) - Math.abs(b.img.width - p.w * TILE - 4)).slice(0, 2), o = pool[(p.x * 7 + p.y * 13) % pool.length];   // 칸 너비에 가까운 것
+    const X = p.x * TILE, Y = p.y * TILE, W0 = p.w * TILE, H0 = p.h * TILE, w2 = o.img.width, h2 = o.img.height;   // 원래 크기 그대로(도트 1칸 = 게임 1칸)
     for (let yy = 0; yy < p.h; yy++) for (let xx = 0; xx < p.w; xx++) { g.fillStyle = (p.x + xx + p.y + yy) % 2 ? TH.fa : TH.fb; g.fillRect(X + xx * TILE, Y + yy * TILE, TILE, TILE); }
     g.fillStyle = 'rgba(0,0,0,.28)'; g.beginPath(); g.ellipse(X + W0 / 2, Y + H0 - 2, W0 / 2 + 1, Math.max(3, H0 / 4), 0, 0, 7); g.fill();
     g.imageSmoothingEnabled = false; g.drawImage(o.img, Math.round(X + (W0 - w2) / 2), Math.round(Y + H0 - h2 + 2), w2, h2);
@@ -142,7 +145,7 @@ function drawMon(m, t) {
   const M = MONSTERS[m.id], small = M.small, fr = A.mons[m.id] || A.mons[M.sprite] || A.mons.germ, X = Math.round(m.x), Y = Math.round(m.y);   // 작은 내성균은 내성균 그림을 작게, 그림 없는 보스는 색을 입혀 임시로
   const img = M.kind === 'boss' ? (m.windT > 0 ? fr[m.windT < 0.2 ? 3 : 2] : fr[Math.floor(t * 3) % 2]) : fr[Math.floor(m.t * (m.dash > 0 ? 16 : 8)) % fr.length];
   x.fillStyle = 'rgba(0,0,0,.3)'; x.beginPath(); x.ellipse(X, Y, img.width * 0.35, 3, 0, 0, 7); x.fill();
-  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.invuln) x.filter = 'grayscale(1) brightness(.7)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; else if (M.tint && !A.mons[m.id]) x.filter = M.tint; if (small) x.scale(0.6, 0.6); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
+  x.save(); x.translate(X, Y); x.scale(m.face, 1); if (m.flash > 0) x.filter = 'brightness(3)'; else if (m.invuln) x.filter = 'grayscale(1) brightness(.7)'; else if (m.stun > 0) x.filter = 'hue-rotate(180deg) saturate(2) brightness(1.3)'; else if (M.tint && !A.mons[m.id]) x.filter = M.tint; if (small && !A.mons[m.id]) x.scale(0.5, 0.5); x.drawImage(img, -Math.round(img.width / 2), -img.height + 1); x.restore();
   const top = Y - img.height;
   if (game.w?.scanT > 0) { x.strokeStyle = '#ff4a3a'; x.lineWidth = 1; x.strokeRect(X - 4.5, top + img.height * 0.4 - 4.5, 9, 9); x.fillStyle = '#ff4a3a'; x.fillRect(X - 1, top + img.height * 0.4 - 1, 2, 2); }
   if (M.kind === 'boss') { const W = 60; x.fillStyle = '#111'; x.fillRect(X - W / 2, top - 8, W, 5); x.fillStyle = '#d84a3a'; x.fillRect(X - W / 2 + 1, top - 7, (W - 2) * m.hp / m.maxHp, 3); }
@@ -167,7 +170,7 @@ function drawPlayer(p, t) {
   if (!blink) { const cw = img.width / A.charRes, ch = img.height / A.charRes; x.save(); x.translate(bx, by); x.scale(p.face, 1); if (sts.length && Math.floor(t * 4) % 2) x.filter = SF[sts[0]]; x.drawImage(img, -Math.round(cw / 2), -ch, cw, ch); x.restore(); }
   for (const id of sts) if (Math.random() < 0.25) fx.parts.push({ x: p.x + (Math.random() - 0.5) * 12, y: p.y - 8 - Math.random() * 14, vx: 0, vy: id === 'wet' ? 25 : -25, t: 0.4, c: STATUS[id].color });
   const g = A.weapons[WEAPONS[p.weapons[p.cur].id].sprite], bob = Math.round(Math.sin(t * 6) * 1.5), gx = bx + p.face * 7, gy = by - 6 + bob;
-  const sw = p.swingT > 0 ? (p.swingT / 8 - 0.5) * -2.2 : 0; x.save(); x.translate(gx, gy); x.rotate(p.aim - p.face * 0.5 * k + sw * p.face); if (p.face < 0) x.scale(1, -1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2)); x.restore();
+  const sw = p.swingT > 0 ? (p.swingT / 8 - 0.5) * -2.2 : 0; x.save(); x.translate(gx, gy); if (sw) x.rotate(sw * p.face); x.scale(p.face, 1); x.drawImage(g, -3 - Math.round(k * 5), -Math.round(g.height / 2));   // 돌리지 않고 좌우만 x.restore();
 }
 
 // ---------- 화면 효과: 피해 숫자, 불꽃, 총구 불꽃, 화면 흔들림 ----------

@@ -64,6 +64,12 @@
    "mons/germ_2.png",
    "mons/germ_3.png"
   ],
+  "germlet": [
+   "mons/germlet_0.png",
+   "mons/germlet_1.png",
+   "mons/germlet_2.png",
+   "mons/germlet_3.png"
+  ],
   "trilobite": [
    "mons/trilobite_0.png",
    "mons/trilobite_1.png",
@@ -389,7 +395,7 @@
    "mons/b9_camera_drone_3.png"
   ]
  },
- "charRes": 2,
+ "charRes": 1,
  "charsOrig": [
   [
    "chars_orig/c0_0.png",
