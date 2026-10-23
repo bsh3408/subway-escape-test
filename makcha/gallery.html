@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>막차 도감</title>
+<style>
+:root{--bg:#14171c;--panel:#1d2128;--ink:#e8e6df;--sub:#9aa1aa;--acc:#e0b04a;--line:#2e343d}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "Malgun Gothic",sans-serif;padding:16px}
+h1{margin:0 0 4px;font-size:26px}h2{margin:26px 0 8px;font-size:20px;border-bottom:2px solid var(--line);padding-bottom:4px}
+.top{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:8px 0}
+.top label{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:4px 10px;cursor:pointer}
+select,button{background:var(--panel);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 10px;font:inherit}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px;display:grid;gap:6px}
+.card.boss{border-color:#c8541e}
+.stage{background:#0d0f12 repeating-conic-gradient(#191c22 0 25%,#13161a 0 50%) 0 0/16px 16px;border-radius:8px;display:flex;align-items:flex-end;justify-content:center;height:150px;overflow:hidden}
+canvas{image-rendering:pixelated}
+.name{font-weight:800;font-size:15px}.name small{color:var(--acc);font-weight:600;margin-left:4px}
+.stats{color:var(--sub);font-size:12.5px}.stats b{color:var(--ink)}
+.frames{display:flex;gap:4px;flex-wrap:wrap}.frames canvas{background:#0d0f12;border-radius:4px}
+.tag{display:inline-block;font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 5px;margin:1px 2px 0 0;color:var(--sub)}.tag.w{color:#ffd060;border-color:#6a5a2a}
+.line{display:flex;flex-wrap:wrap;gap:6px;align-items:flex-end;background:var(--panel);border-radius:10px;padding:8px;margin-bottom:6px}.line b{width:100%;font-size:13px}
+.wp{display:inline-flex;flex-direction:column;align-items:center;gap:2px;background:var(--panel);border-radius:8px;padding:6px;width:110px;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<h1>막차 도감</h1>
+<div class="top">
+  <span>보기:</span>
+  <label><input type="radio" name="anim" value="move" checked> 움직이기</label>
+  <label><input type="radio" name="anim" value="attack"> 공격 준비</label>
+  <label><input type="radio" name="anim" value="all"> 모든 프레임</label>
+  <span>캐릭터 상태:</span>
+  <select id="st"><option value="">보통</option></select>
+  <span>확대</span><select id="zoom"><option>2</option><option selected>3</option><option>4</option></select>
+  <a href="./" style="color:var(--acc)">게임으로 →</a>
+</div>
+<h2>캐릭터</h2><div class="grid" id="chars"></div>
+<h2>몬스터</h2><div class="top"><span>호선</span><select id="lineSel"><option value="all">전체</option></select></div><div class="grid" id="mons"></div>
+<h2>보스</h2><div class="grid" id="bosses"></div>
+<h2>무기</h2><div id="weapons" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+<h2>조형물</h2><div id="props"></div>
+<script type="module">
+import { JOBS, JOB_ORDER, WEAPONS, MONSTERS, LINES, STATUS } from './sim/data.js';
+const $ = id => document.getElementById(id);
+const load = s => new Promise(r => { const i = new Image(); i.onload = () => r(i); i.onerror = () => r(null); i.src = 'assets/' + s; });
+const m = await fetch('assets/manifest.json').then(r => r.json());
+const chars = await Promise.all(m.chars.map(f => Promise.all(f.map(load)))), RES = m.charRes || 1;
+const mons = Object.fromEntries(await Promise.all(Object.entries(m.mons).map(async ([k, f]) => [k, await Promise.all(f.map(load))])));
+const weapons = [...await Promise.all(m.weapons.map(load))]; (await Promise.all((m.weapons2 || []).map(load))).forEach((im, i) => { weapons[10 + i] = im; });
+const SF = { infect: 'sepia(1) hue-rotate(50deg) saturate(2.5)', burn: 'sepia(1) saturate(4) hue-rotate(-20deg)', wet: 'hue-rotate(180deg) saturate(1.6)', corrode: 'sepia(1) hue-rotate(30deg) saturate(3)', frost: 'saturate(.3) brightness(1.4) hue-rotate(160deg)', shock: 'brightness(2)', root: 'hue-rotate(60deg)', poison: 'hue-rotate(250deg) saturate(1.8)' };
+for (const [id, S] of Object.entries(STATUS)) $('st').insertAdjacentHTML('beforeend', `<option value="${id}">${S.icon} ${S.name}</option>`);
+for (let n = 1; n <= 9; n++) $('lineSel').insertAdjacentHTML('beforeend', `<option value="${n}">${n}호선 ${LINES[n].name}</option>`);
+const zoom = () => +$('zoom').value, mode = () => document.querySelector('[name=anim]:checked').value;
+const anims = [];   // 움직이는 캔버스 목록
+function animCanvas(frames, scale, opts = {}) { const c = document.createElement('canvas'), w = Math.max(...frames.filter(Boolean).map(f => f.width)), h = Math.max(...frames.filter(Boolean).map(f => f.height));
+  c.width = Math.round(w * scale); c.height = Math.round(h * scale); anims.push({ c, frames, scale, ...opts }); return c; }
+function drawAnim(a, t) { const g = a.c.getContext('2d'); g.imageSmoothingEnabled = false; g.clearRect(0, 0, a.c.width, a.c.height);
+  const seq = a.seq(), f = a.frames[seq[Math.floor(t * a.fps) % seq.length]]; if (!f) return;
+  g.filter = a.filter ? a.filter() || 'none' : 'none'; g.drawImage(f, Math.round((a.c.width - f.width * a.scale) / 2), a.c.height - f.height * a.scale, f.width * a.scale, f.height * a.scale); }
+function stillFrames(frames, scale) { return frames.filter(Boolean).map((f, i) => { const c = document.createElement('canvas'); c.width = f.width * scale; c.height = f.height * scale; const g = c.getContext('2d'); g.imageSmoothingEnabled = false; g.drawImage(f, 0, 0, c.width, c.height); c.title = `${i + 1}번째 프레임`; return c; }); }
+const weakText = M => [...Object.entries(M.weak || {}).map(([k, v]) => `${WEAPONS[k]?.name || k} ×${v}`), ...Object.entries(M.weakTrait || {}).map(([k, v]) => `${{ burn: '불', water: '물', freeze: '얼림' }[k] || k} ×${v}`), ...(M.rusts ? ['젖으면 ×1.5'] : [])];
+function lineOf(id) { for (let n = 1; n <= 9; n++) if (LINES[n].mobs?.includes(id) || LINES[n].bosses?.includes(id)) return n; return null; }
+
+function render() {
+  anims.length = 0; const z = zoom();
+  // 캐릭터: 서 있기 0·1, 걷기 2~5 (그림 해상도 RES를 고려해 같은 크기로)
+  $('chars').innerHTML = '';
+  JOB_ORDER.forEach(j => { const J = JOBS[j], fr = chars[J.sprite], card = document.createElement('div'); card.className = 'card';
+    const c = animCanvas(fr, z / RES, { fps: 6, seq: () => mode() === 'attack' ? [0, 1] : mode() === 'all' ? [0, 1, 2, 3, 4, 5] : [2, 3, 4, 5], filter: () => SF[$('st').value] });
+    card.innerHTML = `<div class="name">${J.name}</div><div class="stats">체력 <b>${J.hp}</b> · 방어막 <b>${J.shield}</b> · 에너지 <b>${J.energy}</b><br>무기 ${WEAPONS[J.weapon].name} · 스킬 ${J.skill.name}</div>`;
+    const st = document.createElement('div'); st.className = 'stage'; st.appendChild(c); card.prepend(st);
+    if (mode() === 'all') { const fs = document.createElement('div'); fs.className = 'frames'; stillFrames(fr, z / RES / 1.5).forEach(x => fs.appendChild(x)); card.appendChild(fs); }
+    $('chars').appendChild(card); });
+  // 몬스터·보스: 0·1 움직이기, 2·3 공격 준비
+  const sel = $('lineSel').value;
+  for (const [box, boss] of [['mons', false], ['bosses', true]]) { $(box).innerHTML = '';
+    for (const [id, M] of Object.entries(MONSTERS)) { if ((M.kind === 'boss') !== boss) continue; const ln = lineOf(id); if (sel !== 'all' && String(ln) !== sel) continue;
+      const fr = mons[id] || mons[M.sprite] || mons.germ;   // 게임과 같게: 그림이 없으면 내성균 그림(작은 내성균은 작게) const card = document.createElement('div'); card.className = 'card' + (boss ? ' boss' : '');
+      const st = document.createElement('div'); st.className = 'stage';
+      if (fr) { const c = animCanvas(fr, (boss ? z * 0.75 : z) * (M.small ? 0.6 : 1), { fps: 4, seq: () => mode() === 'attack' ? [2, 3] : mode() === 'all' ? [0, 1, 2, 3] : [0, 1], filter: () => !mons[id] && M.tint ? M.tint : '' }); st.appendChild(c); }
+      else st.innerHTML = '<span class="stats">그림 없음</span>';
+      card.appendChild(st);
+      card.insertAdjacentHTML('beforeend', `<div class="name">${M.name}<small>${ln ? ln + '호선' : '분열체'}</small></div>
+        <div class="stats">체력 <b>${M.hp}</b> · 속도 <b>${M.speed}</b> · 공격 <b>${M.atk}</b> · ${{ melee: '근접', ranged: '원거리', roller: '돌진', boss: '보스' }[M.kind]}<br>${M.attackText || ''}</div>
+        <div>${M.inflict ? `<span class="tag">${STATUS[M.inflict[0]].icon} ${STATUS[M.inflict[0]].name} ${Math.round(M.inflict[1] * 100)}%</span>` : ''}${M.touchInflict ? `<span class="tag">닿으면 ${STATUS[M.touchInflict].name}</span>` : ''}${weakText(M).map(t => `<span class="tag w">약점 ${t}</span>`).join('')}${boss && M.patterns ? M.patterns.map(p => `<span class="tag">${p}</span>`).join('') : ''}</div>`);
+      if (mode() === 'all' && fr) { const fs = document.createElement('div'); fs.className = 'frames'; stillFrames(fr, boss ? 1 : 2).forEach(x => fs.appendChild(x)); card.appendChild(fs); }
+      $(box).appendChild(card); } }
+  // 무기
+  $('weapons').innerHTML = Object.entries(WEAPONS).map(([id, W]) => `<div class="wp" data-w="${W.sprite}"><span class="wc"></span><b>${W.name}</b><span class="stats">피해 ${W.dmg} · 초당 ${W.rate}</span></div>`).join('');
+  for (const el of document.querySelectorAll('.wp')) { const im = weapons[+el.dataset.w]; if (!im) { el.querySelector('.wc').textContent = '(임시 그림)'; continue; } const c = stillFrames([im], 3)[0]; el.querySelector('.wc').appendChild(c); }
+  // 조형물
+  $('props').innerHTML = '';
+  for (const [line, list] of Object.entries(m.props || {})) { const row = document.createElement('div'); row.className = 'line'; row.innerHTML = `<b>${line}호선 ${LINES[line].name}</b>`;
+    Promise.all(list.map(d => load(d.src))).then(ims => ims.forEach(im => im && row.appendChild(stillFrames([im], 2)[0]))); $('props').appendChild(row); }
+}
+for (const el of document.querySelectorAll('[name=anim], #zoom, #lineSel')) el.onchange = render;
+$('st').onchange = () => {};
+render();
+const tick = t => { for (const a of anims) drawAnim(a, t / 1000); requestAnimationFrame(tick); }; requestAnimationFrame(tick);
+</script>
+</body>
+</html>
