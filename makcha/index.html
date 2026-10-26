@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>막차 시험판</title>
+<style>
+  html,body { margin:0; height:100%; background:#000; overflow:hidden; font-family:"Pretendard","Malgun Gothic",sans-serif; }
+  body { display:flex; align-items:center; justify-content:center; }
+  #wrap { position:relative; }
+  #game { display:block; image-rendering:pixelated; cursor:crosshair; }
+  .ui { position:absolute; color:#f3ead7; text-shadow:0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; pointer-events:none; white-space:nowrap; }
+  .bar { left:11.06%; transform:translate(-50%,-50%); font-size:0.72em; font-weight:700; font-variant-numeric:tabular-nums; }
+  .cdnum { transform:translate(-50%,-50%); font-size:1.15em; font-weight:800; }
+  .keylab { right:8.4%; transform:translateY(-50%); font-size:0.75em; color:#cfc6b3; }
+  #mat { top:12.4%; left:1%; font-size:0.72em; color:#e6dcc6; }
+  #status { top:16%; left:1%; font-size:0.78em; font-weight:700; }
+  #status span { margin-right:0.6em; }
+  #bag { bottom:2%; left:50%; transform:translateX(-50%); font-size:0.8em; color:#e6dcc6; }
+  #craftList { display:grid; grid-template-columns:repeat(4, 1fr); gap:0.5em; }
+  .panel button.gear { display:flex; flex-direction:column; gap:0.2em; align-items:center; padding:0.6em 0.5em; background:#26221c; color:#f3ead7; border:2px solid #4a4234; font-size:0.85em; font-weight:400; min-width:9em; }
+  .panel button.gear b { font-size:1.05em; }
+  .panel button.gear i { font-style:normal; font-size:0.8em; color:#9a927f; }
+  .panel button.gear span { color:#ffe08a; }
+  .panel button.gear em { font-style:normal; font-size:0.8em; color:#9fd8ff; }
+  .panel button.gear.off { opacity:0.45; cursor:default; }
+  #perkList { display:flex; gap:0.8em; }
+  .panel button.perk { display:flex; flex-direction:column; align-items:center; gap:0.35em; min-width:10em; padding:1em 0.8em; background:#26221c; color:#f3ead7; border:2px solid #f0b429; font-weight:400; }
+  .panel button.perk b { font-size:1.2em; }
+  .panel button.perk span { color:#cfc6b3; font-size:0.9em; }
+  .panel button.perk em { font-style:normal; color:#f0b429; letter-spacing:0.15em; }
+  #treeGrid { display:grid; grid-template-columns:repeat(6, 1fr); gap:0.6em; }
+  .tcol { display:flex; flex-direction:column; gap:0.4em; align-items:stretch; }
+  .tcol h3 { margin:0 0 0.2em; font-size:1em; color:#f0b429; text-align:center; }
+  .tnode { padding:0.45em 0.5em; border:2px solid #3a342a; border-radius:0.4em; color:#6b6458; font-size:0.85em; text-align:center; background:#1a1713; }
+  .tnode.open { color:#e6dcc6; border-color:#6b6458; }
+  .tnode.own { color:#111; background:#f0b429; border-color:#f0b429; font-weight:700; }
+  #banner { top:22%; left:50%; transform:translateX(-50%); font-size:1.5em; font-weight:800; opacity:0; color:#f3ead7; }
+  #banner.show { animation:banner 2.6s ease-out forwards; }
+  @keyframes banner { 0% { opacity:0; transform:translate(-50%, 0.6em); } 15% { opacity:1; transform:translate(-50%, 0); } 75% { opacity:1; } 100% { opacity:0; } }
+  #timer { top:1.2%; left:50%; transform:translateX(-50%); font-size:1.15em; font-variant-numeric:tabular-nums; }
+  #weapon { bottom:2%; left:1.2%; font-size:1em; }
+  #prompt { bottom:9%; left:50%; transform:translateX(-50%); font-size:1em; color:#ffe08a; }
+  #bossname { bottom:6.4%; left:50%; transform:translateX(-50%); font-size:1em; }
+  .panel { position:absolute; inset:0; z-index:5; display:flex; flex-direction:column; align-items:center; justify-content:center; background:rgba(0,0,0,0.78); color:#f3ead7; text-align:center; gap:0.8em; }
+  .panel h1 { margin:0; font-size:2.2em; letter-spacing:0.05em; }
+  .panel p { margin:0; font-size:1em; line-height:1.7; color:#cfc6b3; }
+  .panel .note { font-size:0.85em; color:#9a927f; }
+  .panel button { font:inherit; font-size:1.1em; padding:0.5em 1.6em; border-radius:0.4em; border:0; background:#f0b429; color:#111; cursor:pointer; font-weight:700; }
+  .hide { display:none !important; }
+  #jobs { display:grid; grid-template-columns:repeat(6, 1fr); gap:0.5em; margin:0.3em 0; }
+  .panel button.job { display:flex; flex-direction:column; align-items:center; gap:0.3em; padding:0.5em 0.4em; background:#26221c; color:#e6dcc6; font-size:0.85em; font-weight:600; border:2px solid #3a342a; }
+  .panel button.job.on { border-color:#f0b429; background:#3a3020; color:#fff; }
+  .panel button.job canvas { width:3.4em; height:4em; image-rendering:pixelated; }
+  .panel button.sub { background:#3a342a; color:#f3ead7; }
+  #float { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  .ft { position:absolute; transform:translate(-50%,-100%); font-weight:800; white-space:nowrap; font-size:1.05em;
+        text-shadow:0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000; }
+  .ft.big { font-size:1.45em; }
+  .ft.small { font-size:0.9em; }
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game"></canvas>
+  <div id="float"></div>
+  <div class="ui bar" id="bar0" style="top:3.33%"></div>
+  <div class="ui bar" id="bar1" style="top:6.22%"></div>
+  <div class="ui bar" id="bar2" style="top:9.11%"></div>
+  <div class="ui cdnum" id="skillCd" style="left:95.25%;top:91.11%"></div>
+  <div class="ui cdnum" id="dashCd" style="left:95.25%;top:80.89%"></div>
+  <div class="ui keylab" id="skillLab" style="top:91.11%">스킬 · 우클릭</div>
+  <div class="ui keylab" style="top:80.89%">구르기 · Shift</div>
+  <div class="ui" id="mat"></div>
+  <div class="ui" id="status"></div>
+  <div class="ui" id="bag"></div>
+  <div class="panel hide" id="craft">
+    <h1 style="font-size:1.5em">조합대</h1>
+    <p id="craftMat"></p>
+    <div id="craftList"></div>
+    <p class="note">E 또는 Esc 닫기 · 쓰는 장비는 숫자 키로 쓴다</p>
+  </div>
+  <div class="panel hide" id="perk">
+    <h1 style="font-size:1.5em">능력 고르기</h1>
+    <div id="perkList"></div>
+    <p class="note">앞 단계 능력이 있어야 다음 단계가 나온다 · Tab 스킬 트리</p>
+  </div>
+  <div class="panel hide" id="tree">
+    <h1 style="font-size:1.5em">스킬 트리</h1>
+    <div id="treeGrid"></div>
+    <p class="note">Tab 또는 Esc 닫기</p>
+  </div>
+  <div class="ui" id="banner"></div>
+  <div class="ui" id="timer"></div>
+  <div class="ui" id="weapon"></div>
+  <div class="ui" id="prompt"></div>
+  <div class="ui" id="bossname"></div>
+  <div class="panel" id="title">
+    <h1>막차</h1>
+    <p>구역 1 지층 터널 · 역 1 시험판</p>
+    <div id="jobs"></div>
+    <p>WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대 · Q 무기 바꾸기 · 1~5 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
+    <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
+    <button id="startBtn">시작</button>
+  </div>
+  <div class="panel hide" id="result">
+    <h1 id="resTitle"></h1>
+    <p id="resText"></p>
+    <p class="note">게임 결과는 수행평가 점수와 무관하다.</p>
+    <div style="display:flex;gap:0.8em"><button id="againBtn">다시 하기</button><button id="jobBtn" class="sub">직업 고르기</button></div>
+  </div>
+</div>
+<script src="game.js"></script>
+</body>
+</html>
