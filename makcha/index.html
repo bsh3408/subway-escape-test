@@ -35,6 +35,14 @@
   .tnode { padding:0.45em 0.5em; border:2px solid #3a342a; border-radius:0.4em; color:#6b6458; font-size:0.85em; text-align:center; background:#1a1713; }
   .tnode.open { color:#e6dcc6; border-color:#6b6458; }
   .tnode.own { color:#111; background:#f0b429; border-color:#f0b429; font-weight:700; }
+  #infoBody { display:grid; grid-template-columns:1fr 1.3fr 1fr; gap:1.2em; text-align:left; width:88%; }
+  .icol h3 { margin:0.5em 0 0.3em; font-size:0.95em; color:#f0b429; }
+  .icol h3:first-child { margin-top:0; }
+  .irow { display:flex; justify-content:space-between; gap:1em; font-size:0.85em; padding:0.15em 0; border-bottom:1px solid #2e2922; }
+  .irow span { color:#9a927f; } .irow b { color:#f3ead7; font-weight:600; }
+  .iw { border:2px solid; border-radius:0.4em; padding:0.35em 0.5em; margin-bottom:0.35em; display:flex; flex-direction:column; font-size:0.85em; opacity:0.75; }
+  .iw.on { opacity:1; background:#26221c; } .iw span { color:#cfc6b3; font-size:0.9em; }
+  .ilist { font-size:0.85em; color:#e6dcc6; line-height:1.6; } .ilist i { color:#6b6458; font-style:normal; }
   #banner { top:22%; left:50%; transform:translateX(-50%); font-size:1.5em; font-weight:800; opacity:0; color:#f3ead7; }
   #banner.show { animation:banner 2.6s ease-out forwards; }
   @keyframes banner { 0% { opacity:0; transform:translate(-50%, 0.6em); } 15% { opacity:1; transform:translate(-50%, 0); } 75% { opacity:1; } 100% { opacity:0; } }
@@ -90,6 +98,11 @@
     <div id="treeGrid"></div>
     <p class="note">Tab 또는 Esc 닫기</p>
   </div>
+  <div class="panel hide" id="info">
+    <h1 style="font-size:1.5em">내 상태</h1>
+    <div id="infoBody"></div>
+    <p class="note">E 또는 Esc 닫기</p>
+  </div>
   <div class="ui" id="banner"></div>
   <div class="ui" id="timer"></div>
   <div class="ui" id="weapon"></div>
@@ -99,7 +112,7 @@
     <h1>막차</h1>
     <p>구역 1 지층 터널 · 역 1 시험판</p>
     <div id="jobs"></div>
-    <p>WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대 · Q 무기 바꾸기 · 1~5 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
+    <p>WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대·내 상태 · Q 무기 바꾸기 · 1~5 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
     <button id="startBtn">시작</button>
   </div>

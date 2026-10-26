@@ -96,6 +96,13 @@
   btn(r, '능력 모두 지우기', () => { const J = JOBS[P.job]; P.perks = new Set(); P.maxHp = J.hp; P.hp = Math.min(P.hp, P.maxHp); P.maxEn = J.en; P.en = Math.min(P.en, P.maxEn); P.skillMax = J.cd; });
   for (const t of TREES) { r = sec(t.name); for (const [id, name] of t.perks) btn(r, name, () => { takePerk(id); say(P.x, P.y - 46, name, 'crit'); }); }
 
+  // 유물
+  r = sec('유물 (바로 받기)', '효과는 E 내 상태 창의 수치로 확인한다.');
+  for (const k in RELIC) btn(r, RELIC[k].name, () => takeRelic(k));
+  r = sec('');
+  btn(r, '유물 하나 떨어뜨리기', () => dropRelic(P.x + 50, P.y));
+  btn(r, '유물 모두 지우기(처음부터)', () => { arena = true; start(); });
+
   // 직업과 스킬
   r = sec('직업 (바꾸면 처음부터)');
   for (const k in JOBS) btn(r, JOBS[k].name, () => { jobKey = k; arena = true; start(); }); // 바꾸면 구역 1 시험방에서 다시 시작
