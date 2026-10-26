@@ -6,6 +6,7 @@ const WALK = 12, DASH = 28; // 초당 타일 수 (2026-10-26 교사 요청: 6 �
 const ACCEL = 9, FRICTION = 6; // 클수록 빨리 붙고 빨리 선다(작을수록 미끄러짐)
 const DASH_CD = 0.8; // 구르기 쿨타임(초)
 const RUSH = 34; // 회생 제동 급발진 속도(초당 타일)
+const HIT_INV = 0.5; // 맞은 뒤 무적 시간(초) (2026-10-26 교사 요청: 1.0 → 0.5)
 const STORM_R = 58; // 대기 불안정 회오리 반지름(도트)
 
 // ---------- 화면 ----------
@@ -396,7 +397,7 @@ const WEAP = {
   nail: { name: '못총', r: 'w', type: 'shot', cd: 0.13, en: 1, dmg: 1, sp: 380, br: 2.5, spread: 0.07, len: 16 },
   umbrella: { name: '우산', r: 'w', type: 'melee', cd: 0.45, en: 0, dmg: 2, arc: 2.1, range: 46, kb: 0.6, deflect: 2.4, deflN: 4 },
   ladle: { name: '국자', r: 'w', type: 'melee', cd: 0.38, en: 0, dmg: 3, arc: 1.4, range: 40, kb: 0.8, deflect: 1.6, scoop: true },
-  hammer: { name: '망치', r: 'g', type: 'melee', cd: 0.4, en: 0, dmg: 4, arc: 1.2, range: 38, kb: 1, deflect: 1.75 },
+  hammer: { name: '망치', r: 'g', type: 'melee', cd: 0.4, en: 0, dmg: 4, arc: 1.2, range: 38, kb: 1, deflect: 1.75, stun: 0.5 }, // stun: 특수효과 기절(초)
   rod: { name: '손잡이 쇠봉', r: 'g', type: 'melee', cd: 0.22, en: 0, dmg: 3, arc: 0.5, range: 58, kb: 0.5, deflect: 0.6, deflN: 2 },
   base: { name: '수산화 칼슘 분사기', r: 'b', type: 'spray', cd: 0.2, en: 2, dmg: 1, n: 5, spread: 0.35, sp: 260, life: 0.35, br: 3, tag: 'base', len: 15 },
   reduct: { name: '환원제 분사기', r: 'b', type: 'shot', cd: 0.16, en: 2, dmg: 2, sp: 420, br: 2.5, tag: 'red', len: 16 },
@@ -451,6 +452,9 @@ const EDEF = {
   ai: { hp: 540, bw: 90, bh: 20, w: 100, h: 74, boss: true, name: '관제 AI' },
 };
 const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle' };
+// 재료 종류 (2026-10-26 교사 요청): 생물형은 가죽, 기계형은 부품, 둘 다 아닌 것(방울·숯·기체)은 무작위
+const BIO = new Set(['tri', 'amm', 'mam', 'rat', 'leaf', 'spore', 'owl']), MECH = new Set(['rust', 'drone', 'bias', 'furnace', 'ai']);
+const matOf = k => BIO.has(k) ? 'cloth' : MECH.has(k) ? 'part' : (rand() < 0.5 ? 'cloth' : 'part'); // 'cloth'는 화면에서 가죽
 const isBoss = e => !!EDEF[e.kind].boss;
 // 새 판: 구역 1 역 1부터. 캐릭터 상태는 역을 넘어가도 이어진다
 function reset() {
@@ -459,7 +463,7 @@ function reset() {
   const J = JOBS[jobKey];
   P = { x: 0, y: 0, bw: 18, bh: 6, hp: J.hp, maxHp: J.hp, sh: J.sh, maxSh: J.sh, en: J.en, maxEn: J.en, noEnT: 0, inv: 0, shT: 0, face: 1,
     job: jobKey, skillCd: 0, skillMax: J.cd, stars: {}, packMode: 'cold', chg: 0,
-    st: {}, bag: {}, mat: { cloth: 1, part: 1 }, worn: new Set(), perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 쓰는 장비, 재료(헝겊·부품), 입은 장비
+    st: {}, bag: {}, mat: { cloth: 1, part: 1 }, worn: new Set(), perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 쓰는 장비, 재료(가죽·부품), 입은 장비
     ph: 0, pt: 0, moving: false, vx: 0, vy: 0, dash: 0, dashCd: 0, ddx: 0, ddy: 0, weapons: J.weapons.slice(), wi: 0, cd: 0, swing: 0, swingA: 0 };
   time = 0; ended = false; endT = 0;
   enterStation();
@@ -543,7 +547,7 @@ const nearWeapon = () => { let b = null, bd = 30; for (const p of pickups) if (W
 function dropWeapon(x, y, minR) { pickups.push({ kind: randomWeapon(minR), x, y }); burst(x, y - 8, '#fff3b0', 10); }
 function hurt(n) {
   if (P.inv > 0 || P.dash > 0 || P.rush || ended) return;
-  shake = 6; P.shT = 0; P.inv = 1.0;
+  shake = 6; P.shT = 0; P.inv = HIT_INV;
   let sh = 0, hp = 0;
   for (let i = 0; i < n; i++) { if (P.sh > 0) { P.sh--; sh++; } else { P.hp--; hp++; } }
   if (sh) say(P.x, P.y - 44, '방어막 -' + sh, 'shield', 'small');
@@ -552,9 +556,11 @@ function hurt(n) {
 }
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 // 자동 조준: 보이는 적 중 가장 가까운 적을 노린다. 없으면 마우스 쪽
-function seeLine(x0, y0, x1, y1) {
+function seeLine(x0, y0, x1, y1, skip) { // skip: 노리는 지형지물 자기 칸은 막힌 것으로 보지 않는다
   const d = Math.hypot(x1 - x0, y1 - y0), n = Math.ceil(d / 6);
-  for (let i = 1; i < n; i++) if (solidAt(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return false;
+  for (let i = 1; i < n; i++) { const x = x0 + (x1 - x0) * i / n, y = y0 + (y1 - y0) * i / n;
+    if (skip && Math.floor(x / T) === skip.tx && Math.floor(y / T) === skip.ty) continue;
+    if (solidAt(x, y)) return false; }
   return true;
 }
 let target = null;
@@ -562,6 +568,10 @@ function findTarget() {
   const c = pCenter(); let best = null, bd = 15 * T;
   for (const e of enemies) { if (e.dead) continue; const ex = e.x, ey = e.y - e.h / 2, d = Math.hypot(ex - c.x, ey - c.y);
     if (d < bd && seeLine(c.x, c.y, ex, ey)) { bd = d; best = e; } }
+  if (!best) { // 보이는 몬스터가 없으면 가까운 지형지물(약 5칸 안)을 노린다 (2026-10-26 교사 요청, 몬스터가 먼저)
+    let pd = 5 * T;
+    for (const p of props) { if (p.dead) continue; const d = Math.hypot(p.x - c.x, p.y - 8 - c.y);
+      if (d < pd && seeLine(c.x, c.y, p.x, p.y - 8, p)) { pd = d; best = p; } } }
   target = best;
 }
 const aimPoint = () => target ? { x: target.x, y: target.y - target.h / 2 } : mWorld();
@@ -586,12 +596,15 @@ function attack() {
         if (W0.zap && !e.dead) { // 전기 충격봉: 기절, 가까운 적 2마리에게 전기가 튄다
           e.stun = Math.max(e.stun || 0, isBoss(e) ? 0.3 : 1.0);
           enemies.filter(o => o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 80).slice(0, 2).forEach(o => { damage(o, 2); fx.push({ t: 'zap', x: e.x, y: e.y - e.h / 2, x2: o.x, y2: o.y - o.h / 2, life: 0.15, max: 0.15 }); }); }
-        if (!isBoss(e)) { // 넉백: 크게 밀어내고 잠깐 기절시킨다
+        if (!isBoss(e)) { // 넉백은 모든 근접 무기, 기절은 특수효과가 있을 때만(2026-10-26 교사 요청)
           const l = d || 1, kb = (KNOCK[e.kind] || 380) * W0.kb;
           e.kx = (ec.x - c.x) / l * kb; e.ky = (ec.y - c.y) / l * kb;
-          if (!(e.stun > 0) && !e.dead) say(e.x, e.y - e.h - 16, '기절', 'stun', 'small');
-          e.stun = Math.max(e.stun || 0, 0.45);
-          if (e.st === 'tell' || e.st === 'lunge') { e.st = 'rest'; e.t = 0.3; }
+          const st = meleeStun(W0);
+          if (st > 0 && !e.dead) {
+            if (!(e.stun > 0)) say(e.x, e.y - e.h - 16, '기절', 'stun', 'small');
+            e.stun = Math.max(e.stun || 0, st);
+            if (e.st === 'tell' || e.st === 'lunge') { e.st = 'rest'; e.t = 0.3; }
+          }
         }
       }
     }
@@ -836,7 +849,7 @@ function updatePlayer() {
   }
   for (const p of pickups) if (p.kind === 'relic' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; takeRelic(p.id); } // 유물은 닿으면 줍는다
   for (const p of pickups) if ((p.kind === 'cloth' || p.kind === 'part') && Math.hypot(p.x - P.x, p.y - P.y) < 22 * (1 + relicAdd('magnet'))) { // 재료는 닿으면 줍는다(자석: 더 멀리서)
-    p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '헝겊' : '부품') + ' +1', 'block', 'small'); }
+    p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
   for (const p of pickups) if (p.kind === 'heal' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2); p.dead = true; say(P.x, P.y - 44, '체력 +' + (P.hp - before), 'heal'); burst(p.x, p.y - 6, '#ff6b6b', 8); }
   pickups = pickups.filter(p => !p.dead);
 }
@@ -863,8 +876,8 @@ function damage(e, n) {
     e.dead = true; burst(e.x, e.y - e.h / 2, isBoss(e) ? '#c58a4a' : '#b8935f', isBoss(e) ? 40 : 10);
     if (!isBoss(e)) corpses.push({ x: e.x, y: e.y, t: 6 }); // 곰팡이 포자(분해자)가 찾아간다
     if (has('overflow')) P.en = Math.min(P.maxEn, P.en + 1); // 넘치는 에너지: 쓰러뜨리면 에너지 +1
-    if (!isBoss(e) && rand() < 0.25) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x: e.x + (rand() - 0.5) * 16, y: e.y }); // 재료: 가끔 떨어뜨린다
-    if (isBoss(e)) for (let i = 0; i < 4; i++) pickups.push({ kind: i % 2 ? 'part' : 'cloth', x: e.x - 30 + i * 20, y: e.y + 24 });
+    if (!isBoss(e) && rand() < 0.25) pickups.push({ kind: matOf(e.kind), x: e.x + (rand() - 0.5) * 16, y: e.y }); // 재료: 생물형은 가죽, 기계형은 부품
+    if (isBoss(e)) for (let i = 0; i < 4; i++) pickups.push({ kind: matOf(e.kind), x: e.x - 30 + i * 20, y: e.y + 24 });
     if (e.kind === 'rat') for (const o of enemies) if (o.kind === 'rat' && !o.dead && o.room === e.room) o.rage = 4; // 앞 쥐가 쓰러지면 다음 쥐가 빨라진다
     // 에너지 구슬: 쓰러진 적이 떨어뜨리고, 가까이 가면 끌려온다
     const n = e.kind === 'tri' ? 2 : e.kind === 'amm' ? 3 : 0;
@@ -968,7 +981,7 @@ let timers = [];
 function setTimeout0(t, f) { timers.push({ t, f }); }
 function updateTimers() { for (const x of timers) { x.t -= DT; if (x.t <= 0) { x.done = true; x.f(); } } timers = timers.filter(x => !x.done); }
 // ---------- 상태 이상과 장비 (통박사 초안 6절, 기획안 7절) ----------
-// 화면에는 이름만 보인다. 재료는 헝겊과 부품 두 가지뿐이다(교사 요청)
+// 화면에는 이름만 보인다. 재료는 가죽과 부품 두 가지뿐이다(교사 요청, 2026-10-26 헝겊 → 가죽: 생물형은 가죽, 기계형은 부품)
 const STATUS = {
   acid: { name: '산성 화상', dur: 6, col: '#e8d040' }, burn: { name: '화상', dur: 5, col: '#ff7a2a' }, corrode: { name: '부식', dur: 10, col: '#c26a3a' },
   heat: { name: '열사병', dur: 8, col: '#ff5a3c' }, frost: { name: '동상', dur: 6, col: '#9fd8ff' }, infect: { name: '감염', col: '#c08aff' },
@@ -1029,7 +1042,7 @@ function craft(k) {
 // ---------- 스킬 트리: 역마다 능력 하나를 고른다. 앞 단계가 있어야 다음 단계가 열린다 (컨셉_확정 5절) ----------
 const TREES = [
   { id: 'shot', name: '탄', perks: [['range', '장거리탄'], ['bounce', '튕김탄'], ['chain', '연쇄 튕김']] },
-  { id: 'melee', name: '근접', perks: [['wide', '넓은 휘두르기'], ['counter', '되받아치기'], ['shock', '충격파']] },
+  { id: 'melee', name: '근접', perks: [['wide', '넓은 휘두르기'], ['stunhit', '기절 타격'], ['counter', '되받아치기'], ['shock', '충격파']] }, // 기절 타격: 근접 기절 +0.5초
   { id: 'life', name: '생존', perks: [['tough', '튼튼한 몸'], ['fastsh', '빠른 방어막'], ['regen', '재생']] },
   { id: 'move', name: '기동', perks: [['swift', '날렵함'], ['quickroll', '짧은 구르기'], ['rollhit', '구르기 돌진']] },
   { id: 'energy', name: '에너지', perks: [['save', '에너지 절약'], ['absorb', '에너지 흡수'], ['overflow', '넘치는 에너지']] },
@@ -1057,7 +1070,7 @@ function openPerk() {
   const offer = perkOffer(); if (!offer.length) return;
   choosing = true; const box = document.getElementById('perkList'); box.innerHTML = '';
   for (const o of offer) { const b = document.createElement('button'); b.className = 'perk';
-    b.innerHTML = `<b>${o.name}</b><span>${o.tree.name}</span><em>${'●'.repeat(o.tier + 1)}${'○'.repeat(2 - o.tier)}</em>`;
+    b.innerHTML = `<b>${o.name}</b><span>${o.tree.name}</span><em>${'●'.repeat(o.tier + 1)}${'○'.repeat(o.tree.perks.length - 1 - o.tier)}</em>`;
     b.onclick = () => { takePerk(o.id); closePerk(); say(P.x, P.y - 46, o.name, 'crit'); }; box.appendChild(b); }
   document.getElementById('perk').classList.remove('hide');
 }
@@ -1089,6 +1102,7 @@ const RELIC = {
   ticket: { name: '오래된 승차권', stat: 'skillcd', v: -0.15 },
   timetable: { name: '막차 시간표', stat: 'stationHeal', v: 1 },
   magnet: { name: '자석', stat: 'magnet', v: 1 },
+  hammerHead: { name: '지질 망치 머리', stat: 'stun', v: 0.4 }, // 근접 기절 +0.4초
 };
 function takeRelic(k) {
   if (P.relics.includes(k)) return; P.relics.push(k); const R = RELIC[k];
@@ -1102,6 +1116,8 @@ function dropRelic(x, y) { const left = Object.keys(RELIC).filter(k => !P.relics
 function relicMul(stat) { let m = 1; for (const k of P.relics || []) if (RELIC[k].stat === stat) m *= 1 + RELIC[k].v; return m; }
 function relicAdd(stat) { let s = 0; for (const k of P.relics || []) if (RELIC[k].stat === stat) s += RELIC[k].v; return s; }
 function critChance() { return CRIT + relicAdd('crit'); }
+// 근접 기절 시간: 무기 특수효과 + 능력(기절 타격) + 유물(지질 망치 머리)
+function meleeStun(W0) { return (W0.stun || 0) + (has('stunhit') ? 0.5 : 0) + relicAdd('stun'); }
 function dmgMul(melee) { return relicMul('dmg') * relicMul(melee ? 'melee' : 'ranged'); }
 // 내 상태 창(E): 직업·스킬, 능력치, 무기, 장비, 상태 이상, 능력, 유물을 한눈에 본다. 여는 동안 멈춘다
 let infoOpen = false;
@@ -1117,7 +1133,7 @@ function openInfo() {
       ${g('스킬', `${J.skill} · ${Math.round(P.skillMax * 10) / 10}초`)}
       ${g('체력', `${P.hp} / ${P.maxHp}`)}${g('방어막', `${P.sh} / ${P.maxSh}`)}${g('에너지', `${Math.floor(P.en)} / ${P.maxEn}`)}
       ${g('이동 속도', Math.round((has('swift') ? 1.12 : 1) * relicMul('speed') * 100) + '%')}${g('치명타', Math.round(critChance() * 100) + '%')}
-      ${g('재료', `헝겊 ${P.mat.cloth} · 부품 ${P.mat.part}`)}
+      ${g('재료', `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}`)}
     </div>
     <div class="icol">
       <h3>무기</h3>${wl}
@@ -1138,11 +1154,11 @@ let crafting = false;
 function openCraft() { crafting = true; renderCraft(); document.getElementById('craft').classList.remove('hide'); }
 function closeCraft() { crafting = false; document.getElementById('craft').classList.add('hide'); }
 function renderCraft() {
-  document.getElementById('craftMat').textContent = `헝겊 ${P.mat.cloth} · 부품 ${P.mat.part}`;
+  document.getElementById('craftMat').textContent = `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}`;
   const box = document.getElementById('craftList'); box.innerHTML = '';
   for (const k in GEAR) { const G = GEAR[k], worn = G.wear && P.worn.has(k), ok = P.mat.cloth >= G.cloth && P.mat.part >= G.part && !worn;
     const b = document.createElement('button'); b.className = 'gear' + (ok ? '' : ' off');
-    b.innerHTML = `<b>${G.name}</b>${G.note ? `<i>${G.note}</i>` : ''}<span>${[G.cloth ? '헝겊 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ')}</span><em>${G.wear ? (worn ? '착용 중' : P.worn.size ? '입는 장비 · 갈아입기' : '입는 장비') : (G.key + '번 · ' + (P.bag[k] || 0) + '개')}</em>`;
+    b.innerHTML = `<b>${G.name}</b>${G.note ? `<i>${G.note}</i>` : ''}<span>${[G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ')}</span><em>${G.wear ? (worn ? '착용 중' : P.worn.size ? '입는 장비 · 갈아입기' : '입는 장비') : (G.key + '번 · ' + (P.bag[k] || 0) + '개')}</em>`;
     b.onclick = () => craft(k); box.appendChild(b); }
 }
 const nearBench = () => { const tx = Math.floor(P.x / T), ty = Math.floor((P.y - 3) / T); for (let y = ty - 1; y <= ty + 1; y++) for (let x = tx - 1; x <= tx + 1; x++) if (tile(x, y) === 9) return true; return false; };
@@ -1469,7 +1485,7 @@ function placeProps(r) {
     if (Math.abs(tx - cx) <= 2 || Math.abs(ty - cy) <= 2 || tile(tx, ty) !== 1) continue; // 통로 줄과 가운데는 비운다
     if (r.type === 'start' && tx <= r.x0 + 6 && ty <= r.y0 + 4) continue; // 조합대 앞은 비운다
     const k = kinds[Math.floor(rand() * kinds.length)]; setT(tx, ty, 10);
-    props.push({ kind: k, tx, ty, x: tx * T + 8, y: (ty + 1) * T, hp: PROP[k].hp, flash: 0 }); i++;
+    props.push({ kind: k, tx, ty, x: tx * T + 8, y: (ty + 1) * T, w: 16, h: 16, hp: PROP[k].hp, flash: 0, isProp: true }); i++;
   }
 }
 const propAt = (tx, ty) => props.find(p => !p.dead && p.tx === tx && p.ty === ty);
@@ -1566,7 +1582,8 @@ function render() {
     if (p.kind === 'relic') { const x = Math.round(p.x), y = Math.round(p.y - 12 + Math.sin(time * 3 + p.x) * 2); ringPx(p.x, p.y - 1, 12, '#ffd23f'); // 유물: 금빛 상자
       px(ctx, x - 7, y - 6, 14, 12, '#1a1512'); px(ctx, x - 6, y - 5, 12, 10, '#c8963a'); px(ctx, x - 6, y - 5, 12, 3, '#ffd23f'); px(ctx, x - 1, y - 2, 2, 4, '#1a1512');
       if (Math.floor(time * 4) % 3 === 0) px(ctx, x + 5, y - 9, 2, 2, '#fff6a0'); }
-    else if (p.kind === 'cloth') { const x = Math.round(p.x), y = Math.round(p.y - 8 + Math.sin(time * 4 + p.x)); px(ctx, x - 6, y - 4, 12, 9, '#1a1512'); px(ctx, x - 5, y - 3, 10, 7, '#c8a8d8'); px(ctx, x - 5, y, 10, 1, '#9a7aaa'); px(ctx, x + 2, y - 3, 1, 7, '#9a7aaa'); }
+    else if (p.kind === 'cloth') { const x = Math.round(p.x), y = Math.round(p.y - 8 + Math.sin(time * 4 + p.x)); // 가죽 조각
+      px(ctx, x - 6, y - 4, 12, 9, '#1a1512'); px(ctx, x - 5, y - 3, 10, 7, '#9a6438'); px(ctx, x - 5, y - 3, 10, 2, '#b8804a'); for (let i = -4; i < 5; i += 2) px(ctx, x + i, y + 2, 1, 1, '#e8c890'); }
     else if (p.kind === 'part') { const x = Math.round(p.x), y = Math.round(p.y - 8 + Math.sin(time * 4 + p.x)); px(ctx, x - 5, y - 5, 10, 10, '#1a1512'); px(ctx, x - 4, y - 4, 8, 8, '#8d96a3'); px(ctx, x - 2, y - 2, 4, 4, '#3a3f46'); px(ctx, x - 1, y - 6, 2, 2, '#8d96a3'); px(ctx, x - 1, y + 4, 2, 2, '#8d96a3'); }
     else if (p.kind === 'energy') { const x = Math.round(p.x), y = Math.round(p.y) - 6; px(ctx, x - 2, y - 3, 5, 7, '#0b2340'); px(ctx, x - 3, y - 2, 7, 5, '#0b2340'); px(ctx, x - 1, y - 2, 3, 5, '#5fb8ff'); px(ctx, x - 2, y - 1, 5, 3, '#5fb8ff'); px(ctx, x, y - 1, 1, 1, '#e6f6ff'); }
     else if (p.kind === 'heal') { const y = p.y - 10 + Math.round(Math.sin(time * 4)); px(ctx, p.x - 6, y, 12, 10, '#1a1512'); px(ctx, p.x - 5, y + 1, 10, 8, '#e04848'); px(ctx, p.x - 1, y + 2, 2, 6, '#fff'); px(ctx, p.x - 3, y + 4, 6, 2, '#fff'); }
@@ -1595,7 +1612,7 @@ function render() {
   for (const a of allies) if (a.kind !== 'hawk') list.push({ y: a.y, f: () => drawAlly(a) });
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
   // 자동 조준 표시: 노리는 적의 네 모서리
-  if (target && !target.dead && !ended) { const l = Math.round(target.x - target.w / 2) - 3, t = Math.round(target.y - target.h) - 3, r = l + target.w + 5, b = Math.round(target.y) + 2, c = '#f0b429';
+  if (target && !target.dead && !ended) { const l = Math.round(target.x - target.w / 2) - 3, t = Math.round(target.y - target.h) - 3, r = l + target.w + 5, b = Math.round(target.y) + 2, c = target.isProp ? '#cfc6b3' : '#f0b429'; // 지형지물은 회색 모서리
     for (const [x, y, sx, sy] of [[l, t, 1, 1], [r, t, -1, 1], [l, b, 1, -1], [r, b, -1, -1]]) { px(ctx, sx > 0 ? x : x - 4, y, 5, 1, c); px(ctx, x, sy > 0 ? y : y - 4, 1, 5, c); } }
   // 혼란 표시: 머리 위에서 도는 보라 점
   for (const e of enemies) if (e.conf > 0 && !(e.stun > 0)) { const hx = e.x, hy = e.y - e.h - 6;
@@ -1730,7 +1747,7 @@ function drawHud() {
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   setTxt('prompt', nearExit() ? 'E 다음 역으로' : nearBench() ? 'E 조합대' : near ? 'E ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
-  setTxt('mat', `헝겊 ${P.mat.cloth} · 부품 ${P.mat.part}` + (P.worn.size ? ' · 착용 ' + [...P.worn].map(k => GEAR[k].name).join(', ') : ''));
+  setTxt('mat', `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}` + (P.worn.size ? ' · 착용 ' + [...P.worn].map(k => GEAR[k].name).join(', ') : ''));
   const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name} ${Math.ceil(P.st[k])}</span>`).join(' ');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   setTxt('bag', Object.keys(GEAR).filter(k => P.bag[k] > 0).map(k => `${GEAR[k].key} ${GEAR[k].name} ×${P.bag[k]}`).join('   '));
