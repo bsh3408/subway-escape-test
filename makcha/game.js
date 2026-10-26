@@ -291,7 +291,7 @@ function wavesFor(zone, st) {
 // ---------- 지도: 역 하나 = 방 3~4개를 격자에 무작위로 잇는다 ----------
 // 타일: 0 빈곳 1 바닥 2 벽 3 닫힌 문 4 가로 선로 5 세로 선로 6 열린 문 7 돌기둥 8 출구(다음 역)
 const CW = 44, CH = 32, GW = 4, GH = 3, MW = CW * GW, MH = CH * GH;
-const SOLID = new Set([0, 2, 3, 7]);
+const SOLID = new Set([0, 2, 3, 7, 10]); // 10: 부서지는 지형지물(props)
 let map, rooms, links;
 const ROOMSIZE = { start: [20, 16], fight: [30, 20], supply: [18, 14], exit: [20, 16], boss: [38, 26] };
 const tile = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? 0 : map[y * MW + x];
@@ -366,6 +366,7 @@ function buildMap() {
   }
   for (const r of rooms) if (r.type === 'exit') { const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1); for (let y = cy - 1; y <= cy; y++) for (let x = cx - 1; x <= cx; x++) setT(x, y, 8); }
   for (const r of rooms) if (r.type === 'start' || r.type === 'supply') { setT(r.x0 + 3, r.y0 + 3, 9); setT(r.x0 + 4, r.y0 + 3, 9); } // 조합대
+  props = []; for (const r of rooms) placeProps(r);
 }
 function roomAt(wx, wy, margin) {
   const tx = Math.floor(wx / T), ty = Math.floor(wy / T);
@@ -610,6 +611,7 @@ function attack() {
     }
     if (nRefl) say(P.x, P.y - 46, nRefl > 1 ? '튕김 ×' + nRefl : '튕김', 'deflect');
     if (nBlock) say(P.x, P.y - (nRefl ? 60 : 46), '막음', 'block', 'small');
+    for (const p of props) if (!p.dead && Math.hypot(p.x - c.x, p.y - 8 - c.y) < W0.range * wr + 10 && angDiff(Math.atan2(p.y - 8 - c.y, p.x - c.x), a) < W0.arc * wa) hitProp(p, Math.round(W0.dmg * dm)); // 근접으로 지형지물 부수기
     if (W0.wave) shots.push({ x: c.x + Math.cos(a) * 20, y: c.y + Math.sin(a) * 20, vx: Math.cos(a) * 320, vy: Math.sin(a) * 320, life: 0.55, dmg: 6 * dm, r: 9, pierce: 4, wave: true }); // 광선검: 베기 파동
     if (W0.scoop) { let n = 0; for (const h of hazards) if (Math.hypot(h.x - c.x, h.y - c.y) < W0.range + 16 && angDiff(Math.atan2(h.y - c.y, h.x - c.x), a) < W0.arc) { h.t = h.life; n++; if (h.kind === 'nutri') P.en = Math.min(P.maxEn, P.en + 5); }
       if (n) say(P.x, P.y - 46, '웅덩이 담기', 'heal', 'small'); } // 국자: 웅덩이를 떠 담는다
@@ -633,6 +635,7 @@ function fireBeam(x, y, a, dmg) {
   const [x2, y2] = rayEnd(x, y, a), L = Math.hypot(x2 - x, y2 - y) || 1, ux = (x2 - x) / L, uy = (y2 - y) / L;
   for (const e of enemies) { if (e.dead) continue; const ex = e.x - x, ey = e.y - e.h / 2 - y, t = ex * ux + ey * uy;
     if (t > 0 && t < L && Math.abs(ex * uy - ey * ux) < e.w * 0.45 + 4) damage(e, dmg); }
+  hitProp(propAtPx(x2 + ux * 10, y2 + uy * 10), dmg); // 빛줄기가 닿은 지형지물
   fx.push({ t: 'beam', x, y, x2, y2, life: 0.15, max: 0.15 });
 }
 // 유도 코일 충전기: 누르고 있으면 충전, 떼면 충전한 만큼 강한 탄
@@ -665,6 +668,7 @@ function confuse(e, t) { if (isBoss(e)) t *= 0.4; if (!(e.conf > 0)) say(e.x, e.
 function explode(x, y, r = 48, dmg = 7) {
   for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < r + e.w * 0.3) {
     damage(e, Math.round(dmg)); if (!isBoss(e)) { const d = Math.hypot(e.x - x, e.y - y) || 1; e.kx = (e.x - x) / d * 380; e.ky = (e.y - y) / d * 380; } }
+  for (const p of props) if (!p.dead && Math.hypot(p.x - x, (p.y - 8 - y) * 1.4) < r + 8) hitProp(p, dmg); // 폭발은 지형지물도 부순다
   burst(x, y - 6, '#ffb347', 22 + r / 4); burst(x, y - 6, '#5a4a3a', 10); fx.push({ t: 'boom', x, y, r, life: 0.3, max: 0.3 }); shake = Math.max(shake, 4 + r / 10);
 }
 let lobs = []; // 유탄: 조준한 곳으로 포물선을 그리며 날아가 터진다
@@ -853,6 +857,8 @@ function damage(e, n) {
   const crit = rand() < critChance(); if (crit) n *= 2; // 치명타: 피해 2배
   e.hp -= n; e.flash = 0.08; burst(e.x, e.y - e.h / 2, '#ffe9a8', 3);
   say(e.x, e.y - e.h - 2, crit ? '치명타 ' + n : String(n), crit ? 'crit' : 'dmg', crit ? 'big' : '');
+  if (isBoss(e) && rand() < Math.min(0.5, n * 0.04)) { // 보스를 때리면 일정 확률로 에너지 구슬 (피해가 클수록 잘 나옴, 2026-10-26 교사 요청)
+    const a = rand() * Math.PI * 2; pickups.push({ kind: 'energy', x: e.x + Math.cos(a) * e.bw * 0.4, y: e.y + 6, vx: Math.cos(a) * 70, vy: Math.sin(a) * 50 + 30, t: 0 }); }
   if (e.hp <= 0 && !e.dead) {
     e.dead = true; burst(e.x, e.y - e.h / 2, isBoss(e) ? '#c58a4a' : '#b8935f', isBoss(e) ? 40 : 10);
     if (!isBoss(e)) corpses.push({ x: e.x, y: e.y, t: 6 }); // 곰팡이 포자(분해자)가 찾아간다
@@ -1147,6 +1153,7 @@ const HAZ = { acid: { r: 18, life: 4, col: '#e8d040', hurt: true, st: 'acid' }, 
   nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, frost: { r: 26, life: 9999, col: '#bfe6ff', st: 'frost' } }; // frost: 냉매통 둘레 서리 바닥(구역 3)
 function addHazard(x, y, kind) { hazards.push({ x, y, kind, t: 0, life: HAZ[kind].life }); }
 function updateHazards() {
+  for (const p of props) if (p.flash > 0) p.flash -= DT;
   for (const h of hazards) { h.t += DT; const H0 = HAZ[h.kind];
     if (Math.hypot(P.x - h.x, (P.y - h.y) * 1.6) < H0.r) {
       if (h.kind === 'fire' && P.worn.has('gloves')) continue; // 단열 장갑: 불꽃 웅덩이의 열이 몸에 덜 전해진다
@@ -1354,12 +1361,12 @@ function updateFx() {
 function updateBullets() {
   const pc = pCenter();
   for (const b of ebul) { b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
-    if (solidAt(b.x, b.y) || b.life <= 0) { b.dead = true; if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); }
+    if (solidAt(b.x, b.y) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
     if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
       const s = b.st || (b.hz === 'acid' ? 'acid' : b.hz === 'fire' ? 'burn' : null); if (s) applyStatus(s); } }
   ebul = ebul.filter(b => !b.dead && b.life > 0);
   for (const s of shots) { s.x += s.vx * DT; s.y += s.vy * DT; s.life -= DT;
-    if (solidAt(s.x, s.y)) {
+    if (solidAt(s.x, s.y)) { hitProp(propAtPx(s.x, s.y), s.dmg); // 지형지물에 맞으면 부서진다
       if (has('bounce') && !s.bounced && !s.deflect) { // 튕김탄: 벽에서 한 번 튕긴다
         s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(s.x + s.vx * DT, s.y)) s.vx *= -1; if (solidAt(s.x, s.y + s.vy * DT)) s.vy *= -1; s.bounced = true; burst(s.x, s.y, '#fff3b0', 2); continue; }
       s.dead = true; if (s.boom) explode(s.x - s.vx * DT, s.y - s.vy * DT, s.boom.r, s.boom.dmg); else burst(s.x, s.y, '#bdb5a6', 3); continue; }
@@ -1434,7 +1441,7 @@ function drawTiles(cx, cy) {
       else { px(ctx, X, Y + 6, T, 4, '#4a3a2a'); if (mid) { px(ctx, X + 3, Y, 2, T, '#8d96a3'); px(ctx, X + 11, Y, 2, T, '#8d96a3'); } }
     } else if (v === 3) {
       px(ctx, X, Y, T, T, '#2a1414'); for (let i = 1; i < T; i += 5) px(ctx, X + i, Y, 2, T, '#c94a3a'); px(ctx, X, Y + 7, T, 2, '#8a2e24');
-    } else if (v === 7) px(ctx, X, Y, T, T, (tx + ty) % 2 ? '#3f3a34' : '#433d37');
+    } else if (v === 7 || v === 10) { const TH = THEME[stage.zone]; px(ctx, X, Y, T, T, (tx + ty) % 2 ? TH.floor[0] : TH.floor[1]); }
     else if (v === 9) { // 조합대(작업대)
       px(ctx, X, Y, T, T, THEME[stage.zone].floor[0]); px(ctx, X, Y + 3, T, 10, '#1a1512'); px(ctx, X + 1, Y + 4, T - 2, 3, '#a07a4a'); px(ctx, X + 1, Y + 7, T - 2, 5, '#6a4a2a');
       if (tile(tx - 1, ty) !== 9) { px(ctx, X + 3, Y + 1, 4, 3, '#e8e0c8'); px(ctx, X + 9, Y + 2, 3, 2, '#8d96a3'); } }
@@ -1444,6 +1451,63 @@ function drawTiles(cx, cy) {
       if (tile(tx - 1, ty) !== 8 && tile(tx, ty - 1) !== 8) { const b = Math.floor(time * 3) % 2; // 위쪽 화살표
         px(ctx, X + 14, Y + 6 - b, 4, 14, '#f0b429'); px(ctx, X + 10, Y + 10 - b, 12, 2, '#f0b429'); px(ctx, X + 12, Y + 8 - b, 8, 2, '#f0b429'); } }
   }
+}
+// ---------- 지형지물: 구역마다 특색 있는, 부서지는 물건 (2026-10-26 교사 요청) ----------
+// 바닥 1칸을 막고(이동·탄 모두 막는 엄폐물), 부수면 에너지·체력·재료가 나온다
+const PROP = {
+  fossilRock: { z: 0, name: '화석 바위', hp: 9, extra: 'mat' }, cart: { z: 0, name: '광차', hp: 6 }, timber: { z: 0, name: '나무 버팀목 더미', hp: 4 },
+  pot: { z: 1, name: '화분', hp: 3 }, compost: { z: 1, name: '퇴비 자루', hp: 4, extra: 'nutri' }, hay: { z: 1, name: '짚더미', hp: 3 },
+  drum: { z: 2, name: '녹슨 드럼통', hp: 6, extra: 'boom' }, crate: { z: 2, name: '나무 궤짝', hp: 4 }, pipe: { z: 2, name: '녹슨 배관 토막', hp: 7 },
+  server: { z: 3, name: '서버 상자', hp: 7, extra: 'energy' }, battery: { z: 3, name: '배터리 묶음', hp: 5 }, cone: { z: 3, name: '공사용 원뿔', hp: 2 },
+};
+let props = [];
+function placeProps(r) {
+  const n = r.type === 'fight' ? 5 + Math.floor(rand() * 3) : r.type === 'boss' ? 4 : r.type === 'start' ? 2 : 1;
+  const kinds = Object.keys(PROP).filter(k => PROP[k].z === stage.zone), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
+  for (let i = 0, tries = 0; i < n && tries < 80; tries++) {
+    const tx = r.x0 + 2 + Math.floor(rand() * (r.w - 4)), ty = r.y0 + 3 + Math.floor(rand() * (r.h - 5));
+    if (Math.abs(tx - cx) <= 2 || Math.abs(ty - cy) <= 2 || tile(tx, ty) !== 1) continue; // 통로 줄과 가운데는 비운다
+    if (r.type === 'start' && tx <= r.x0 + 6 && ty <= r.y0 + 4) continue; // 조합대 앞은 비운다
+    const k = kinds[Math.floor(rand() * kinds.length)]; setT(tx, ty, 10);
+    props.push({ kind: k, tx, ty, x: tx * T + 8, y: (ty + 1) * T, hp: PROP[k].hp, flash: 0 }); i++;
+  }
+}
+const propAt = (tx, ty) => props.find(p => !p.dead && p.tx === tx && p.ty === ty);
+const propAtPx = (x, y) => propAt(Math.floor(x / T), Math.floor(y / T));
+function hitProp(p, n) {
+  if (!p || p.dead) return; p.hp -= n; p.flash = 0.08; burst(p.x, p.y - 8, '#cfc6b3', 2);
+  if (p.hp > 0) return;
+  p.dead = true; setT(p.tx, p.ty, 1); burst(p.x, p.y - 8, '#a89a84', 12); shake = Math.max(shake, 2);
+  const X = PROP[p.kind].extra, x = p.x, y = p.y - 4;
+  if (X === 'boom') explode(x, y, 44, 6); // 녹슨 드럼통: 터지며 둘레 적에게 피해
+  if (X === 'nutri') addHazard(x, y, 'nutri');
+  const orbs = (n) => { for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2; pickups.push({ kind: 'energy', x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 45, t: 0 }); } };
+  if (X === 'energy') orbs(6); // 서버 상자: 에너지 많이
+  if (X === 'mat') pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x: x + 10, y }); // 화석 바위: 재료 하나 더
+  const d = rand(); // 떨어지는 것: 에너지 45%, 재료 25%, 체력 15%
+  if (d < 0.45) orbs(2 + Math.floor(rand() * 2)); else if (d < 0.70) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x, y }); else if (d < 0.85) pickups.push({ kind: 'heal', x, y });
+}
+function drawProp(p) {
+  const X = p.tx * T, Y = p.ty * T, O = '#1a1512', k = p.kind, dmg = 1 - p.hp / PROP[k].hp;
+  const D = {
+    fossilRock: () => { ell(ctx, X + 8, Y + 9, 18, 16, O); ell(ctx, X + 8, Y + 9, 16, 14, '#7a746a'); ell(ctx, X + 6, Y + 6, 8, 6, '#9a9387'); px(ctx, X + 7, Y + 9, 6, 4, '#d8c7a4'); px(ctx, X + 8, Y + 10, 4, 1, '#a8916a'); },
+    cart: () => { px(ctx, X, Y + 2, 16, 11, O); px(ctx, X + 1, Y + 3, 14, 8, '#6a5a4a'); px(ctx, X + 1, Y + 3, 14, 2, '#8a7a6a'); ell(ctx, X + 4, Y + 14, 5, 5, O); ell(ctx, X + 12, Y + 14, 5, 5, O); px(ctx, X + 3, Y + 1, 10, 2, '#5a4a3a'); },
+    timber: () => { for (let i = 0; i < 3; i++) { px(ctx, X, Y + 3 + i * 4, 16, 4, O); px(ctx, X + 1, Y + 4 + i * 4, 14, 2, i % 2 ? '#8a5a2e' : '#a06a38'); } },
+    pot: () => { px(ctx, X + 2, Y + 6, 12, 10, O); px(ctx, X + 3, Y + 7, 10, 8, '#a8542e'); px(ctx, X + 3, Y + 7, 10, 2, '#c8743e'); px(ctx, X + 5, Y - 2, 2, 8, '#5f8a3a'); px(ctx, X + 9, Y - 4, 2, 10, '#7ab84a'); px(ctx, X + 3, Y - 1, 4, 3, '#7ab84a'); px(ctx, X + 10, Y - 5, 4, 3, '#5f8a3a'); },
+    compost: () => { ell(ctx, X + 8, Y + 9, 16, 14, O); ell(ctx, X + 8, Y + 9, 14, 12, '#8a7a4a'); px(ctx, X + 5, Y + 2, 6, 3, '#6a5a3a'); px(ctx, X + 4, Y + 9, 8, 2, '#6a5a3a'); px(ctx, X + 6, Y + 11, 2, 2, '#4a6a2a'); },
+    hay: () => { ell(ctx, X + 8, Y + 10, 18, 13, O); ell(ctx, X + 8, Y + 10, 16, 11, '#d8b84a'); for (let i = 0; i < 5; i++) px(ctx, X + 2 + i * 3, Y + 6 + (i % 2), 1, 7, '#a88a2a'); },
+    drum: () => { px(ctx, X + 1, Y - 4, 14, 20, O); px(ctx, X + 2, Y - 3, 12, 18, '#9a4a26'); px(ctx, X + 2, Y + 1, 12, 2, '#6a2a12'); px(ctx, X + 2, Y + 9, 12, 2, '#6a2a12'); px(ctx, X + 2, Y - 3, 12, 2, '#c26a3a'); px(ctx, X + 4, Y + 4, 3, 3, '#e8d040'); },
+    crate: () => { px(ctx, X, Y, 16, 16, O); px(ctx, X + 1, Y + 1, 14, 14, '#9c6b3c'); px(ctx, X + 1, Y + 7, 14, 2, '#6e4826'); px(ctx, X + 7, Y + 1, 2, 14, '#6e4826'); },
+    pipe: () => { px(ctx, X - 1, Y + 4, 18, 10, O); px(ctx, X, Y + 5, 16, 8, '#7a5a4a'); px(ctx, X, Y + 5, 16, 2, '#9a7a6a'); px(ctx, X, Y + 4, 3, 10, '#5a4038'); px(ctx, X + 13, Y + 4, 3, 10, '#5a4038'); px(ctx, X + 6, Y + 8, 3, 3, '#9a4a26'); },
+    server: () => { px(ctx, X + 1, Y - 6, 14, 22, O); px(ctx, X + 2, Y - 5, 12, 20, '#2a3440'); for (let i = 0; i < 4; i++) { px(ctx, X + 3, Y - 3 + i * 5, 10, 3, '#14202c'); px(ctx, X + 11, Y - 2 + i * 5, 1, 1, (Math.floor(time * 3) + i) % 2 ? '#7ee07e' : '#f0b429'); } },
+    battery: () => { for (let i = 0; i < 3; i++) { px(ctx, X + i * 5, Y + 2, 6, 14, O); px(ctx, X + 1 + i * 5, Y + 3, 4, 12, i === 1 ? '#3f7fd0' : '#2a2a30'); px(ctx, X + 2 + i * 5, Y, 2, 3, '#c3cad3'); px(ctx, X + 1 + i * 5, Y + 6, 4, 2, '#f0b429'); } },
+    cone: () => { px(ctx, X + 1, Y + 13, 14, 3, O); px(ctx, X + 2, Y + 13, 12, 2, '#e05a2a'); for (let j = 0; j < 12; j++) { const w = 2 + Math.floor(j / 2); px(ctx, X + 8 - w / 2 - 1, Y + 1 + j, w + 2, 1, O); px(ctx, X + 8 - w / 2, Y + 1 + j, w, 1, j % 5 > 2 ? '#f3f3f3' : '#e05a2a'); } },
+  };
+  px(ctx, X + 1, Y + T - 2, T - 2, 3, 'rgba(0,0,0,0.3)');
+  D[k]();
+  if (dmg > 0.4) { px(ctx, X + 4, Y + 4, 1, 5, O); px(ctx, X + 5, Y + 8, 3, 1, O); } // 금이 간다
+  if (dmg > 0.7) { px(ctx, X + 10, Y + 3, 1, 6, O); px(ctx, X + 8, Y + 9, 3, 1, O); }
+  if (p.flash > 0) { ctx.globalAlpha = 0.6; px(ctx, X, Y - 4, T, T + 4, '#ffffff'); ctx.globalAlpha = 1; }
 }
 function drawPillar(tx, ty) { const X = tx * T, Y = ty * T, [b, l, d, s] = THEME[stage.zone].pillar;
   px(ctx, X, Y - T, T, T * 2, '#1b1916'); px(ctx, X + 1, Y - T + 1, T - 2, T * 2 - 2, b);
@@ -1518,6 +1582,7 @@ function render() {
   const list = [];
   const tx0 = Math.floor(cx / T) - 1, ty0 = Math.floor(cy / T) - 1;
   for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) if (tile(tx, ty) === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) });
+  for (const p of props) if (!p.dead && p.tx >= tx0 - 1 && p.tx < tx0 + 54 && p.ty >= ty0 - 1 && p.ty < ty0 + 33) list.push({ y: p.y, f: () => drawProp(p) });
   for (const e of enemies) list.push({ y: e.y, f: () => {
     const s = sprFor(e), alt = Math.round(e.alt || 0);
     px(ctx, Math.round(e.x - e.bw / 2), Math.round(e.y) - 2, e.bw, 3, 'rgba(0,0,0,0.3)');

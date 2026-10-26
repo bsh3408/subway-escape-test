@@ -14,6 +14,7 @@
     for (let y = y0 + 2; y < y0 + h - 1; y++) for (let x = x0 + 1; x < x0 + w - 1; x++) setT(x, y, 1);
     for (const [x, y] of [[9, 7], [w - 10, 7], [9, h - 5], [w - 10, h - 5]]) setT(x0 + x, y0 + y, 7);
     setT(x0 + 3, y0 + 3, 9); setT(x0 + 4, y0 + 3, 9); // 조합대
+    props = []; placeProps({ ...rooms[0], type: 'fight' }); placeProps({ ...rooms[0], type: 'fight' }); // 지형지물(구역마다 다름)
   };
   zoneClear = function () { if (arena) { say(P.x, P.y - 50, '보스 처치', 'crit', 'big'); return; } origZoneClear(); };
   const room = () => roomAt(P.x, P.y - 3, 0) || rooms[0];
@@ -69,6 +70,7 @@
   r = sec('보스 부르기');
   for (const k in BOSS) btn(r, BOSS[k], () => { enemies.filter(e => isBoss(e)).forEach(e => e.dead = true); const p = place(200); spawnEnemy(k, p.x, p.y, room()); }, 'boss');
   r = sec('');
+  btn(r, '지형지물 다시 깔기', () => { for (const p of props) if (!p.dead) setT(p.tx, p.ty, 1); props = []; placeProps({ ...room(), type: 'fight' }); placeProps({ ...room(), type: 'fight' }); });
   btn(r, '적 모두 없애기', () => { enemies.forEach(e => e.dead = true); enemies = []; ebul = []; marks = []; bossRef = null; });
 
   // 무기
