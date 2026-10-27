@@ -409,33 +409,33 @@ let P, enemies, ebul, shots, fx, marks, pickups, cam, shake, time, running, ende
 // en: 한 번 쓸 때 드는 에너지, len: 손잡이에서 총구까지 길이(탄이 나가는 곳)
 const RARITY = { w: '#e8e8e8', g: '#7ee07e', b: '#5fb8ff', p: '#c08aff', o: '#ffae42' };
 const WEAP = {
-  sling: { name: '새총', r: 'w', type: 'shot', cd: 0.32, en: 0.5, dmg: 2, sp: 320, br: 3.5, len: 15 },
-  nail: { name: '못총', r: 'w', type: 'shot', cd: 0.13, en: 0.25, dmg: 1, sp: 380, br: 2.5, spread: 0.07, len: 16 },
+  sling: { name: '새총', r: 'w', type: 'shot', cd: 0.4, en: 1, dmg: 3, sp: 300, br: 4.5, len: 15, shape: 'stone' }, // 느리고 큰 돌: 맞히기 쉽다
+  nail: { name: '못총', r: 'w', type: 'shot', cd: 0.38, en: 1, dmg: 1, burst: 3, gap: 0.06, sp: 440, br: 2.5, spread: 0.06, len: 16, shape: 'needle' }, // 3발 점사
   umbrella: { name: '우산', r: 'w', type: 'melee', cd: 0.45, en: 0, dmg: 2, arc: 2.1, range: 46, kb: 0.6, deflect: 2.4, deflN: 4 },
   ladle: { name: '국자', r: 'w', type: 'melee', cd: 0.38, en: 0, dmg: 3, arc: 1.4, range: 40, kb: 0.8, deflect: 1.6, scoop: true },
   hammer: { name: '망치', r: 'g', type: 'melee', cd: 0.4, en: 0, dmg: 4, arc: 1.2, range: 38, kb: 1, deflect: 1.75, stun: 0.5 }, // stun: 특수효과 기절(초)
   rod: { name: '손잡이 쇠봉', r: 'g', type: 'melee', cd: 0.22, en: 0, dmg: 3, arc: 0.5, range: 58, kb: 0.5, deflect: 0.6, deflN: 2 },
-  base: { name: '수산화 칼슘 분사기', r: 'b', type: 'spray', cd: 0.2, en: 1.5, dmg: 1, n: 5, spread: 0.35, sp: 260, life: 0.35, br: 3, tag: 'base', len: 15 },
-  reduct: { name: '환원제 분사기', r: 'b', type: 'shot', cd: 0.16, en: 0.8, dmg: 2, sp: 420, br: 2.5, tag: 'red', len: 16 },
-  pack: { name: '냉온 팩탄', r: 'p', type: 'shot', cd: 0.45, en: 1.5, dmg: 3, sp: 260, br: 5, tag: 'pack', len: 14 },
-  beam: { name: '빛줄기 창', r: 'p', type: 'beam', cd: 0.5, en: 3, dmg: 4, len: 18 },
-  coil: { name: '유도 코일 충전기', r: 'o', type: 'charge', cd: 0.2, en: 5, dmg: 6, len: 14 },
-  // 에너지는 위력에 맞춘다: 약한 총은 적게, 강한 총은 많이(2026-10-27 교사 요청)
+  base: { name: '수산화 칼슘 분사기', r: 'b', type: 'spray', cd: 0.3, en: 1, dmg: 1, n: 5, spread: 0.35, sp: 260, life: 0.35, br: 3, tag: 'base', len: 15, shape: 'drop' },
+  reduct: { name: '환원제 분사기', r: 'b', type: 'shot', cd: 0.3, en: 1, dmg: 2, burst: 2, gap: 0.08, sp: 420, br: 2.5, tag: 'red', len: 16, shape: 'drop' },
+  pack: { name: '냉온 팩탄', r: 'p', type: 'shot', cd: 0.45, en: 2, dmg: 3, sp: 260, br: 5, tag: 'pack', len: 14, shape: 'pack' },
+  beam: { name: '빛줄기 창', r: 'p', type: 'beam', cd: 0.5, en: 3, dmg: 5, len: 18 },
+  coil: { name: '유도 코일 충전기', r: 'o', type: 'charge', cd: 0.2, en: 4, dmg: 6, len: 14 },
+  // 에너지·피해는 정수, 무기마다 연사(cd)·점사(burst)·퍼짐(n)·꿰뚫기·탄 모양으로 성능 차이를 준다(2026-10-27 교사 요청)
   // 실제 총기를 본뜬 무기 (2026-10-26 교사 요청): 연사·피해·흩어짐·에너지를 다르게
-  pistol: { name: '권총', r: 'w', type: 'shot', cd: 0.28, en: 0.5, dmg: 3, sp: 420, br: 3, len: 12 },
-  revolver: { name: '리볼버', r: 'g', type: 'shot', cd: 0.55, en: 1.5, dmg: 7, sp: 480, br: 3.5, len: 14 },
-  smg: { name: '기관단총', r: 'g', type: 'shot', cd: 0.08, en: 0.4, dmg: 1.5, sp: 400, br: 2.5, spread: 0.12, len: 13 },
-  shotgun: { name: '산탄총', r: 'b', type: 'shot', cd: 0.65, en: 3, dmg: 2, n: 6, spread: 0.4, sp: 380, life: 0.45, br: 3, len: 17 },
-  rifle: { name: '돌격소총', r: 'b', type: 'shot', cd: 0.12, en: 0.6, dmg: 2.5, sp: 460, br: 3, spread: 0.05, len: 17 },
-  sniper: { name: '저격소총', r: 'p', type: 'shot', cd: 1.1, en: 5, dmg: 15, sp: 800, br: 3, pierce: 3, life: 1.2, len: 19 },
-  lmg: { name: '기관총', r: 'o', type: 'shot', cd: 0.06, en: 0.8, dmg: 2, sp: 440, br: 3, spread: 0.14, len: 18 },
+  pistol: { name: '권총', r: 'w', type: 'shot', cd: 0.22, en: 1, dmg: 2, sp: 460, br: 3, len: 12, shape: 'bullet' }, // 빠른 단발
+  revolver: { name: '리볼버', r: 'g', type: 'shot', cd: 0.6, en: 2, dmg: 8, sp: 520, br: 3.5, pierce: 1, len: 14, shape: 'slug' }, // 느리지만 한 방이 크고 1마리 꿰뚫음
+  smg: { name: '기관단총', r: 'g', type: 'shot', cd: 0.4, en: 1, dmg: 1, burst: 5, gap: 0.06, sp: 420, br: 2.5, spread: 0.14, len: 13, shape: 'dot' }, // 5발 점사, 많이 흩어짐
+  shotgun: { name: '산탄총', r: 'b', type: 'shot', cd: 0.7, en: 2, dmg: 2, n: 7, spread: 0.42, sp: 400, life: 0.4, br: 3, len: 17, shape: 'pellet' }, // 가까이서 7발
+  rifle: { name: '돌격소총', r: 'b', type: 'shot', cd: 0.38, en: 1, dmg: 2, burst: 3, gap: 0.08, sp: 500, br: 3, spread: 0.04, len: 17, shape: 'tracer' }, // 3발 점사, 곧게 나간다
+  sniper: { name: '저격소총', r: 'p', type: 'shot', cd: 1.2, en: 4, dmg: 18, sp: 900, br: 3, pierce: 3, life: 1.2, len: 19, shape: 'line' },
+  lmg: { name: '기관총', r: 'o', type: 'shot', cd: 0.5, en: 2, dmg: 2, burst: 8, gap: 0.05, sp: 470, br: 3, spread: 0.16, len: 18, shape: 'tracer' }, // 8발 점사
   // 폭발 무기 (2026-10-26 교사 요청): 적에게만 피해, 둘레의 적을 밀어낸다
-  rocket: { name: '로켓포', r: 'o', type: 'shot', cd: 1.0, en: 6, dmg: 4, sp: 230, br: 5, len: 18, boom: { r: 56, dmg: 14 } },
-  grenade: { name: '유탄 발사기', r: 'p', type: 'lob', cd: 0.7, en: 4, dmg: 10, len: 15, boom: { r: 48, dmg: 10 } },
+  rocket: { name: '로켓포', r: 'o', type: 'shot', cd: 1.0, en: 5, dmg: 4, sp: 230, br: 5, len: 18, boom: { r: 56, dmg: 14 }, shape: 'rocket' },
+  grenade: { name: '유탄 발사기', r: 'p', type: 'lob', cd: 0.7, en: 3, dmg: 10, len: 15, boom: { r: 48, dmg: 10 } },
   // 에너지를 쓰는 근접 무기 (2026-10-26 교사 요청)
-  baton: { name: '전기 충격봉', r: 'b', type: 'melee', cd: 0.32, en: 1.5, dmg: 4, arc: 1.0, range: 42, kb: 0.6, deflect: 1.2, deflN: 3, zap: true },
-  saw: { name: '회전 톱', r: 'p', type: 'melee', cd: 0.12, en: 0.8, dmg: 2, arc: 1.6, range: 40, kb: 0.2, deflect: 1.6, deflN: 2 },
-  saber: { name: '광선검', r: 'o', type: 'melee', cd: 0.35, en: 3, dmg: 9, arc: 1.5, range: 56, kb: 1, deflect: 2.0, deflN: 4, wave: true },
+  baton: { name: '전기 충격봉', r: 'b', type: 'melee', cd: 0.32, en: 1, dmg: 4, arc: 1.0, range: 42, kb: 0.6, deflect: 1.2, deflN: 3, zap: true },
+  saw: { name: '회전 톱', r: 'p', type: 'melee', cd: 0.2, en: 1, dmg: 2, arc: 1.6, range: 40, kb: 0.2, deflect: 1.6, deflN: 2 },
+  saber: { name: '광선검', r: 'o', type: 'melee', cd: 0.35, en: 2, dmg: 9, arc: 1.5, range: 56, kb: 1, deflect: 2.0, deflN: 4, wave: true },
 };
 const MAX_WEAPONS = 2;
 const starMul = k => 1 + 0.25 * ((P.stars[k] || 1) - 1); // 별 하나마다 피해 +25%
@@ -611,7 +611,7 @@ function attack() {
   let W0 = WEAP[wk]; const cost = enCost(W0.en);
   if (P.en < cost) { W0 = BASH; if (!(P.noEnT > 0)) { say(P.x, P.y - 46, '에너지 부족 · 휘두르기', 'energy', 'small'); P.noEnT = 2; } }
   else if (W0.type === 'charge') return; // 충전 무기는 누르고 있다가 뗄 때 쏜다(updatePlayer)
-  else P.en -= cost;
+  else spendEn(cost);
   P.cd = W0.cd; P.swingW = W0 === BASH ? BASH : null;
   const dm = starMul(wk) * (P.st.corrode ? 0.7 : 1) * dmgMul(W0.type === 'melee'); // 부식: 무기 피해 30% 감소
   if (W0.type === 'melee') {
@@ -661,8 +661,16 @@ function attack() {
       if (n) say(P.x, P.y - 46, '웅덩이 담기', 'heal', 'small'); } // 국자: 웅덩이를 떠 담는다
     return;
   }
+  if (W0.burst) P.burstQ = { wk, left: W0.burst - 1, t: W0.gap, dm };
+  shootOnce(wk, W0, dm);
+}
+// 점사 남은 발: 쏘는 사이에도 조준을 따라간다
+function updateBurst() { const q = P.burstQ; if (!q || ended) return;
+  if (P.weapons[P.wi] !== q.wk) { P.burstQ = null; return; }
+  q.t -= DT; if (q.t > 0) return; shootOnce(q.wk, WEAP[q.wk], q.dm); q.left--; q.t = WEAP[q.wk].gap; if (q.left <= 0) P.burstQ = null; }
+function shootOnce(wk, W0, dm) {
   // 탄은 그려진 총구 끝에서 나간다
-  const pose = weaponPose(a), pv = weaponPivot(a);
+  const c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x), pose = weaponPose(a), pv = weaponPivot(a);
   const gx = pv.x + pose.ux * W0.len, gy = pv.y + pose.uy * W0.len, a2 = Math.atan2(m.y - gy, m.x - gx);
   if (W0.type === 'beam') { fireBeam(gx, gy, a2, Math.round(W0.dmg * dm)); return; }
   if (W0.type === 'lob') { const d = Math.min(Math.hypot(m.x - gx, m.y - gy), 15 * T); lobs.push({ x0: gx, y0: gy, x1: gx + Math.cos(a2) * d, y1: gy + Math.sin(a2) * d + 12, t: 0, dur: 0.45 + d / 900, r: W0.boom.r, dmg: W0.boom.dmg * dm }); return; }
@@ -671,7 +679,7 @@ function attack() {
     const sa = a2 + (n > 1 ? (rand() - 0.5) * 2 * W0.spread : (W0.spread ? (rand() - 0.5) * 2 * W0.spread : 0)), sp = W0.sp * (n > 1 ? 0.8 + rand() * 0.4 : 1);
     const lr = has('range') ? 1.15 : 1; // 장거리탄: 더 빠르고 멀리
     shots.push({ x: gx, y: gy, vx: Math.cos(sa) * sp * lr, vy: Math.sin(sa) * sp * lr, life: (W0.life || 1.3) * (has('range') ? 1.4 : 1), dmg: W0.dmg * dm, r: W0.br, tag: W0.tag, mode: W0.tag === 'pack' ? P.packMode : undefined,
-      boom: W0.boom ? { r: W0.boom.r, dmg: W0.boom.dmg * dm } : undefined, rocket: !!W0.boom, pierce: W0.pierce || 0 });
+      boom: W0.boom ? { r: W0.boom.r, dmg: W0.boom.dmg * dm } : undefined, rocket: !!W0.boom, pierce: W0.pierce || 0, shape: W0.shape });
   }
 }
 // 빛줄기 창: 벽에 닿을 때까지 곧게 뻗어 길 위의 적을 모두 꿰뚫는다
@@ -688,9 +696,9 @@ function updateCharge() {
   if (mouse.down) { if (!P.chg && P.en < enCost(WEAP[wk].en)) return; // 에너지가 없으면 attack()에서 휘두른다
     P.chg = Math.min(1, (P.chg || 0) + DT / 1.1); }
   else if (P.chg > 0) {
-    if (P.chg > 0.15) { P.en -= enCost(WEAP[wk].en); const c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x), pose = weaponPose(a), pv = weaponPivot(a);
+    if (P.chg > 0.15) { spendEn(enCost(WEAP[wk].en)); const c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x), pose = weaponPose(a), pv = weaponPivot(a);
       const gx = pv.x + pose.ux * WEAP[wk].len, gy = pv.y + pose.uy * WEAP[wk].len, a2 = Math.atan2(m.y - gy, m.x - gx), k = P.chg;
-      shots.push({ x: gx, y: gy, vx: Math.cos(a2) * 380, vy: Math.sin(a2) * 380, life: 1.6, dmg: (6 + 14 * k) * starMul(wk) * dmgMul(false), r: 4 + 4 * k, pierce: k > 0.9 ? 3 : 0, coil: true });
+      shots.push({ x: gx, y: gy, vx: Math.cos(a2) * 380, vy: Math.sin(a2) * 380, life: 1.6, dmg: (6 + 14 * k) * starMul(wk) * dmgMul(false), r: 4 + 4 * k, shape: 'coil', pierce: k > 0.9 ? 3 : 0, coil: true });
       shake = Math.max(shake, 2 + 4 * k); }
     P.chg = 0; }
 }
@@ -870,6 +878,7 @@ function updatePlayer() {
   if (vy && move(P, 0, vy)) P.vy = 0;
   P.moving = Math.hypot(P.vx, P.vy) > 30;
   P.pt += DT; if (P.pt > (P.moving ? 0.08 : 0.4)) { P.pt = 0; P.ph++; }
+  updateBurst();
   if (mouse.down && P.cd <= 0 && !ended) attack();
   updateCharge();
   for (const p of pickups) if (p.kind === 'energy') {
@@ -897,7 +906,7 @@ function spawnEnemy(kind, x, y, room) {
 }
 function damage(e, n) {
   if (e.invul) { if (!(e.blockT > 0)) { say(e.x, e.y - e.h - (e.alt || 0) - 4, '막힘', 'block', 'small'); e.blockT = 0.4; } return; }
-  n = Math.round(n * skillDmg(e));
+  n = Math.max(1, Math.round(n * skillDmg(e))); // 피해는 정수
   const crit = rand() < critChance(); if (crit) n *= 2; // 치명타: 피해 2배
   e.hp -= n; e.flash = 0.08; burst(e.x, e.y - e.h / 2, '#ffe9a8', 3);
   say(e.x, e.y - e.h - 2, crit ? '치명타 ' + n : String(n), crit ? 'crit' : 'dmg', crit ? 'big' : '');
@@ -1082,7 +1091,9 @@ const TREES = [
 ];
 const has = id => P.perks.has(id);
 function dashCdMax() { return DASH_CD * (has('quickroll') ? 0.6 : 1) * relicMul('dashcd'); } // 짧은 구르기
-function enCost(n) { return n ? n * (has('save') ? 0.7 : 1) * relicMul('encost') : n; } // 에너지 절약: 정확히 30% 덜 쓴다(에너지는 소수로 셈)
+function enCost(n) { return n || 0; } // 에너지는 정수로 쓴다
+// 에너지 절약(30%)·유물은 그 확률만큼 에너지를 쓰지 않고 쏜다
+function spendEn(c) { const free = 1 - (has('save') ? 0.7 : 1) * relicMul('encost'); if (c > 0 && !(rand() < free)) P.en -= c; }
 function perkOffer() { // 트리마다 다음 단계 하나씩 후보로 놓고 서로 다른 트리에서 3개를 고른다
   const cand = [];
   for (const t of TREES) { const i = t.perks.findIndex(([id]) => !has(id)); if (i >= 0) cand.push({ tree: t, tier: i, id: t.perks[i][0], name: t.perks[i][1] }); }
@@ -1470,6 +1481,27 @@ function updateFx() {
 }
 
 // ---------- 탄 ----------
+// 무기마다 탄 모양이 다르다(2026-10-27 교사 요청). 길쭉한 탄은 날아가는 방향으로 눕힌다
+function streak(x, y, ux, uy, L, w, col) { for (let i = 0; i < L; i++) px(ctx, Math.round(x - ux * i - w / 2), Math.round(y - uy * i - w / 2), w, w, col); }
+function drawShot(s, x, y, d) {
+  const v = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / v, uy = s.vy / v;
+  if (s.deflect) { ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, '#fff3b0'); return; }
+  switch (s.shape) {
+    case 'stone': ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, '#9a9182'); px(ctx, x - 2, y - 2, 2, 2, '#d8d0c0'); return; // 새총: 둥근 돌
+    case 'needle': streak(x, y, ux, uy, 8, 1, '#d8dde3'); px(ctx, x - 1, y - 1, 2, 2, '#ffffff'); return; // 못: 가는 바늘
+    case 'bullet': streak(x, y, ux, uy, 4, 3, '#2a2520'); streak(x, y, ux, uy, 3, 2, '#e0b04a'); return; // 권총: 짧은 놋쇠 탄
+    case 'slug': streak(x - ux * 4, y - uy * 4, ux, uy, 8, 1, '#ffe9a8'); streak(x, y, ux, uy, 5, 4, '#2a2520'); streak(x, y, ux, uy, 4, 3, '#c8783a'); return; // 리볼버: 굵은 탄과 꼬리
+    case 'dot': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, '#ffe14a'); return; // 기관단총: 작은 점
+    case 'tracer': streak(x, y, ux, uy, 11, 2, '#ff9a3c'); streak(x, y, ux, uy, 4, 2, '#fff2b0'); return; // 소총·기관총: 예광탄 줄
+    case 'pellet': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, '#c9c2b4'); return; // 산탄: 작은 알갱이
+    case 'line': ctx.globalAlpha = 0.5; streak(x, y, ux, uy, 26, 1, '#bfe6ff'); ctx.globalAlpha = 1; streak(x, y, ux, uy, 6, 2, '#ffffff'); return; // 저격: 긴 흰 선
+    case 'drop': { const col = s.tag === 'base' ? '#f4f4f0' : '#9ad08a'; ell(ctx, x, y, d + 1, d + 1, '#2a2520'); ell(ctx, x, y, d, d, col); streak(x - ux * 2, y - uy * 2, ux, uy, 3, 1, col); return; } // 분사기: 물방울
+    case 'pack': { const col = s.mode === 'hot' ? '#ff7a2a' : '#7fc8ff'; px(ctx, x - 5, y - 4, 10, 8, '#2a2520'); px(ctx, x - 4, y - 3, 8, 6, col); px(ctx, x - 1, y - 3, 2, 6, '#f4f4f0'); return; } // 팩: 네모난 주머니
+    case 'rocket': streak(x - ux * 7, y - uy * 7, ux, uy, 5, 3, rand() < 0.5 ? '#ffd23f' : '#ff5a1e'); streak(x, y, ux, uy, 8, 4, '#2a2520'); streak(x, y, ux, uy, 7, 3, '#8a9096'); px(ctx, Math.round(x - 1), Math.round(y - 1), 3, 3, '#d04030'); return; // 로켓: 몸통·탄두·불꽃
+    case 'coil': ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, '#ffd23f'); for (let i = 0; i < 3; i++) { const a = rand() * Math.PI * 2; px(ctx, Math.round(x + Math.cos(a) * (d / 2 + 2)), Math.round(y + Math.sin(a) * (d / 2 + 2)), 1, 1, '#ffffff'); } return; // 코일: 번쩍이는 구슬
+  }
+  ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, s.rocket ? '#ff7a2a' : '#b9b2a3');
+}
 // 적 탄: 가운데·좌우 가장자리·장애물 윗면(그림이 타일 위로 8도트 솟음)에 닿으면 막힌다
 const bulletWall = b => solidAt(b.x, b.y) || solidAt(b.x, b.y + 7) || solidAt(b.x - b.r * 0.7, b.y) || solidAt(b.x + b.r * 0.7, b.y);
 // 두 점 사이에 벽·장애물이 있으면 true(벽에 붙어 선 몸통이 벽 너머 탄에 맞지 않게)
@@ -1805,8 +1837,7 @@ function render() {
     if (s.wave) { const a = Math.atan2(s.vy, s.vx), vx = -Math.sin(a), vy = Math.cos(a); ctx.globalAlpha = Math.min(1, s.life / 0.3); // 베기 파동: 진행 방향에 수직인 초승달
       for (let i = -9; i <= 9; i++) { const bend = (1 - (i * i) / 81) * 5; px(ctx, Math.round(s.x + vx * i - Math.cos(a) * bend), Math.round(s.y + vy * i - Math.sin(a) * bend), 2, 2, i % 3 ? '#ffe9a8' : '#ffffff'); }
       ctx.globalAlpha = 1; continue; }
-    const col = s.deflect ? '#fff3b0' : s.tag === 'base' ? '#f4f4f0' : s.tag === 'red' ? '#9ad08a' : s.tag === 'pack' ? (s.mode === 'hot' ? '#ff7a2a' : '#7fc8ff') : s.coil ? '#ffd23f' : s.rocket ? '#ff7a2a' : '#b9b2a3';
-    ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, col); }
+    drawShot(s, x, y, d); }
   drawSkillsOver(cx, cy);
   // 망치 휘두름
   if (P.swing > 0) { const c = pCenter(), k = P.swing / 0.16, W0 = P.swingW || WEAP[P.weapons[P.wi]], R = W0.range || 38, ad = Math.round((W0.arc || 1.2) * 180 / Math.PI * 0.85);
