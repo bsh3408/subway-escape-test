@@ -1467,11 +1467,16 @@ function updateFx() {
 }
 
 // ---------- 탄 ----------
+// 적 탄: 가운데·좌우 가장자리·장애물 윗면(그림이 타일 위로 8도트 솟음)에 닿으면 막힌다
+const bulletWall = b => solidAt(b.x, b.y) || solidAt(b.x, b.y + 7) || solidAt(b.x - b.r * 0.7, b.y) || solidAt(b.x + b.r * 0.7, b.y);
+// 두 점 사이에 벽·장애물이 있으면 true(벽에 붙어 선 몸통이 벽 너머 탄에 맞지 않게)
+function wallBetween(x0, y0, x1, y1) { const n = Math.ceil(Math.hypot(x1 - x0, y1 - y0) / 4);
+  for (let i = 1; i < n; i++) if (solidAt(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return true; return false; }
 function updateBullets() {
   const pc = pCenter();
   for (const b of ebul) { b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
-    if (solidAt(b.x, b.y) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
-    if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
+    if (bulletWall(b) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
+    if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
       const s = b.st || (b.hz === 'acid' ? 'acid' : b.hz === 'fire' ? 'burn' : null); if (s) applyStatus(s); } }
   ebul = ebul.filter(b => !b.dead && b.life > 0);
   for (const s of shots) { s.x += s.vx * DT; s.y += s.vy * DT; s.life -= DT;
@@ -1596,7 +1601,8 @@ const LAYOUTS = {
   cross(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; // 십자 회랑: 네 귀퉁이 큰 덩어리
     for (let y = 2; y < ih - 2; y++) for (let x = 2; x < iw - 2; x++) if (Math.abs(x - cx) > 2 && Math.abs(y - cy) > 2 && Math.abs(x - cx) < cx - 3 && Math.abs(y - cy) < cy - 2) b(x, y); },
 };
-const LAYOUT_FIGHT = ['pillars', 'maze', 'roomInRoom', 'corners', 'stagger', 'checker', 'rings', 'cross'], LAYOUT_BOSS = ['pillars', 'corners', 'checker', 'cross'];
+const LAYOUT_FIGHT = ['pillars', 'roomInRoom', 'corners', 'checker', 'cross'], // 미로 느낌이 강한 maze·stagger·rings는 뺐다
+ LAYOUT_BOSS = ['pillars', 'corners', 'checker', 'cross'];
 function placeBlocks(r) {
   if (r.type !== 'fight' && r.type !== 'boss' && r.type !== 'supply') return;
   const ix0 = r.x0 + 1, iy0 = r.y0 + 2, iw = r.w - 2, ih = r.h - 3, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
