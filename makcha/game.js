@@ -93,19 +93,20 @@ function drawTiger(g, f) { const O = '#1a1512', B = '#e88a2a';
   px(g, 0, 5, 3, 2, O); px(g, 0, 3, 2, 3, O); }
 const HUMAN_LOOK = { hat: 'hair', hatC: '#2a1d14', hatD: '#1a120c', shirt: '#6a8fc0', vest: '#6a8fc0', pocket: '#5a7aa8', shoe: '#2a2a30' };
 // 직업: 체력·방어막·에너지, 스킬(쿨타임 초), 겉모습. 스킬 내용은 컨셉_확정.md 4절(통박사 점검 반영)
+// 시작 무기: 직업에 어울리는 약한 무기, pick은 시작 방 바닥에 놓이는 두 번째 무기 (2026-10-27 교사 요청)
 const JOBS = {
-  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 10, weapons: ['sling'], pick: 'hammer',
+  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 10, weapons: ['flashlight'], pick: 'bb',
     look: { hat: 'cap', hatC: '#24365c', hatD: '#16223d', shirt: '#dfe6ee', vest: '#2e4470', pocket: '#22355a', shoe: '#2a2a30' } },
-  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 12, weapons: ['hammer'], pick: 'sling',
+  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 12, weapons: ['shovel'], pick: 'sling',
     look: { hat: 'brim', hatC: '#9a7b45', hatD: '#6e552b', shirt: '#c9b27a', vest: '#6f7d3c', pocket: '#55612c', shoe: '#5a3b22' } },
-  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 12, weapons: ['sling'], pick: 'hammer',
+  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 12, weapons: ['straw'], pick: 'broom',
     look: { hat: 'bucket', hatC: '#5f8a3a', hatD: '#3f6024', shirt: '#e8e0c8', vest: '#7a9a4a', pocket: '#5a7a34', shoe: '#4a3a28' } },
-  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 7, weapons: ['sling'], pick: 'hammer',
+  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 7, weapons: ['watergun'], pick: 'ruler',
     look: { hat: 'goggles', hatC: '#7fd0c8', hatD: '#3a8a84', shirt: '#f4f4f0', vest: '#f4f4f0', pocket: '#c9d2d6', shoe: '#3a3a40',
       mark: (g, x, bt) => { px(g, x - 1, bt + 1, 2, 10, '#c9d2d6'); } } },
-  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 11, weapons: ['sling'], pick: 'hammer',
+  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 11, weapons: ['umbrella'], pick: 'rubber',
     look: { hat: 'beanie', hatC: '#3f7fb8', hatD: '#2a5a86', shirt: '#d8e4ee', vest: '#e08a2e', pocket: '#b86a1e', shoe: '#2f3640' } },
-  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 14, weapons: ['sling'], pick: 'hammer',
+  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 14, weapons: ['dart'], pick: 'mop',
     look: { hat: 'helmet', hatC: '#f3f3f3', hatD: '#c9c9c9', shirt: '#e05a3a', vest: '#f0c419', pocket: '#c99f10', shoe: '#2a2a30' } },
 };
 let jobKey = 'geo';
@@ -272,6 +273,11 @@ const WDRAW = {
   baton(g, ux, uy) { bar(g, 6, 3, '#2a2a30', ux, uy); bar(g, 10, 3, '#3f7fd0', ux, uy, 6); blob(g, ux, uy, 16, 3, 3, '#9fd8ff'); },
   saw(g, ux, uy) { bar(g, 8, 3, '#d9483b', ux, uy); const x = Math.round(WC + ux * 13), y = Math.round(WC + uy * 13); ell(g, x, y, 13, 13, '#1a1512'); ell(g, x, y, 11, 11, '#c3cad3'); ell(g, x, y, 4, 4, '#3a3f46');
     for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; px(g, Math.round(x + Math.cos(a) * 6), Math.round(y + Math.sin(a) * 6), 1, 1, '#1a1512'); } },
+  plasma(g, ux, uy) { bar(g, 7, 4, '#3a3f46', ux, uy); bar(g, 3, 2, '#8d96a3', ux, uy, 7); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 10, 3, '#7fd8ff'); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 10, 1, '#ffffff'); }, // 손잡이 끝에서 뿜는 파란 플라스마
+  meteor(g, ux, uy) { bar(g, 12, 2, '#5a3a22', ux, uy); const x = Math.round(WC + ux * 15), y = Math.round(WC + uy * 15); ell(g, x, y, 11, 11, '#1a1512'); ell(g, x, y, 9, 9, '#5a4a3a'); px(g, x - 2, y - 2, 2, 2, '#ff7a2a'); px(g, x + 1, y + 1, 2, 1, '#ffb347'); }, // 달아오른 운석 머리
+  magnet(g, ux, uy) { bar(g, 10, 2, '#8d96a3', ux, uy); const vx = -uy, vy = ux, cx = WC + ux * 14, cy = WC + uy * 14;
+    stroke(g, cx - vx * 5, cy - vy * 5, ux, uy, 5, 3, '#d9483b'); stroke(g, cx + vx * 5, cy + vy * 5, ux, uy, 5, 3, '#3f7fd0'); stroke(g, cx - vx * 5, cy - vy * 5, vx, vy, 10, 3, '#8d96a3'); }, // 빨강·파랑 극이 있는 말굽 전자석
+  sonic(g, ux, uy) { bar(g, 6, 3, '#2a2a30', ux, uy); stroke(g, WC + ux * 6, WC + uy * 6, ux, uy, 13, 3, '#c3cad3'); const vx = -uy, vy = ux; px(g, Math.round(WC + ux * 12 + vx * 3), Math.round(WC + uy * 12 + vy * 3), 1, 1, '#9fd8ff'); px(g, Math.round(WC + ux * 15 - vx * 3), Math.round(WC + uy * 15 - vy * 3), 1, 1, '#9fd8ff'); }, // 떨리는 칼날
   saber(g, ux, uy) { bar(g, 5, 3, '#3a3f46', ux, uy); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 4, '#ff6ad5'); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 2, '#ffe6f8'); },
   watergun(g, ux, uy) { bar(g, 9, 5, '#3f9fe0', ux, uy); bar(g, 3, 2, '#ffd23f', ux, uy, 9); blob(g, ux, uy, 2, 4, 4, '#f0b429'); }, // 파란 장난감 물총
   rubber(g, ux, uy) { bar(g, 11, 2, '#c8a070', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 11 - vx * 2, WC + uy * 11 - vy * 2, vx, vy, 4, 1, '#d9483b'); }, // 나무젓가락과 고무줄
@@ -487,6 +493,11 @@ const WEAP = {
   // 에너지를 쓰는 근접 무기 (2026-10-26 교사 요청)
   baton: { name: '전기 충격봉', r: 'b', type: 'melee', cd: 0.32, en: 1, dmg: 4, arc: 1.0, range: 42, kb: 0.6, deflect: 1.2, deflN: 3, zap: true },
   saw: { name: '회전 톱', r: 'p', type: 'melee', cd: 0.2, en: 1, dmg: 2, arc: 1.6, range: 40, kb: 0.2, deflect: 1.6, deflN: 2 },
+  // 과학 원리 근접 무기: 에너지를 많이 쓰고 강하다 (2026-10-27 교사 요청)
+  plasma: { name: '플라스마 절단기', r: 'o', type: 'melee', cd: 0.4, en: 4, dmg: 14, arc: 1.1, range: 52, kb: 0.8, deflect: 1.4, deflN: 3, burn: true, desc: '기체를 아주 높은 온도로 가열하면 원자에서 전자가 떨어져 나가 전자와 이온이 섞인 플라스마가 된다. 뜨거운 플라스마로 베어 큰 피해와 화상을 준다' },
+  meteor: { name: '운석 충돌 망치', r: 'p', type: 'melee', cd: 0.75, en: 4, dmg: 10, arc: 1.2, range: 44, kb: 1.2, deflect: 1.2, stun: 0.6, meteor: { r: 46, dmg: 12 }, desc: '운석이 충돌한 것처럼 내려찍는다. 맞은 자리에서 충격파가 터진다. 중생대 백악기 말 대멸종의 원인으로 운석 충돌 가설이 유력하게 꼽힌다' },
+  magnet: { name: '전자석 철퇴', r: 'o', type: 'melee', cd: 0.6, en: 5, dmg: 13, arc: 1.4, range: 46, kb: 0.6, deflect: 1.6, deflN: 4, magnet: true, desc: '전류가 흐르면 자석이 되는 전자석. 철로 된 기계형 적만 끌어당겨 한데 모은다(생물형 적은 끌려오지 않는다)' },
+  sonic: { name: '초음파 진동 칼', r: 'p', type: 'melee', cd: 0.16, en: 3, dmg: 5, arc: 1.0, range: 44, kb: 0.3, deflect: 1.4, deflN: 3, desc: '칼날이 1초에 2만 번 넘게 떨리는 초음파 진동으로 대상을 잘게 끊어 자른다. 휘두르는 간격이 아주 짧다' },
   saber: { name: '광선검', r: 'o', type: 'melee', cd: 0.35, en: 2, dmg: 9, arc: 1.5, range: 56, kb: 1, deflect: 2.0, deflN: 4, wave: true },
 };
 const MAX_WEAPONS = 2;
@@ -668,6 +679,10 @@ function attack() {
   const dm = starMul(wk) * (P.st.corrode ? 0.7 : 1) * dmgMul(W0.type === 'melee'); // 부식: 무기 피해 30% 감소
   if (W0.type === 'melee') {
     P.swing = 0.16; P.swingA = a;
+    if (W0.magnet) { // 전자석: 철로 된 기계형 적만 끌어당긴다(통박사: 전자석은 철 같은 물체만 끌어당김)
+      let np = 0; for (const e of enemies) { if (e.dead || isBoss(e) || !MECH.has(e.kind)) continue; const dx = c.x - e.x, dy = c.y - (e.y - e.h / 2), d = Math.hypot(dx, dy); if (d < 160 && d > 20) { e.kx = dx / d * 460; e.ky = dy / d * 460; np++; } }
+      if (np) say(P.x, P.y - 60, '끌어당김 ×' + np, 'stun', 'small'); fx.push({ t: 'boom', x: c.x, y: c.y + 4, r: 60, life: 0.2, max: 0.2 }); }
+    if (W0.meteor) { const mx = c.x + Math.cos(a) * W0.range * 0.8, my = c.y + Math.sin(a) * W0.range * 0.8 + 12; explode(mx, my, W0.meteor.r, Math.round(W0.meteor.dmg * dm)); } // 운석: 내려찍은 자리에서 충격파
     const wr = has('wide') ? 1.15 : 1, wa = has('wide') ? 1.3 : 1; // 넓은 휘두르기
     if (has('shock')) { // 충격파: 휘두를 때 둘레로 파동이 퍼진다
       for (const e of enemies) if (!e.dead && Math.hypot(e.x - c.x, e.y - e.h / 2 - c.y) < W0.range * 1.8 + e.w * 0.3) damage(e, Math.max(1, Math.round(2 * dm)));
@@ -676,6 +691,7 @@ function attack() {
       const ec = { x: e.x, y: e.y - e.h / 2 }, d = Math.hypot(ec.x - c.x, ec.y - c.y);
       if (d < W0.range * wr + e.w * 0.35 && angDiff(Math.atan2(ec.y - c.y, ec.x - c.x), a) < W0.arc * wa) {
         damage(e, Math.round(W0.dmg * dm));
+        if (W0.burn && !e.dead) { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } // 플라스마: 화상
         if (W0.zap && !e.dead) { // 전기 충격봉: 기절, 가까운 적 2마리에게 전기가 튄다
           e.stun = Math.max(e.stun || 0, isBoss(e) ? 0.3 : 1.0);
           enemies.filter(o => o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 80).slice(0, 2).forEach(o => { damage(o, 2); fx.push({ t: 'zap', x: e.x, y: e.y - e.h / 2, x2: o.x, y2: o.y - o.h / 2, life: 0.15, max: 0.15 }); }); }
