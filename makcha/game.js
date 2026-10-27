@@ -380,17 +380,6 @@ function buildMap() {
       }
     }
   }
-  // 돌기둥 배치: 전투방마다 무작위 틀 하나 (가운데 줄은 통로가 지나므로 비운다)
-  const PILLARS = [
-    w => [[7, 6], [w.w - 8, 6], [7, w.h - 5], [w.w - 8, w.h - 5]],
-    w => [[7, 8], [w.w - 8, 8], [11, 13], [w.w - 12, 13]],
-    w => [[5, 5], [10, 5], [w.w - 6, w.h - 5], [w.w - 11, w.h - 5], [w.w - 6, 5], [5, w.h - 5]],
-    w => [[9, 6], [w.w - 10, 6], [9, w.h - 5], [w.w - 10, w.h - 5], [(w.w >> 1) - 6, 6], [(w.w >> 1) + 5, w.h - 5]],
-  ];
-  for (const r of rooms) if (r.type === 'fight') for (const [x, y] of PILLARS[Math.floor(rand() * PILLARS.length)](r)) {
-    const tx = r.x0 + x, ty = r.y0 + y, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
-    if (Math.abs(tx - cx) > 2 && Math.abs(ty - cy) > 2 && tile(tx, ty) === 1) setT(tx, ty, 7);
-  }
   for (const r of rooms) if (r.type === 'exit') { const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1); for (let y = cy - 1; y <= cy; y++) for (let x = cx - 1; x <= cx; x++) setT(x, y, 8); }
   for (const r of rooms) if (r.type === 'start' || r.type === 'supply') { setT(r.x0 + 3, r.y0 + 3, 9); setT(r.x0 + 4, r.y0 + 3, 9); } // 조합대
   for (const r of rooms) placeBlocks(r); // 부서지지 않는 장애물 덩어리
@@ -1572,32 +1561,55 @@ function drawTiles(cx, cy) {
         px(ctx, X + 14, Y + 6 - b, 4, 14, '#f0b429'); px(ctx, X + 10, Y + 10 - b, 12, 2, '#f0b429'); px(ctx, X + 12, Y + 8 - b, 8, 2, '#f0b429'); } }
   }
 }
-// ---------- 부서지지 않는 장애물 덩어리 (2026-10-27 교사 요청: 이동을 막는 장애물이 많으면 좋겠다) ----------
-// 일자·ㄱ자·덩어리·십자 모양을 놓는다. 가운데 십자 줄(통로)은 비우고, 놓을 때마다 방 안 모든 바닥에 걸어갈 수 있는지 확인한다
-const SHAPES = [
-  [[0, 0], [1, 0], [2, 0]], [[0, 0], [0, 1], [0, 2]], [[0, 0], [1, 0], [2, 0], [3, 0]], [[0, 0], [0, 1], [0, 2], [0, 3]],
-  [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [1, 1]], [[0, 0], [0, 1], [1, 1]], [[1, 0], [0, 1], [1, 1]],
-  [[0, 0], [1, 0], [0, 1], [1, 1]], [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]], [[0, 0], [1, 0], [2, 0], [0, 1]], [[0, 0], [0, 1], [0, 2], [1, 2]],
-];
-function roomConnected(r) { // 방 안 바닥이 모두 이어져 있는지(가운데에서 칠하기)
-  const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1), seen = new Set([cx + ',' + cy]), q = [[cx, cy]];
+// ---------- 부서지지 않는 장애물 (2026-10-27 교사 요청: 많이, 규칙적으로 미로·던전처럼) ----------
+function roomConnected(r) { // 방 안 바닥이 모두 이어져 있는지(바닥 한 칸에서 시작해 칠하기)
+  let sx = -1, sy = -1;
+  for (let y = r.y0 + 2; y < r.y0 + r.h - 1 && sx < 0; y++) for (let x = r.x0 + 1; x < r.x0 + r.w - 1; x++) if (!SOLID.has(tile(x, y))) { sx = x; sy = y; break; }
+  if (sx < 0) return false;
+  const seen = new Set([sx + ',' + sy]), q = [[sx, sy]];
   while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
     if (seen.has(k) || nx <= r.x0 || nx >= r.x0 + r.w - 1 || ny < r.y0 + 2 || ny >= r.y0 + r.h - 1 || SOLID.has(tile(nx, ny))) continue; seen.add(k); q.push([nx, ny]); } }
   for (let y = r.y0 + 2; y < r.y0 + r.h - 1; y++) for (let x = r.x0 + 1; x < r.x0 + r.w - 1; x++) if (!SOLID.has(tile(x, y)) && !seen.has(x + ',' + y)) return false;
   return true;
 }
+// 규칙적인 방 배치 틀 (2026-10-27 교사 요청: 미로나 던전 같은 느낌). 좌우·상하 대칭으로 세운다
+// b(x, y): 방 안쪽 좌표(0..iw-1, 0..ih-1)에 장애물 한 칸. iw·ih: 안쪽 폭·높이
+const LAYOUTS = {
+  pillars(b, iw, ih) { for (let y = 3; y < ih - 2; y += 4) for (let x = 3; x < iw - 2; x += 4) b(x, y); }, // 기둥 회랑
+  maze(b, iw, ih) { const k = Math.max(3, Math.floor(iw / 6)); let i = 0; // 칸막이 미로: 세로벽, 틈이 위·아래로 엇갈린다
+    for (let x = k; x < iw - 2; x += k, i++) { const top = i % 2 === 0; for (let y = 0; y < ih; y++) if (top ? y > 2 : y < ih - 3) b(x, y); } },
+  roomInRoom(b, iw, ih) { const m = 4, cx = iw >> 1, cy = ih >> 1; // 방 속의 방: 네 변 가운데가 뚫린 안쪽 벽
+    for (let x = m; x < iw - m; x++) { if (Math.abs(x - cx) > 1) { b(x, m - 1); b(x, ih - m); } }
+    for (let y = m - 1; y <= ih - m; y++) { if (Math.abs(y - cy) > 1) { b(m, y); b(iw - m - 1, y); } }
+    b(cx - 3, cy - 2); b(cx + 3, cy - 2); b(cx - 3, cy + 2); b(cx + 3, cy + 2); },
+  corners(b, iw, ih) { const L = Math.min(6, (iw >> 2)), H = Math.min(4, (ih >> 2)); // 네 귀퉁이 ㄱ자
+    for (const [sx, sy] of [[0, 0], [1, 0], [0, 1], [1, 1]]) { const x0 = sx ? iw - 4 : 3, y0 = sy ? ih - 4 : 3, dx = sx ? -1 : 1, dy = sy ? -1 : 1;
+      for (let i = 0; i < L; i++) b(x0 + dx * i, y0); for (let i = 1; i < H; i++) b(x0, y0 + dy * i); } },
+  stagger(b, iw, ih) { let row = 0; for (let y = 2; y < ih - 2; y += 3, row++) { const off = row % 2 ? 0 : 3; // 엇갈린 벽
+      for (let x = 2 + off; x < iw - 2; x += 7) for (let i = 0; i < 4 && x + i < iw - 2; i++) b(x + i, y); } },
+  checker(b, iw, ih) { for (let by = 0; by * 4 + 3 < ih - 2; by++) for (let bx = 0; bx * 4 + 3 < iw - 2; bx++) if ((bx + by) % 2 === 0) { // 체스판 2×2
+      const x = bx * 4 + 3, y = by * 4 + 3; b(x, y); b(x + 1, y); b(x, y + 1); b(x + 1, y + 1); } },
+  rings(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; // 이중 고리: 바깥은 좌우, 안쪽은 위아래가 뚫림
+    const ring = (m, gapH) => { for (let x = m; x < iw - m; x++) { if (!gapH || Math.abs(x - cx) > 1) { b(x, m - 1); b(x, ih - m); } }
+      for (let y = m - 1; y <= ih - m; y++) { if (gapH || Math.abs(y - cy) > 1) { b(m, y); b(iw - m - 1, y); } } };
+    ring(3, false); if (iw > 18 && ih > 13) ring(6, true); },
+  cross(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; // 십자 회랑: 네 귀퉁이 큰 덩어리
+    for (let y = 2; y < ih - 2; y++) for (let x = 2; x < iw - 2; x++) if (Math.abs(x - cx) > 2 && Math.abs(y - cy) > 2 && Math.abs(x - cx) < cx - 3 && Math.abs(y - cy) < cy - 2) b(x, y); },
+};
+const LAYOUT_FIGHT = ['pillars', 'maze', 'roomInRoom', 'corners', 'stagger', 'checker', 'rings', 'cross'], LAYOUT_BOSS = ['pillars', 'corners', 'checker', 'cross'];
 function placeBlocks(r) {
-  const n = r.type === 'fight' ? 6 + Math.floor(rand() * 4) : r.type === 'boss' ? 3 + Math.floor(rand() * 2) : r.type === 'start' ? 1 : 2;
-  const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
-  for (let i = 0, tries = 0; i < n && tries < 150; tries++) {
-    const S = SHAPES[Math.floor(rand() * SHAPES.length)], ox = r.x0 + 3 + Math.floor(rand() * (r.w - 7)), oy = r.y0 + 4 + Math.floor(rand() * (r.h - 8));
-    const cells = S.map(([x, y]) => [ox + x, oy + y]);
-    // 가운데 십자 줄과 벽 바로 옆은 비우고, 다른 장애물과는 한 칸 띄운다
-    if (cells.some(([x, y]) => Math.abs(x - cx) <= 2 || Math.abs(y - cy) <= 2 || x <= r.x0 + 1 || x >= r.x0 + r.w - 2 || y <= r.y0 + 2 || y >= r.y0 + r.h - 2)) continue;
-    if (cells.some(([x, y]) => { for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (tile(xx, yy) !== 1 && tile(xx, yy) !== 6 && !cells.some(([a, b]) => a === xx && b === yy)) return true; return false; })) continue;
+  if (r.type !== 'fight' && r.type !== 'boss' && r.type !== 'supply') return;
+  const ix0 = r.x0 + 1, iy0 = r.y0 + 2, iw = r.w - 2, ih = r.h - 3, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
+  const list = shuffle((r.type === 'boss' ? LAYOUT_BOSS : r.type === 'supply' ? ['pillars', 'corners'] : LAYOUT_FIGHT).slice());
+  for (const name of list) {
+    const cells = [];
+    LAYOUTS[name]((x, y) => { const tx = ix0 + x, ty = iy0 + y;
+      // 문 앞(좌우 가운데 줄·위아래 가운데 줄의 가장자리 3칸)은 비운다
+      if ((Math.abs(ty - cy) <= 1 && (x < 3 || x > iw - 4)) || (Math.abs(tx - cx) <= 1 && (y < 3 || y > ih - 4))) return;
+      if (tile(tx, ty) === 1) cells.push([tx, ty]); }, iw, ih);
     for (const [x, y] of cells) setT(x, y, 11);
-    if (!roomConnected(r)) { for (const [x, y] of cells) setT(x, y, 1); continue; }
-    i++;
+    if (roomConnected(r)) { r.layout = name; return; }
+    for (const [x, y] of cells) setT(x, y, 1); // 길이 막히면 다른 틀로
   }
 }
 // 구역마다 다른 장애물 모양(키 24도트: 바닥 1칸 + 위로 8도트)
