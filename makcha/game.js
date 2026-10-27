@@ -555,7 +555,7 @@ function reset() {
   const J = JOBS[jobKey];
   P = { x: 0, y: 0, bw: 18, bh: 6, hp: J.hp, maxHp: J.hp, sh: J.sh, maxSh: J.sh, en: J.en, maxEn: J.en, noEnT: 0, inv: 0, shT: 0, face: 1,
     job: jobKey, skillCd: 0, skillMax: J.cd, stars: {}, packMode: 'cold', chg: 0,
-    st: {}, gear: null, guard: {}, solarT: 0, mat: { cloth: 0, part: 0 }, perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 장비(1개), 상태 이상 막는 시간, 재료(가죽·부품)
+    st: {}, gear: null, guard: {}, solarT: 0, heatX: 0, coldX: 0, wetT: 0, warmT: 0, frostTick: 0, mat: { cloth: 0, part: 0 }, perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 장비(1개), 상태 이상 막는 시간, 재료(가죽·부품)
     ph: 0, pt: 0, moving: false, vx: 0, vy: 0, dash: 0, dashCd: 0, ddx: 0, ddy: 0, weapons: J.weapons.slice(), wi: 0, cd: 0, swing: 0, swingA: 0 };
   time = 0; ended = false; endT = 0;
   enterStation();
@@ -570,8 +570,7 @@ function enterStation() {
   enemies = []; ebul = []; shots = []; fx = []; marks = []; pickups = []; texts = []; flasks = []; puddles = []; skillFx = { kind: '', t: 0 }; allies = []; bombs = []; lobs = []; quakes = []; foci = [];
   cam = { x: P.x - W / 2, y: P.y - H / 2 }; shake = 0; bossRef = null; trans = 0;
   hazards = []; corpses = []; timers = []; clouds = []; dark = 0; P.slowT = 0;
-  if (stage.zone === 2) for (const r of rooms) if (r.type === 'fight') for (let i = 0; i < 2; i++) { // 구역 3: 냉매통 둘레 서리 바닥
-    const x = (r.x0 + 4 + rand() * (r.w - 8)) * T, y = (r.y0 + 4 + rand() * (r.h - 7)) * T; addHazard(x, y, 'frost'); }
+  P.climIn = null; furnishRooms(); // 더운 방·추운 방, 쏟아진 산·염기
   showBanner();
   if (stage.zi > 0 || stage.st > 0) openPerk(); // 역을 넘어올 때마다 능력 고르기
   if (relicAdd('stationHeal') && (stage.zi > 0 || stage.st > 0) && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
@@ -872,6 +871,7 @@ function splash(x, y) { // 중화제가 떨어진 자리: 주변 적에게 피�
   let n = 0;
   for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < 46) damage(e, 6);
   for (const b of ebul) if (!b.dead && Math.hypot(b.x - x, b.y - y) < 46) { b.dead = true; n++; }
+  for (const h of hazards) if ((h.kind === 'acid' || h.kind === 'base') && Math.hypot(h.x - x, (h.y - y) * 1.4) < 56) h.t = h.life; // 산·염기 웅덩이를 중화
   puddles.push({ x, y, t: 0, life: 3 }); burst(x, y - 4, '#e8d040', 14); shake = Math.max(shake, 3);
   say(x, y - 20, n ? '중화 ×' + n : '중화', 'heal');
 }
@@ -941,7 +941,7 @@ function drawSkillsOver(cx, cy) {
 function updatePlayer() {
   P.inv = Math.max(0, P.inv - DT); P.cd -= DT; P.noEnT -= DT; P.skillCd = Math.max(0, P.skillCd - DT); P.dashCd -= DT; P.swing = Math.max(0, P.swing - DT);
   const shDelay = has('fastsh') ? 1.8 : 3; // 빠른 방어막
-  P.shT += DT; if (P.shT > shDelay && P.sh < P.maxSh && !P.st.infect) { P.sh++; P.shT = shDelay - 1; } // 감염 중에는 방어막이 차지 않는다
+  P.shT += DT; if (P.shT > shDelay && P.sh < P.maxSh && !P.st.infect && !P.st.acid) { P.sh++; P.shT = shDelay - 1; } // 감염·화학 화상 중에는 방어막이 차지 않는다
   findTarget();
   const m = aimPoint(); if (Math.abs(m.x - P.x) > 2) P.face = m.x >= P.x ? 1 : -1;
   // 관성 이동: 속도가 목표 속도로 부드럽게 따라가고, 손을 떼면 미끄러지듯 멈춘다
@@ -990,6 +990,8 @@ function updatePlayer() {
   for (const p of pickups) if (p.kind === 'relic' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; takeRelic(p.id); } // 유물은 닿으면 줍는다
   for (const p of pickups) if ((p.kind === 'cloth' || p.kind === 'part') && Math.hypot(p.x - P.x, p.y - P.y) < 22 * (1 + relicAdd('magnet'))) { // 재료는 닿으면 줍는다(자석: 더 멀리서)
     p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
+  for (const p of pickups) if (p.kind === 'water' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; P.heatX = 0; // 물을 마신다
+    if (P.st.heat) cure('heat', '물을 마셔 열사병이 풀렸다'); else say(P.x, P.y - 44, '물 · 더위가 가셨다', 'heal', 'small'); burst(p.x, p.y - 6, '#7fc8ff', 8); }
   for (const p of pickups) if (p.kind === 'heal' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2); p.dead = true; say(P.x, P.y - 44, '체력 +' + (P.hp - before), 'heal'); burst(p.x, p.y - 6, '#ff6b6b', 8); }
   pickups = pickups.filter(p => !p.dead);
 }
@@ -1112,7 +1114,7 @@ const AI = {
     if (e.shootT <= 0) { e.st = 'tell'; e.t = 0.6; e.n = e.n || 0; }
   },
   float(e, o, dx, dy, dist, pc, ex, ey) { // 온실기체 안개: 느리게 떠다니다 가까우면 열기 파동
-    e.cd -= DT; if (e.st === 'tell') { e.t -= DT; if (e.t <= 0) { const a0 = rand() * Math.PI; for (let i = 0; i < 12; i++) { fire(ex, ey, a0 + i / 12 * Math.PI * 2, 75, 6); ebul[ebul.length - 1].st = 'heat'; } addHazard(e.x, e.y, 'heat'); e.st = 'idle'; e.cd = 2.6; } return; }
+    e.cd -= DT; if (e.st === 'tell') { e.t -= DT; if (e.t <= 0) { const a0 = rand() * Math.PI; for (let i = 0; i < 12; i++) { fire(ex, ey, a0 + i / 12 * Math.PI * 2, 75, 6); ebul[ebul.length - 1].st = 'heat'; } e.st = 'idle'; e.cd = 2.6; } return; }
     move(e, dx / dist * o.speed * T * DT, dy / dist * o.speed * T * DT);
     if (dist < 4 * T && e.cd <= 0) { e.st = 'tell'; e.t = 0.7; }
   },
@@ -1124,27 +1126,30 @@ function updateTimers() { for (const x of timers) { x.t -= DT; if (x.t <= 0) { x
 // ---------- 상태 이상과 장비 (통박사 초안 6절, 기획안 7절) ----------
 // 화면에는 이름만 보인다. 재료는 가죽과 부품 두 가지뿐이다(교사 요청, 2026-10-26 헝겊 → 가죽: 생물형은 가죽, 기계형은 부품)
 const STATUS = {
-  acid: { name: '산성 화상', dur: 6, col: '#e8d040' }, burn: { name: '화상', dur: 5, col: '#ff7a2a' }, corrode: { name: '부식', dur: 10, col: '#c26a3a' },
-  heat: { name: '열사병', dur: 8, col: '#ff5a3c' }, frost: { name: '동상', dur: 6, col: '#9fd8ff' }, infect: { name: '감염', col: '#c08aff' },
+  // 2026-10-27 교사 요청: keep은 저절로 낫지 않는다(제독·물·몸 녹이기·약으로만 풀림)
+  acid: { name: '화학 화상', col: '#e8d040', keep: true }, burn: { name: '화상', dur: 5, col: '#ff7a2a' }, corrode: { name: '부식', dur: 10, col: '#c26a3a' },
+  heat: { name: '열사병', col: '#ff5a3c', keep: true }, frost: { name: '동상', col: '#9fd8ff', keep: true }, infect: { name: '감염', col: '#c08aff' },
 };
 // 장비: 한 번에 1개만 들고, G 키로 한 번 쓰면 사라진다(2026-10-27 교사 요청: 입는/쓰는 장비 구분 없앰)
 // guard: 쓴 뒤 그 상태 이상에 걸리지 않는 시간(초)
 const GEAR = {
-  hotpack: { name: '핫팩', cloth: 1, part: 1, cures: 'frost', guard: 20, desc: '동상을 바로 낫게 하고, 20초 동안 동상에 걸리지 않는다' },
-  coldpack: { name: '냉찜질 팩', cloth: 1, part: 1, cures: 'heat', guard: 20, desc: '열사병을 바로 낫게 하고, 20초 동안 열사병에 걸리지 않는다' },
-  pad: { name: '중화 패드', cloth: 1, part: 2, cures: 'acid', guard: 20, note: '게임 연출', desc: '산성 화상을 바로 낫게 하고, 20초 동안 산성 화상을 입지 않는다' }, // 실제 응급 처치는 흐르는 물로 씻기(통박사 정정)
+  hotpack: { name: '방한복', cloth: 2, part: 0, cures: 'frost', guard: 30, desc: '입으면 동상이 바로 풀리고, 30초 동안 추운 곳에 있어도 몸이 식지 않는다' },
+  coldpack: { name: '수통', cloth: 1, part: 1, cures: 'heat', guard: 30, desc: '물을 마셔 열사병을 바로 풀고, 30초 동안 더운 곳에 있어도 열사병에 걸리지 않는다' },
+  pad: { name: '제독 세척액', cloth: 1, part: 2, cures: 'acid', guard: 20, desc: '몸에 묻은 산·염기를 씻어 내 화학 화상을 제독한다. 20초 동안 산·염기 웅덩이에 닿아도 화학 화상을 입지 않는다' }, // 실제 응급 처치는 흐르는 물로 씻기(통박사 정정) → 물웅덩이에 서 있어도 제독된다
   coat: { name: '방수 코팅 외투', cloth: 2, part: 1, cures: 'corrode', guard: 30, desc: '부식을 바로 없애고, 30초 동안 부식되지 않는다' },
   gloves: { name: '단열 장갑', cloth: 2, part: 1, cures: 'burn', guard: 30, desc: '화상을 바로 낫게 하고, 30초 동안 불꽃 웅덩이에 다치지 않는다' },
   solar: { name: '태양광 충전 배낭', cloth: 1, part: 2, desc: '30초 동안 에너지가 1초에 3씩 찬다' },
-  kit: { name: '진단·항생제 키트', cloth: 1, part: 2, desc: '감염됐을 때 쓴다. 병원체를 확인해 세균이면 항생제로 낫게 한다. 바이러스에는 항생제가 듣지 않아 키트를 아껴 둔다' },
+  antibio: { name: '항생제', cloth: 1, part: 1, drug: '세균', desc: '세균 감염을 낫게 한다. 바이러스에는 듣지 않는다(맞지 않으면 쓰지 않고 남는다)' },
+  antiviral: { name: '항바이러스제', cloth: 1, part: 2, drug: '바이러스', desc: '바이러스 감염을 낫게 한다. 세균에는 듣지 않는다(맞지 않으면 쓰지 않고 남는다)' },
 };
 const gearCost = G => [G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ');
 function applyStatus(k) {
   if (ended) return;
   if (P.guard[k] > 0) { if (!(P.blockMsg > 0)) { say(P.x, P.y - 46, STATUS[k].name + ' 막음', 'block', 'small'); P.blockMsg = 1.5; } return; }
-  if (k === 'infect') { if (P.st.infect) return; const virus = rand() < 0.5; P.st.infect = { t: 0, type: virus ? '바이러스' : '세균', known: false, life: virus ? 14 : 1e9 }; say(P.x, P.y - 46, '감염', 'conf'); return; }
-  if (!(P.st[k] > 0)) say(P.x, P.y - 46, STATUS[k].name, 'hurt', 'small');
-  P.st[k] = STATUS[k].dur;
+  if (k === 'infect') { if (P.st.infect) return; const virus = rand() < 0.5; P.st.infect = { t: 0, type: virus ? '바이러스' : '세균', known: false, life: 1e9 }; say(P.x, P.y - 46, '감염', 'conf'); return; } // 바이러스·세균 모두 약을 먹기 전까지 낫지 않는다
+  if (!(P.st[k] > 0)) { say(P.x, P.y - 46, STATUS[k].name, 'hurt', 'small'); if (k === 'frost') P.frostTick = 0; }
+  if (k === 'acid' && P.sh > 0) { P.sh = 0; say(P.x, P.y - 60, '방어막 0', 'hurt', 'small'); } // 화학 화상: 닿는 순간 방어막이 0이 된다
+  P.st[k] = STATUS[k].keep ? 1e9 : STATUS[k].dur;
 }
 function cure(k, msg) { delete P.st[k]; if (msg) say(P.x, P.y - 46, msg, 'heal', 'small'); }
 function updateStatus() {
@@ -1154,22 +1159,66 @@ function updateStatus() {
       if (Math.floor(o.t / 4) !== Math.floor((o.t - DT) / 4)) hurt(1);
       if (o.life <= 0) cure('infect', '감염이 나았다'); continue; }
     const before = P.st[k]; P.st[k] -= DT;
-    if ((k === 'acid' || k === 'burn') && Math.floor(before / 2) !== Math.floor(P.st[k] / 2)) hurt(1); // 2초마다 피해
-    if (k === 'heat') P.en = Math.max(0, P.en - 2 * DT); // 열사병: 에너지가 준다
+    if (k === 'burn' && Math.floor(before / 2) !== Math.floor(P.st[k] / 2) && (P.sh > 0 || P.hp > 1)) hurt(1); // 화상: 2초마다 피해 1, 체력을 1 아래로는 깎지 않는다
+    if (k === 'frost') { P.frostTick = (P.frostTick || 0) + DT; if (P.frostTick >= 5) { P.frostTick -= 5; hurt(1); } } // 동상: 5초마다 피해 1
+    if (STATUS[k].keep) { P.st[k] = 1e9; continue; }
     if (P.st[k] <= 0) delete P.st[k];
   }
   for (const g in P.guard) P.guard[g] -= DT;
+  updateClimate();
   if (P.solarT > 0) { P.solarT -= DT; P.en = Math.min(P.maxEn, P.en + 3 * DT); } // 태양광 충전 배낭
   P.en = Math.min(P.maxEn, P.en + relicAdd('enregen') * DT); // 태양 전지판 조각
 }
-const statusSpeed = () => (P.st.heat ? 0.8 : 1) * (P.st.frost ? 0.7 : 1);
+const statusSpeed = () => (P.st.heat ? 0.5 : 1) * (P.st.frost ? 0.5 : 1); // 열사병·동상: 이동 속도 50%
+// ---------- 기후 구역 (2026-10-27 교사 요청) ----------
+// 역마다 전투방 하나가 더운 방이나 추운 방이 된다. 오래 머물면 열사병·동상에 걸린다
+// 열사병: 물웅덩이에 계속 서 있거나 물을 마셔야 풀린다 / 동상: 방한복, 열이 나는 무기, 용암 틈 곁에서 풀린다
+const CLIM = {
+  hot: { name: ['지열 배관실', '비닐 온실', '제련로 앞 통로', '폭염 환기구'], tag: '더운 곳', col: '#ff6a2a', hint: '오래 있으면 열사병 · 물웅덩이에 들어가 몸을 식힌다' },
+  cold: { name: ['빙하기 얼음 동굴', '냉동 저장고', '냉각수 탱크실', '데이터 센터 냉각실'], tag: '추운 곳', col: '#7fc8ff', hint: '오래 있으면 동상 · 용암 틈 곁이나 열이 나는 무기로 몸을 녹인다' },
+};
+const EXPOSE = 8; // 이 시간(초)을 넘게 머물면 걸린다
+const HEAT_WEAP = new Set(['plasma', 'lens']);
+const warmWeapon = () => { const k = P.weapons[P.wi]; return HEAT_WEAP.has(k) || (k === 'pack' && P.packMode === 'hot'); }; // 냉온 팩탄은 발열 모드일 때
+const inHaz = (kind, r) => hazards.some(h => h.kind === kind && Math.hypot(P.x - h.x, (P.y - h.y) * 1.6) < (r || HAZ[kind].r));
+function updateClimate() {
+  const room = roomAt(P.x, P.y - 3, 0), c = room && room.clim;
+  if (c !== P.climIn) { P.climIn = c; if (c) { say(P.x, P.y - 66, CLIM[c].tag + ' · ' + CLIM[c].name[stage.zone], c === 'hot' ? 'hurt' : 'stun'); say(P.x, P.y - 50, CLIM[c].hint, 'block', 'small'); } }
+  const water = inHaz('water'), lava = inHaz('lava', 80), warm = lava || warmWeapon();
+  if (water) { // 물: 몸을 식히고, 산·염기를 씻어 낸다
+    P.heatX = Math.max(0, P.heatX - 4 * DT); P.wetT += DT;
+    if (P.wetT >= 1.5 && P.st.heat) cure('heat', '물에 몸을 식혀 열사병이 풀렸다');
+    if (P.wetT >= 1.5 && P.st.acid) cure('acid', '물로 씻어 제독했다');
+  } else { P.wetT = 0; P.heatX = c === 'hot' && !(P.guard.heat > 0) ? Math.min(EXPOSE, P.heatX + DT) : Math.max(0, P.heatX - 2 * DT); }
+  if (warm) { // 열: 몸을 녹인다
+    P.coldX = Math.max(0, P.coldX - 4 * DT); P.warmT += DT;
+    if (P.warmT >= 1.5 && P.st.frost) cure('frost', (lava ? '용암 열기' : '무기의 열') + '로 몸을 녹여 동상이 풀렸다');
+  } else { P.warmT = 0; P.coldX = c === 'cold' && !(P.guard.frost > 0) ? Math.min(EXPOSE, P.coldX + DT) : Math.max(0, P.coldX - 2 * DT); }
+  if (P.heatX >= EXPOSE && !P.st.heat) applyStatus('heat');
+  if (P.coldX >= EXPOSE && !P.st.frost) applyStatus('frost');
+}
+// 방 안 빈 바닥 한 칸(둘레 1칸도 비어 있는 곳)
+function freeSpot(r) {
+  for (let i = 0; i < 60; i++) { const tx = r.x0 + 3 + Math.floor(rand() * (r.w - 6)), ty = r.y0 + 4 + Math.floor(rand() * (r.h - 7)); let ok = true;
+    for (let y = ty - 1; y <= ty + 1 && ok; y++) for (let x = tx - 1; x <= tx + 1; x++) if (tile(x, y) !== 1) { ok = false; break; }
+    if (ok && !hazards.some(h => Math.hypot(h.x - (tx * T + 8), h.y - (ty * T + 8)) < 50)) return { x: tx * T + 8, y: ty * T + 10 }; }
+  return null;
+}
+function placeHaz(r, kind, n, drum) { for (let i = 0; i < n; i++) { const p = freeSpot(r); if (p) { addHazard(p.x, p.y, kind); if (drum) hazards[hazards.length - 1].drum = true; } } }
+function furnishRooms() {
+  const fights = rooms.filter(r => r.type === 'fight');
+  if (fights.length && rand() < 0.75) { const r = fights[Math.floor(rand() * fights.length)]; r.clim = rand() < 0.5 ? 'hot' : 'cold';
+    if (r.clim === 'hot') placeHaz(r, 'water', 2); else placeHaz(r, 'lava', 1); } // 더운 방: 물웅덩이 2곳 / 추운 방: 용암 틈 1곳
+  if (stage.zone === 2) for (const r of fights) if (!r.clim) { placeHaz(r, 'acid', 1, true); placeHaz(r, 'base', 1, true); placeHaz(r, 'water', 1); } // 구역 3: 쏟아진 산·염기 + 비상 세척용 물
+}
 function useGear() {
   const k = P.gear, G = GEAR[k]; if (!running || ended) return;
   if (!G) { say(P.x, P.y - 46, '장비 없음', 'block', 'small'); return; }
-  if (k === 'kit') { const inf = P.st.infect;
+  if (G.drug) { const inf = P.st.infect; // 감염은 병원체에 맞는 약을 먹어야 낫는다
     if (!inf) { say(P.x, P.y - 46, '감염됐을 때 쓴다', 'block', 'small'); return; }
-    if (inf.type === '바이러스') { inf.known = true; say(P.x, P.y - 46, '바이러스 · 항생제가 듣지 않는다', 'block', 'small'); return; } // 키트는 남는다
-    P.gear = null; cure('infect', '세균 확인 · 항생제로 나음'); return; }
+    inf.known = true;
+    if (inf.type !== G.drug) { say(P.x, P.y - 46, inf.type + '에는 ' + G.name + '가 듣지 않는다', 'block', 'small'); return; } // 약은 남는다
+    P.gear = null; cure('infect', inf.type + ' 감염 · ' + G.name + '로 나음'); return; }
   P.gear = null;
   if (k === 'solar') { P.solarT = 30; say(P.x, P.y - 46, '태양광 충전 30초', 'energy', 'small'); return; }
   P.guard[G.cures] = G.guard; cure(G.cures, G.name + ' · ' + G.guard + '초 동안 ' + STATUS[G.cures].name + ' 막음');
@@ -1316,26 +1365,49 @@ const nearBench = () => { const tx = Math.floor(P.x / T), ty = Math.floor((P.y -
 
 // 바닥 웅덩이: 산성(노랑)·불꽃·열기는 닿으면 피해, 양분은 느려짐
 let hazards = [], corpses = [];
-const HAZ = { acid: { r: 18, life: 4, col: '#e8d040', hurt: true, st: 'acid' }, fire: { r: 16, life: 3, col: '#ff7a2a', hurt: true, st: 'burn' }, heat: { r: 26, life: 4, col: '#ff5a3c', hurt: true, st: 'heat' },
-  nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, frost: { r: 26, life: 9999, col: '#bfe6ff', st: 'frost' }, // frost: 냉매통 둘레 서리 바닥(구역 3)
-  frostT: { r: 24, life: 5, col: '#bfe6ff', st: 'frost' } }; // frostT: 냉각 설비 관리기가 남기는 잠깐의 서리
+// acid·base: 산성(BTB 노랑)·염기성(BTB 파랑) 웅덩이 → 화학 화상 / water: 물웅덩이(몸 식히기·제독) / lava: 용암 틈(닿으면 화상, 곁에 있으면 몸이 녹는다)
+const HAZ = { acid: { r: 18, life: 6, col: '#e8d040', hurt: true, st: 'acid' }, base: { r: 18, life: 6, col: '#3f7fd0', hurt: true, st: 'acid' }, fire: { r: 16, life: 3, col: '#ff7a2a', hurt: true, st: 'burn' },
+  nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, water: { r: 22, life: 1e9, col: '#4aa0e0' }, lava: { r: 15, life: 1e9, col: '#ff5a1e', hurt: true, st: 'burn' },
+  frostT: { r: 24, life: 5, col: '#bfe6ff', cold: true } }; // frostT: 냉각 설비 관리기가 남기는 서리(밟으면 몸이 빨리 식는다)
 function addHazard(x, y, kind) { hazards.push({ x, y, kind, t: 0, life: HAZ[kind].life }); }
 function updateHazards() {
   for (const p of props) if (p.flash > 0) p.flash -= DT;
   for (const h of hazards) { h.t += DT; const H0 = HAZ[h.kind];
     if (Math.hypot(P.x - h.x, (P.y - h.y) * 1.6) < H0.r) {
-      if (h.kind === 'fire' && P.guard.burn > 0) continue; // 단열 장갑: 불꽃 웅덩이의 열이 몸에 덜 전해진다
+      if ((h.kind === 'fire' || h.kind === 'lava') && P.guard.burn > 0) continue; // 단열 장갑: 열이 몸에 덜 전해진다
+      if (H0.st === 'acid' && P.guard.acid > 0) continue; // 제독 세척액을 쓴 뒤
+      if (H0.cold) P.coldX = Math.min(EXPOSE, P.coldX + 2 * DT);
       if (H0.hurt) hurt(1); if (H0.slow) P.slowT = 0.2; if (H0.st) applyStatus(H0.st); } }
   hazards = hazards.filter(h => h.t < h.life);
   for (const c of corpses) c.t -= DT; corpses = corpses.filter(c => c.t > 0);
 }
+function drawClimate() {
+  for (const r of rooms) { if (!r.clim) continue; const X = (r.x0 + 1) * T, Y = (r.y0 + 2) * T, w = (r.w - 2) * T, h = (r.h - 3) * T;
+    if (X > cam.x + W || X + w < cam.x || Y > cam.y + H || Y + h < cam.y) continue;
+    ctx.globalAlpha = 0.16; px(ctx, X, Y, w, h, CLIM[r.clim].col); ctx.globalAlpha = 0.55;
+    if (r.clim === 'cold') for (let i = 0; i < 9; i++) { ctx.globalAlpha = 0.35; ell(ctx, X + 30 + (i * 151) % (w - 60), Y + 30 + (i * 89) % (h - 60), 34 + (i % 3) * 10, 14 + (i % 2) * 6, '#e6f6ff'); } // 얼음 바닥
+    ctx.globalAlpha = 0.55;
+    for (let i = 0; i < 70; i++) { const sx = (i * 97 + 13) % w, sp = 14 + (i % 5) * 6;
+      if (r.clim === 'cold') { const sy = (i * 53 + time * sp) % h; px(ctx, X + Math.round(sx + Math.sin(time + i) * 3), Y + Math.round(sy), 2, 2, '#ffffff'); } // 내리는 눈
+      else { const sy = h - (i * 53 + time * sp) % h; px(ctx, X + Math.round(sx + Math.sin(time * 3 + i) * 2), Y + Math.round(sy), 1, 4, '#ffb070'); } } // 피어오르는 아지랑이
+    ctx.globalAlpha = 1; }
+}
 function drawHazards() {
+  drawClimate();
+  for (const h of hazards) { if (h.kind !== 'lava') continue; ctx.globalAlpha = 0.1 + 0.04 * Math.sin(time * 3); ell(ctx, Math.round(h.x), Math.round(h.y), 160, 100, '#ffb070'); ctx.globalAlpha = 0.8; ringPx(h.x, h.y, 80, '#ffb070'); ctx.globalAlpha = 1; } // 용암 열기가 닿는 범위
   for (const h of hazards) { const H0 = HAZ[h.kind], fade = Math.min(1, (h.life - h.t) / 0.8, h.t / 0.2);
+    ctx.globalAlpha = 1;
+    if (h.kind === 'lava') { const x = Math.round(h.x), y = Math.round(h.y); ell(ctx, x, y, 36, 22, '#1a1512'); ell(ctx, x, y, 30, 17, '#5a2a1a'); ell(ctx, x, y, 22, 11, '#ff5a1e'); ell(ctx, x, y, 12, 5, '#ffd23f');
+      if (Math.floor(time * 3 + x) % 4 === 0) px(ctx, x - 6 + (Math.floor(time * 7) % 12), y - 3, 2, 2, '#fff6a0'); continue; } // 용암 틈
+    if (h.kind === 'water') { const x = Math.round(h.x), y = Math.round(h.y); ell(ctx, x, y, 46, 27, '#1a3a5a'); ell(ctx, x, y, 42, 24, '#3f8fd0'); ell(ctx, x - 4, y - 2, 20, 8, '#7fc8ff');
+      const k = (time * 0.8 + x * 0.01) % 1; ringPx(x, y, 4 + k * 14, 'rgba(230,246,255,' + (0.7 * (1 - k)).toFixed(2) + ')'); continue; } // 물웅덩이
+    if (h.drum) { const x = Math.round(h.x) - 18, y = Math.round(h.y) - 4; px(ctx, x - 6, y - 16, 12, 16, '#1a1512'); px(ctx, x - 5, y - 15, 10, 14, h.kind === 'acid' ? '#c8b030' : '#3f6fb0'); px(ctx, x - 5, y - 11, 10, 2, '#1a1512'); px(ctx, x - 2, y - 8, 4, 4, '#f4f4f0'); } // 쏟아진 약품통
     ctx.globalAlpha = 0.45 * fade; ell(ctx, Math.round(h.x), Math.round(h.y), H0.r * 2, Math.round(H0.r * 1.2), H0.col);
     ctx.globalAlpha = 0.7 * fade; if (Math.floor(time * 4 + h.x) % 3 === 0) px(ctx, Math.round(h.x + Math.sin(h.t * 5 + h.y) * H0.r * 0.5), Math.round(h.y - 2), 2, 2, '#fff');
-    if (h.kind === 'frost') { ctx.globalAlpha = 1; const x = Math.round(h.x), y = Math.round(h.y); // 냉매통
-      px(ctx, x - 6, y - 16, 12, 16, '#1a1512'); px(ctx, x - 5, y - 15, 10, 14, '#7fb2d9'); px(ctx, x - 5, y - 11, 10, 2, '#e6f6ff'); px(ctx, x - 5, y - 5, 10, 2, '#e6f6ff'); } }
+  }
   ctx.globalAlpha = 1;
+  for (const [v, col, nm] of [[P.heatX, '#ff6a2a', 'heat'], [P.coldX, '#9fd8ff', 'frost']]) { if (!(v > 0.2) || P.st[nm]) continue; // 몸 위 막대: 차면 열사병·동상
+    const x = Math.round(P.x) - 11, y = Math.round(P.y) - 46 - (nm === 'frost' && P.heatX > 0.2 ? 5 : 0); px(ctx, x, y, 22, 4, '#1a1512'); px(ctx, x + 1, y + 1, Math.round(20 * v / EXPOSE), 2, col); }
 }
 
 // ---------- 구역 보스 ----------
@@ -1402,8 +1474,8 @@ const BOSS2 = {
   vine: { move: 0, seq: [{ t: 'rays', n: 3 }, { t: 'ring', n: 24, sp: 100, r: 7, rep: 2 }, { t: 'roots', n: 4 }, { t: 'summon', kind: 'spore', n: 3 }, { t: 'spin', arms: 3, dur: 2.4, sp: 100, r: 6, spin: 1.8 }] },
   neutral: { move: 0.8, seq: [{ t: 'fan', n: 5, spread: 0.22, sp: 110, r: 7, rep: 2, hz: 'acid' }, { t: 'laser', n: 1, len: 360 }, { t: 'ring', n: 20, sp: 100, r: 7, rep: 2 }, { t: 'haz', hz: 'acid', n: 5 }] },
   cooler: { move: 0.9, seq: [{ t: 'fan', n: 5, spread: 0.2, sp: 110, r: 7, rep: 2, st: 'frost' }, { t: 'laser', n: 1, len: 340 }, { t: 'ring', n: 20, sp: 95, r: 7, rep: 2, st: 'heat' }, { t: 'fan', n: 2, spread: 0.6, sp: 70, r: 12, rep: 2 }, { t: 'haz', hz: 'frostT', n: 4 }] },
-  turbine: { move: 0.5, seq: [{ t: 'spin', arms: 6, dur: 2.6, sp: 110, r: 6, spin: 2.6 }, { t: 'laser', n: 2, len: 380 }, { t: 'haz', hz: 'heat', n: 3 }, { t: 'roots', n: 3, near: true }, { t: 'ring', n: 26, sp: 120, r: 7, rep: 1 }] },
-  solar: { move: 0.4, seq: [{ t: 'laser', n: 2, len: 420, seqDelay: 0.35 }, { t: 'fan', n: 7, spread: 0.14, sp: 140, r: 6, rep: 2 }, { t: 'haz', hz: 'heat', n: 1, big: true }, { t: 'summon', kind: 'drone', n: 2 }, { t: 'ring', n: 24, sp: 110, r: 7, rep: 2 }] },
+  turbine: { move: 0.5, seq: [{ t: 'spin', arms: 6, dur: 2.6, sp: 110, r: 6, spin: 2.6 }, { t: 'laser', n: 2, len: 380 }, { t: 'haz', hz: 'fire', n: 3 }, { t: 'roots', n: 3, near: true }, { t: 'ring', n: 26, sp: 120, r: 7, rep: 1 }] },
+  solar: { move: 0.4, seq: [{ t: 'laser', n: 2, len: 420, seqDelay: 0.35 }, { t: 'fan', n: 7, spread: 0.14, sp: 140, r: 6, rep: 2 }, { t: 'haz', hz: 'fire', n: 1, big: true }, { t: 'summon', kind: 'drone', n: 2 }, { t: 'ring', n: 24, sp: 110, r: 7, rep: 2 }] },
 };
 function bossGeneric(e, dx, dy, dist) {
   const B = BOSS2[e.kind], ey = e.y - e.h / 2, r = e.room; e.t -= DT;
@@ -1415,7 +1487,7 @@ function bossGeneric(e, dx, dy, dist) {
       if (p.t === 'rays') { const o = rand() * Math.PI * 2; e.lines = Array.from({ length: p.n }, (_, i) => { const aa = o + i * Math.PI * 2 / p.n; const [x2, y2] = rayEnd(e.x, ey, aa); return { x1: e.x, y1: ey, x2, y2 }; }); }
       if (p.t === 'jump') { e.tx = P.x; e.ty = P.y; marks.push({ t: 'land', x: P.x, y: P.y, life: 1.6, max: 1.6 }); }
       if (p.t === 'haz') for (let i = 0; i < p.n; i++) { const x = p.big ? (r.x0 + r.w / 2) * T : P.x + (rand() - 0.5) * 140, y = p.big ? (r.y0 + r.h / 2) * T : P.y + (rand() - 0.5) * 90;
-        marks.push({ t: 'haz', hz: p.hz, x, y, big: p.big, life: 0.9, max: 0.9 }); }
+        marks.push({ t: 'haz', hz: p.hz === 'acid' && rand() < 0.5 ? 'base' : p.hz, x, y, big: p.big, life: 0.9, max: 0.9 }); }
       if (p.t === 'roots') for (let i = 0; i < p.n; i++) { const a2 = rand() * Math.PI * 2, d2 = p.near ? 30 + rand() * 50 : 60 + rand() * 80; marks.push({ t: 'rock', x: P.x + Math.cos(a2) * d2, y: P.y + Math.sin(a2) * d2 * 0.7, life: 1.0, max: 1.0 }); }
     }
     return;
@@ -1613,7 +1685,8 @@ function updateBullets() {
   for (const b of ebul) { b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
     if (bulletWall(b) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
     if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
-      const s = b.st || (b.hz === 'acid' ? 'acid' : b.hz === 'fire' ? 'burn' : null); if (s) applyStatus(s); } }
+      const s = b.st || (b.hz === 'fire' ? 'burn' : null);
+      if (s === 'heat') P.heatX = Math.min(EXPOSE, P.heatX + 2.5); else if (s === 'frost') P.coldX = Math.min(EXPOSE, P.coldX + 2.5); else if (s) applyStatus(s); } } // 열기·냉기 탄은 몸에 더위·추위를 쌓는다
   ebul = ebul.filter(b => !b.dead && b.life > 0);
   for (const s of shots) { s.x += s.vx * DT; s.y += s.vy * DT; s.life -= DT;
     if (solidAt(s.x, s.y)) { hitProp(propAtPx(s.x, s.y), s.dmg); // 지형지물에 맞으면 부서진다
@@ -1803,6 +1876,7 @@ function hitProp(p, n) {
   if (X === 'nutri') addHazard(x, y, 'nutri');
   const orbs = (n) => { for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2; pickups.push({ kind: 'energy', x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 45, t: 0 }); } };
   if (X === 'energy') orbs(6); // 서버 상자: 에너지 많이
+  if (roomAt(x, y, 0) && roomAt(x, y, 0).clim === 'hot' && rand() < 0.4) pickups.push({ kind: 'water', x: x - 10, y }); // 더운 방: 물병
   if (X === 'mat' && rand() < 0.3) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x: x + 10, y }); // 화석 바위: 가끔 재료 하나 더
   const d = rand(); // 떨어지는 것: 에너지 85%, 재료 6%, 체력 4% (2026-10-27 교사 요청: 아이템은 드물게, 에너지는 잘)
   if (d < 0.85) orbs(2 + Math.floor(rand() * 2)); else if (d < 0.91) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x, y }); else if (d < 0.95) pickups.push({ kind: 'heal', x, y });
@@ -1895,6 +1969,7 @@ function render() {
       px(ctx, x - 6, y - 4, 12, 9, '#1a1512'); px(ctx, x - 5, y - 3, 10, 7, '#9a6438'); px(ctx, x - 5, y - 3, 10, 2, '#b8804a'); for (let i = -4; i < 5; i += 2) px(ctx, x + i, y + 2, 1, 1, '#e8c890'); }
     else if (p.kind === 'part') { const x = Math.round(p.x), y = Math.round(p.y - 8 + Math.sin(time * 4 + p.x)); px(ctx, x - 5, y - 5, 10, 10, '#1a1512'); px(ctx, x - 4, y - 4, 8, 8, '#8d96a3'); px(ctx, x - 2, y - 2, 4, 4, '#3a3f46'); px(ctx, x - 1, y - 6, 2, 2, '#8d96a3'); px(ctx, x - 1, y + 4, 2, 2, '#8d96a3'); }
     else if (p.kind === 'energy') { const x = Math.round(p.x), y = Math.round(p.y) - 6; px(ctx, x - 2, y - 3, 5, 7, '#0b2340'); px(ctx, x - 3, y - 2, 7, 5, '#0b2340'); px(ctx, x - 1, y - 2, 3, 5, '#5fb8ff'); px(ctx, x - 2, y - 1, 5, 3, '#5fb8ff'); px(ctx, x, y - 1, 1, 1, '#e6f6ff'); }
+    else if (p.kind === 'water') { const x = Math.round(p.x), y = Math.round(p.y - 12 + Math.sin(time * 4)); px(ctx, x - 4, y - 2, 8, 12, '#1a1512'); px(ctx, x - 3, y - 1, 6, 10, '#7fc8ff'); px(ctx, x - 3, y + 2, 6, 4, '#3f8fd0'); px(ctx, x - 2, y - 5, 4, 4, '#1a1512'); px(ctx, x - 1, y - 4, 2, 3, '#f4f4f0'); } // 물병
     else if (p.kind === 'heal') { const y = p.y - 10 + Math.round(Math.sin(time * 4)); px(ctx, p.x - 6, y, 12, 10, '#1a1512'); px(ctx, p.x - 5, y + 1, 10, 8, '#e04848'); px(ctx, p.x - 1, y + 2, 2, 6, '#fff'); px(ctx, p.x - 3, y + 4, 6, 2, '#fff'); }
     else { const y = Math.round(p.y - 12 + Math.sin(time * 4)); ell(ctx, Math.round(p.x), Math.round(p.y) - 1, 22, 7, 'rgba(0,0,0,0.3)'); // 바닥 무기: 등급 색 고리
       ringPx(p.x, p.y - 1, 12, RARITY[WEAP[p.kind].r]); drawSpr(SPR.wf[p.kind][0], p.x - WC, y - WC, false, false); }
@@ -2058,7 +2133,8 @@ function drawHud() {
   setTxt('prompt', nearExit() ? 'E 다음 역으로' : nearBench() ? 'E 조합대' : near ? 'E ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
   setTxt('mat', `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}`);
-  const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name} ${Math.ceil(P.st[k])}</span>`).join(' ');
+  const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name}${STATUS[k].keep ? '' : ' ' + Math.ceil(P.st[k])}</span>`).join(' ')
+    + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   setTxt('bag', (P.gear ? 'G 장비 · ' + GEAR[P.gear].name : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
