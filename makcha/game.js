@@ -744,12 +744,15 @@ const nearWeapon = () => { let b = null, bd = 30; for (const p of pickups) if (W
 function dropWeapon(x, y, minR) { pickups.push({ kind: randomWeapon(minR), x, y }); burst(x, y - 8, '#fff3b0', 10); }
 function hurt(n) {
   if (P.inv > 0 || P.dash > 0 || P.rush || ended) return;
-  shake = 6; P.shT = 0; P.inv = HIT_INV;
+  if (rand() < relicAdd('dodge')) { P.inv = 0.3; say(P.x, P.y - 44, '피함', 'block', 'small'); return; } // 보안 칩
+  shake = 6; P.shT = 0; P.inv = HIT_INV + relicAdd('inv');
+  const th = relicAdd('thorns'); if (th) for (const e of enemies) if (!e.dead && Math.hypot(e.x - P.x, e.y - P.y) < 50) damage(e, th); // 소금 결정·선인장 가시
   let sh = 0, hp = 0;
   for (let i = 0; i < n; i++) { if (P.sh > 0) { P.sh--; sh++; } else { P.hp--; hp++; } }
   if (sh) say(P.x, P.y - 44, '방어막 -' + sh, 'shield', 'small');
   if (hp) say(P.x, P.y - (sh ? 58 : 44), '-' + hp, 'hurt', 'big');
-  if (P.hp <= 0) { P.hp = 0; finish(false); }
+  if (P.hp <= 0) { if (relicAdd('revive') && !P.revived) { P.revived = true; P.hp = 2; P.inv = 2; say(P.x, P.y - 60, '호박 속 곤충 · 다시 일어났다', 'heal', 'big'); burst(P.x, P.y - 16, '#ffd23f', 20); } // 한 판에 한 번
+    else { P.hp = 0; finish(false); } }
 }
 const angDiff = (a, b) => Math.abs(Math.atan2(Math.sin(a - b), Math.cos(a - b)));
 // 자동 조준: 보이는 적 중 가장 가까운 적을 노린다. 없으면 마우스 쪽
@@ -1046,7 +1049,7 @@ function drawSkillsOver(cx, cy) {
 }
 function updatePlayer() {
   P.inv = Math.max(0, P.inv - DT); P.cd -= DT; P.noEnT -= DT; P.skillCd = Math.max(0, P.skillCd - DT); P.dashCd -= DT; P.swing = Math.max(0, P.swing - DT);
-  const shDelay = has('fastsh') ? 1.8 : 3; // 빠른 방어막
+  const shDelay = (has('fastsh') ? 1.8 : 3) * relicMul('shDelay'); // 빠른 방어막, 꿀벌 밀랍
   P.shT += DT; if (P.shT > shDelay && P.sh < P.maxSh && !P.st.infect && !P.st.acid) { P.sh++; P.shT = shDelay - 1; } // 감염·화학 화상 중에는 방어막이 차지 않는다
   findTarget();
   const m = aimPoint(); if (Math.abs(m.x - P.x) > 2) P.face = m.x >= P.x ? 1 : -1;
@@ -1098,7 +1101,7 @@ function updatePlayer() {
     p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
   for (const p of pickups) if (p.kind === 'water' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; P.heatX = 0; // 물을 마신다
     if (P.st.heat) cure('heat', '물을 마셔 열사병이 풀렸다'); else say(P.x, P.y - 44, '물 · 더위가 가셨다', 'heal', 'small'); burst(p.x, p.y - 6, '#7fc8ff', 8); }
-  for (const p of pickups) if (p.kind === 'heal' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2); p.dead = true; say(P.x, P.y - 44, '체력 +' + (P.hp - before), 'heal'); burst(p.x, p.y - 6, '#ff6b6b', 8); }
+  for (const p of pickups) if (p.kind === 'heal' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2 + relicAdd('healUp')); p.dead = true; say(P.x, P.y - 44, '체력 +' + (P.hp - before), 'heal'); burst(p.x, p.y - 6, '#ff6b6b', 8); }
   pickups = pickups.filter(p => !p.dead);
 }
 
@@ -1116,8 +1119,8 @@ function spawnEnemy(kind, x, y, room) {
 }
 function damage(e, n) {
   if (e.invul) { if (!(e.blockT > 0)) { say(e.x, e.y - e.h - (e.alt || 0) - 4, '막힘', 'block', 'small'); e.blockT = 0.4; } return; }
-  n = Math.max(1, Math.round(n * skillDmg(e))); // 피해는 정수
-  const crit = rand() < critChance(); if (crit) n *= 2; // 치명타: 피해 2배
+  n = Math.max(1, Math.round(n * skillDmg(e) * (isBoss(e) ? relicMul('bossDmg') : 1) * (P.hp <= 2 ? relicMul('lowHpDmg') : 1) * (e.hp >= e.maxHp ? relicMul('firstHit') : 1))); // 피해는 정수, 유물 배율(보스·위기·첫 피해)
+  const crit = rand() < critChance(); if (crit) n = Math.round(n * (2 + relicAdd('critDmg'))); // 치명타: 피해 2배
   e.hp -= n; e.flash = 0.08; burst(e.x, e.y - e.h / 2, '#ffe9a8', 3);
   say(e.x, e.y - e.h - 2, crit ? '치명타 ' + n : String(n), crit ? 'crit' : 'dmg', crit ? 'big' : '');
   if (isBoss(e) && rand() < Math.min(0.5, n * 0.04)) { // 보스를 때리면 일정 확률로 에너지 구슬 (피해가 클수록 잘 나옴, 2026-10-26 교사 요청)
@@ -1126,7 +1129,10 @@ function damage(e, n) {
     e.dead = true; burst(e.x, e.y - e.h / 2, isBoss(e) ? '#c58a4a' : '#b8935f', isBoss(e) ? 40 : 10);
     if (!isBoss(e)) corpses.push({ x: e.x, y: e.y, t: 6 }); // 곰팡이 포자(분해자)가 찾아간다
     if (has('overflow')) P.en = Math.min(P.maxEn, P.en + 1); // 넘치는 에너지: 쓰러뜨리면 에너지 +1
-    if (!isBoss(e) && rand() < 0.25) pickups.push({ kind: matOf(e.kind), x: e.x + (rand() - 0.5) * 16, y: e.y }); // 재료: 생물형은 가죽, 기계형은 부품
+    if (relicAdd('killEn')) P.en = Math.min(P.maxEn, P.en + relicAdd('killEn')); // 전기 회로판
+    if (!isBoss(e) && rand() < relicAdd('killHeal')) pickups.push({ kind: 'heal', x: e.x, y: e.y }); // 토종 씨앗
+    if (!isBoss(e) && rand() < relicAdd('explodeKill')) explode(e.x, e.y - 6, 40, 5); // 테르밋 가루
+    if (!isBoss(e) && rand() < 0.25 + relicAdd('matDrop')) pickups.push({ kind: matOf(e.kind), x: e.x + (rand() - 0.5) * 16, y: e.y }); // 재료: 생물형은 가죽, 기계형은 부품
     if (isBoss(e)) for (let i = 0; i < 4; i++) pickups.push({ kind: matOf(e.kind), x: e.x - 30 + i * 20, y: e.y + 24 });
     if (e.kind === 'methane') methanePop(e); // 쓰러뜨려도 터진다
     if (EDEF[e.kind].split) { for (const s of [-1, 1]) { const c = spawnEnemy('fake2', e.x + s * 12, e.y, e.room); c.st = 'idle'; c.t = 0.4; } say(e.x, e.y - 30, '정보가 퍼졌다', 'conf', 'small'); }
@@ -1138,7 +1144,7 @@ function damage(e, n) {
   }
 }
 // r: 탄 반지름(보스 탄은 크다), hz: 탄이 멈춘 자리에 남는 웅덩이(산성·불꽃)
-function fire(x, y, a, sp, r, hz) { ebul.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: hz ? 1.6 : 6, r: r || 5, hz, boss: firingBoss }); }
+function fire(x, y, a, sp, r, hz) { sp *= relicMul('ebSpeed'); ebul.push({ x, y, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: hz ? 1.6 : 6, r: r || 5, hz, boss: firingBoss }); }
 let firingBoss = false; // 보스가 쏜 탄 표시(튕겨낼 수 없음)
 const BOSS_DMG = 2; // 보스 공격 피해 (2026-10-26 교사 요청: 상향)
 const isTell = e => e.st === 'tell' || e.st.endsWith('Tell');
@@ -1314,7 +1320,8 @@ const GEAR = {
 const gearCost = G => [G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ');
 function applyStatus(k) {
   if (ended) return;
-  if (P.guard[k] > 0) { if (!(P.blockMsg > 0)) { say(P.x, P.y - 46, STATUS[k].name + ' 막음', 'block', 'small'); P.blockMsg = 1.5; } return; }
+  if (P.guard[k] > 0 || (k === 'burn' && relicAdd('burnRes'))) { if (!(P.blockMsg > 0)) { say(P.x, P.y - 46, STATUS[k].name + ' 막음', 'block', 'small'); P.blockMsg = 1.5; } return; }
+  if (!(k === 'infect' ? P.st.infect : P.st[k] > 0) && rand() < relicAdd('statusRes')) { say(P.x, P.y - 46, STATUS[k].name + ' 막음', 'block', 'small'); return; } // 리트머스 종이: 새로 걸릴 때만 굴린다
   if (k === 'infect') { if (P.st.infect) return; const virus = rand() < 0.5; P.st.infect = { t: 0, type: virus ? '바이러스' : '세균', known: false, life: 1e9 }; say(P.x, P.y - 46, '감염', 'conf'); return; } // 바이러스·세균 모두 약을 먹기 전까지 낫지 않는다
   if (!(P.st[k] > 0)) { say(P.x, P.y - 46, STATUS[k].name, 'hurt', 'small'); if (k === 'frost') P.frostTick = 0; }
   if (k === 'acid' && P.sh > 0) { P.sh = 0; say(P.x, P.y - 60, '방어막 0', 'hurt', 'small'); } // 화학 화상: 닿는 순간 방어막이 0이 된다
@@ -1361,11 +1368,11 @@ function updateClimate() {
     P.heatX = Math.max(0, P.heatX - 4 * DT); P.wetT += DT;
     if (P.wetT >= 1.5 && P.st.heat) cure('heat', '물에 몸을 식혀 열사병이 풀렸다');
     if (P.wetT >= 1.5 && P.st.acid) cure('acid', '물로 씻어 제독했다');
-  } else { P.wetT = 0; P.heatX = c === 'hot' && !(P.guard.heat > 0) ? Math.min(EXPOSE, P.heatX + DT) : Math.max(0, P.heatX - 2 * DT); }
+  } else { P.wetT = 0; P.heatX = c === 'hot' && !(P.guard.heat > 0) ? Math.min(EXPOSE, P.heatX + DT * (1 - relicAdd('heatRes'))) : Math.max(0, P.heatX - 2 * DT); }
   if (warm) { // 열: 몸을 녹인다
     P.coldX = Math.max(0, P.coldX - 4 * DT); P.warmT += DT;
     if (P.warmT >= 1.5 && P.st.frost) cure('frost', (lava ? '용암 열기' : '무기의 열') + '로 몸을 녹여 동상이 풀렸다');
-  } else { P.warmT = 0; P.coldX = c === 'cold' && !(P.guard.frost > 0) ? Math.min(EXPOSE, P.coldX + DT) : Math.max(0, P.coldX - 2 * DT); }
+  } else { P.warmT = 0; P.coldX = c === 'cold' && !(P.guard.frost > 0) ? Math.min(EXPOSE, P.coldX + DT * (1 - relicAdd('frostRes'))) : Math.max(0, P.coldX - 2 * DT); }
   if (P.heatX >= EXPOSE && !P.st.heat) applyStatus('heat');
   if (P.coldX >= EXPOSE && !P.st.frost) applyStatus('frost');
 }
@@ -1455,26 +1462,69 @@ function toggleTree() {
 // ---------- 유물: 주우면 그 판 내내 효과가 이어진다 ----------
 // stat: 어떤 값을 바꾸는지, v: 바꾸는 양(곱하는 값은 비율). 화면에는 이름만 보인다
 const RELIC = {
-  fossilTri: { name: '삼엽충 화석', stat: 'shield', v: 1 },
-  strata: { name: '지층 표본', stat: 'hp', v: 1 },
-  fossilAmm: { name: '암모나이트 화석', stat: 'crit', v: 0.07 },
-  tusk: { name: '매머드 상아', stat: 'melee', v: 0.25 },
-  cog: { name: '녹슨 톱니', stat: 'ranged', v: 0.15 },
-  feather: { name: '포식자 깃털', stat: 'speed', v: 0.08 },
-  valve: { name: '냉매통 밸브', stat: 'dashcd', v: -0.2 },
-  solarBit: { name: '태양 전지판 조각', stat: 'enregen', v: 0.8 },
-  usb: { name: '낡은 USB', stat: 'encost', v: -0.15 },
-  ticket: { name: '오래된 승차권', stat: 'skillcd', v: -0.15 },
-  timetable: { name: '막차 시간표', stat: 'stationHeal', v: 1 },
-  magnet: { name: '자석', stat: 'magnet', v: 1 },
-  hammerHead: { name: '지질 망치 머리', stat: 'stun', v: 0.4 }, // 근접 기절 +0.4초
+  fossilTri: { name: '삼엽충 화석', stat: 'shield', v: 1, desc: '최대 방어막 +1' },
+  strata: { name: '지층 표본', stat: 'hp', v: 1, desc: '최대 체력 +1' },
+  fossilAmm: { name: '암모나이트 화석', stat: 'crit', v: 0.07, desc: '치명타 확률 +7%' },
+  tusk: { name: '매머드 상아', stat: 'melee', v: 0.25, desc: '근접 피해 +25%' },
+  cog: { name: '녹슨 톱니', stat: 'ranged', v: 0.15, desc: '원거리 피해 +15%' },
+  feather: { name: '포식자 깃털', stat: 'speed', v: 0.08, desc: '이동 속도 +8%' },
+  valve: { name: '냉매통 밸브', stat: 'dashcd', v: -0.2, desc: '구르기 대기 시간 -20%' },
+  solarBit: { name: '태양 전지판 조각', stat: 'enregen', v: 0.8, desc: '에너지가 1초에 0.8씩 찬다' },
+  usb: { name: '낡은 USB', stat: 'encost', v: -0.15, desc: '15% 확률로 에너지를 쓰지 않는다' },
+  ticket: { name: '오래된 승차권', stat: 'skillcd', v: -0.15, desc: '스킬 대기 시간 -15%' },
+  timetable: { name: '막차 시간표', stat: 'stationHeal', v: 1, desc: '새 역에 들어설 때마다 체력 +1' },
+  magnet: { name: '자석', stat: 'magnet', v: 1, desc: '아이템을 두 배 멀리서 끌어당긴다' },
+  hammerHead: { name: '지질 망치 머리', stat: 'stun', v: 0.4, desc: '근접 공격 기절 +0.4초' },
+  // 구역 1 지층 터널
+  fern: { name: '고사리 화석', stat: 'roomHeal', v: 0.25, desc: '전투방을 정리하면 25% 확률로 체력 +1' },
+  amber: { name: '호박 속 곤충', stat: 'revive', v: 1, desc: '한 판에 한 번, 쓰러져도 체력 2로 다시 일어난다' },
+  fossilFish: { name: '물고기 화석', stat: 'speed', v: 0.06, desc: '이동 속도 +6%' },
+  dinoTooth: { name: '공룡 이빨', stat: 'critDmg', v: 0.5, desc: '치명타 피해 2배 → 2.5배' },
+  indexFossil: { name: '표준 화석', stat: 'relicLuck', v: 0.06, desc: '전투방에서 유물이 더 자주 나온다' },
+  meteor: { name: '운석 조각', stat: 'bossDmg', v: 0.2, desc: '보스에게 주는 피해 +20%' },
+  // 구역 2 지하 텃밭 마을
+  acorn: { name: '도토리', stat: 'healUp', v: 1, desc: '체력 회복 아이템이 1 더 회복한다' },
+  wax: { name: '꿀벌 밀랍', stat: 'shDelay', v: -0.25, desc: '방어막이 25% 더 빨리 찬다' },
+  pellet: { name: '올빼미 펠릿', stat: 'magnet', v: 0.5, desc: '아이템을 더 멀리서 끌어당긴다' },
+  wormSoil: { name: '지렁이 분변토', stat: 'matDrop', v: 0.15, desc: '가죽·부품이 더 자주 나온다' },
+  seedBank: { name: '토종 씨앗', stat: 'killHeal', v: 0.04, desc: '적을 쓰러뜨리면 4% 확률로 체력 회복 아이템이 나온다' },
+  silk: { name: '거미줄', stat: 'ebSpeed', v: -0.12, desc: '적 탄이 12% 느려진다' },
+  // 구역 3 녹슨 침수 터널
+  litmus: { name: '리트머스 종이', stat: 'statusRes', v: 0.25, desc: '25% 확률로 상태 이상을 막는다' },
+  catalyst: { name: '촉매 그물', stat: 'skillcd', v: -0.12, desc: '스킬 대기 시간 -12%' },
+  zinc: { name: '아연 조각', stat: 'inv', v: 0.3, desc: '맞은 뒤 무적 시간 +0.3초' },
+  thermite: { name: '테르밋 가루', stat: 'explodeKill', v: 0.15, desc: '쓰러진 적이 15% 확률로 폭발한다' },
+  salt: { name: '소금 결정', stat: 'thorns', v: 3, desc: '맞으면 둘레의 적에게 피해 3' },
+  beaker: { name: '눈금 비커', stat: 'maxEn', v: 30, desc: '최대 에너지 +30' },
+  // 구역 4 지상 출구
+  battery: { name: '리튬 이온 전지', stat: 'enregen', v: 0.6, desc: '에너지가 1초에 0.6씩 찬다' },
+  chip: { name: '반도체 칩', stat: 'firstHit', v: 0.5, desc: '체력이 가득 찬 적에게 주는 첫 피해 +50%' },
+  firewall: { name: '보안 칩', stat: 'dodge', v: 0.1, desc: '10% 확률로 공격을 피한다' },
+  blade: { name: '풍력 날개 조각', stat: 'dashcd', v: -0.15, desc: '구르기 대기 시간 -15%' },
+  dataLog: { name: '빅데이터 기록', stat: 'weapLuck', v: 0.15, desc: '전투방에서 무기가 더 자주 나온다' },
+  circuit: { name: '전기 회로판', stat: 'killEn', v: 1, desc: '적을 쓰러뜨리면 에너지 +1' },
+  // 구역 5 폭염 열섬 환승역
+  parasol: { name: '양산', stat: 'heatRes', v: 0.4, desc: '더운 곳에서 더위가 40% 느리게 쌓인다' },
+  spine: { name: '선인장 가시', stat: 'thorns', v: 2, desc: '맞으면 둘레의 적에게 피해 2' },
+  whitePaint: { name: '흰색 지붕 페인트', stat: 'burnRes', v: 1, desc: '화상에 걸리지 않는다' },
+  thermo: { name: '온도계', stat: 'lowHpDmg', v: 0.4, desc: '체력이 2 이하일 때 주는 피해 +40%' },
+  // 구역 6 영구 동토층 터널
+  down: { name: '오리털 뭉치', stat: 'frostRes', v: 0.4, desc: '추운 곳에서 추위가 40% 느리게 쌓인다' },
+  iceCore: { name: '빙하 얼음 기둥', stat: 'crit', v: 0.05, desc: '치명타 확률 +5%' },
+  tundra: { name: '동토층 흙', stat: 'hp', v: 1, desc: '최대 체력 +1' },
+  sledRunner: { name: '썰매 날', stat: 'speed', v: 0.06, desc: '이동 속도 +6%' },
+  coalLump: { name: '석탄 덩어리', stat: 'dmg', v: 0.1, desc: '모든 피해 +10%' },
 };
-function takeRelic(k) {
-  if (P.relics.includes(k)) return; P.relics.push(k); const R = RELIC[k];
+// 주웠을 때와 대기실에서 들고 갈 때 바로 바뀌는 값
+function applyRelic(R) {
   if (R.stat === 'shield') { P.maxSh += R.v; P.sh += R.v; }
   if (R.stat === 'hp') { P.maxHp += R.v; P.hp += R.v; }
+  if (R.stat === 'maxEn') { P.maxEn += R.v; P.en += R.v; }
   if (R.stat === 'skillcd') P.skillMax = Math.round(P.skillMax * (1 + R.v) * 10) / 10;
-  say(P.x, P.y - 46, '유물 · ' + R.name, 'crit', 'big'); burst(P.x, P.y - 16, '#ffd23f', 14);
+}
+function takeRelic(k) {
+  if (P.relics.includes(k)) return; P.relics.push(k); const R = RELIC[k]; applyRelic(R);
+  say(P.x, P.y - 46, '유물 · ' + R.name, 'crit', 'big'); say(P.x, P.y - 32, R.desc, 'block', 'small'); burst(P.x, P.y - 16, '#ffd23f', 14);
 }
 // ---------- 창고: 판 밖에 남는 것(가죽·부품, 유물 보관함). 지금은 이 브라우저에 저장하고, 나중에 연구소 서버(재화)와 연결한다 ----------
 const SAVE_KEY = 'makcha.save.v1';
@@ -1515,7 +1565,7 @@ function openInfo() {
     </div>
     <div class="icol">
       <h3>능력</h3><div class="ilist">${list(TREES.flatMap(t => t.perks).filter(([id]) => has(id)).map(([, n]) => n), '없음')}</div>
-      <h3>유물</h3><div class="ilist">${list((P.relics || []).map(k => RELIC[k].name), '없음')}</div>
+      <h3>유물</h3><div class="ilist">${list((P.relics || []).map(k => RELIC[k].name + '(' + RELIC[k].desc + ')'), '없음')}</div>
     </div>`;
   document.getElementById('info').classList.remove('hide');
 }
@@ -1797,8 +1847,9 @@ function updateRooms() {
       if (r.wi < r.waves.length) spawnWave(r);
       else { r.state = 'clear'; setDoors(r, 6);
         if (has('regen') && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '재생 · 체력 +1', 'heal', 'small'); } // 재생 if (r.type === 'fight' && rand() < 0.5) pickups.push({ kind: 'heal', x: (r.x0 + r.w / 2) * T, y: (r.y0 + r.h / 2 + 1) * T });
-        if (r.type === 'fight' && rand() < 0.3) dropWeapon((r.x0 + r.w / 2) * T + 36, (r.y0 + r.h / 2 + 1) * T); // 전투방 보상: 가끔 무기
-        if (r.type === 'fight' && rand() < 0.08) dropRelic((r.x0 + r.w / 2) * T - 36, (r.y0 + r.h / 2 + 1) * T); } // 드물게 유물
+        if (r.type === 'fight' && P.hp < P.maxHp && rand() < relicAdd('roomHeal')) { P.hp++; say(P.x, P.y - 46, '고사리 화석 · 체력 +1', 'heal', 'small'); }
+        if (r.type === 'fight' && rand() < 0.3 + relicAdd('weapLuck')) dropWeapon((r.x0 + r.w / 2) * T + 36, (r.y0 + r.h / 2 + 1) * T); // 전투방 보상: 가끔 무기
+        if (r.type === 'fight' && rand() < 0.1 + relicAdd('relicLuck')) dropRelic((r.x0 + r.w / 2) * T - 36, (r.y0 + r.h / 2 + 1) * T); } // 드물게 유물
     }
   }
 }
@@ -2370,14 +2421,13 @@ document.getElementById('jobBtn').onclick = toLobby;
 // ---------- 대기실: 직업, 들고 갈 유물(3개까지), 미리 만들 장비(1개) ----------
 let loadout = { relics: [], gear: null };
 function applyLoadout() {
-  for (const k of loadout.relics) if (save.relics.includes(k)) { P.relics.push(k); const R = RELIC[k];
-    if (R.stat === 'shield') { P.maxSh += R.v; P.sh += R.v; } if (R.stat === 'hp') { P.maxHp += R.v; P.hp += R.v; } if (R.stat === 'skillcd') P.skillMax = Math.round(P.skillMax * (1 + R.v) * 10) / 10; }
+  for (const k of loadout.relics) if (save.relics.includes(k)) { P.relics.push(k); applyRelic(RELIC[k]); }
   if (loadout.gear) { P.gear = loadout.gear; loadout.gear = null; } // 장비는 그 판에서만
 }
 function renderLobby() {
   const rb = document.getElementById('lobbyRelics'); rb.innerHTML = '';
   if (!save.relics.length) rb.innerHTML = '<i>아직 없다 · 연구소 재화로 얻는다(연결 예정)</i>';
-  for (const k of save.relics) { const b = document.createElement('button'); b.className = 'lob' + (loadout.relics.includes(k) ? ' on' : ''); b.textContent = RELIC[k].name;
+  for (const k of save.relics) { const b = document.createElement('button'); b.className = 'lob' + (loadout.relics.includes(k) ? ' on' : ''); b.textContent = RELIC[k].name; b.title = RELIC[k].desc;
     b.onclick = () => { const i = loadout.relics.indexOf(k); if (i >= 0) loadout.relics.splice(i, 1); else if (loadout.relics.length < 3) loadout.relics.push(k); renderLobby(); }; rb.appendChild(b); }
   document.getElementById('lobbyRelicN').textContent = `${loadout.relics.length} / 3`;
   document.getElementById('lobbyMat').textContent = `창고 가죽 ${save.mat.cloth} · 부품 ${save.mat.part}`;
