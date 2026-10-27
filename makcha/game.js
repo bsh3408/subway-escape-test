@@ -603,13 +603,15 @@ function findTarget() {
   target = best;
 }
 const aimPoint = () => target ? { x: target.x, y: target.y - target.h / 2 } : mWorld();
+// 에너지가 모자라면 든 무기를 그냥 휘두른다(2026-10-27 교사 요청). 약하지만 탄 1개는 막거나 튕긴다
+const BASH = { type: 'melee', cd: 0.4, dmg: 2, range: 30, arc: 1.0, kb: 0.7, deflect: 0.8, deflN: 1 };
 function attack() {
-  const wk = P.weapons[P.wi], W0 = WEAP[wk], c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x);
-  if (W0.type === 'charge') return; // 충전 무기는 누르고 있다가 뗄 때 쏜다(updatePlayer)
-  const cost = enCost(W0.en);
-  if (P.en < cost) { P.cd = 0.3; if (!(P.noEnT > 0)) { say(P.x, P.y - 46, '에너지 부족', 'energy', 'small'); P.noEnT = 1; } return; }
-  P.en -= cost;
-  P.cd = W0.cd;
+  const wk = P.weapons[P.wi], c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x);
+  let W0 = WEAP[wk]; const cost = enCost(W0.en);
+  if (P.en < cost) { W0 = BASH; if (!(P.noEnT > 0)) { say(P.x, P.y - 46, '에너지 부족 · 휘두르기', 'energy', 'small'); P.noEnT = 2; } }
+  else if (W0.type === 'charge') return; // 충전 무기는 누르고 있다가 뗄 때 쏜다(updatePlayer)
+  else P.en -= cost;
+  P.cd = W0.cd; P.swingW = W0 === BASH ? BASH : null;
   const dm = starMul(wk) * (P.st.corrode ? 0.7 : 1) * dmgMul(W0.type === 'melee'); // 부식: 무기 피해 30% 감소
   if (W0.type === 'melee') {
     P.swing = 0.16; P.swingA = a;
@@ -682,7 +684,7 @@ function fireBeam(x, y, a, dmg) {
 // 유도 코일 충전기: 누르고 있으면 충전, 떼면 충전한 만큼 강한 탄
 function updateCharge() {
   const wk = P.weapons[P.wi]; if (WEAP[wk].type !== 'charge' || ended) { P.chg = 0; return; }
-  if (mouse.down) { if (!P.chg && P.en < enCost(WEAP[wk].en)) { if (!(P.noEnT > 0)) { say(P.x, P.y - 46, '에너지 부족', 'energy', 'small'); P.noEnT = 1; } return; }
+  if (mouse.down) { if (!P.chg && P.en < enCost(WEAP[wk].en)) return; // 에너지가 없으면 attack()에서 휘두른다
     P.chg = Math.min(1, (P.chg || 0) + DT / 1.1); }
   else if (P.chg > 0) {
     if (P.chg > 0.15) { P.en -= enCost(WEAP[wk].en); const c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x), pose = weaponPose(a), pv = weaponPivot(a);
@@ -1806,7 +1808,7 @@ function render() {
     ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, col); }
   drawSkillsOver(cx, cy);
   // 망치 휘두름
-  if (P.swing > 0) { const c = pCenter(), k = P.swing / 0.16, W0 = WEAP[P.weapons[P.wi]], R = W0.range || 38, ad = Math.round((W0.arc || 1.2) * 180 / Math.PI * 0.85);
+  if (P.swing > 0) { const c = pCenter(), k = P.swing / 0.16, W0 = P.swingW || WEAP[P.weapons[P.wi]], R = W0.range || 38, ad = Math.round((W0.arc || 1.2) * 180 / Math.PI * 0.85);
     ctx.fillStyle = `rgba(255,247,194,${0.4 + 0.6 * k})`;
     for (let d = -ad; d <= ad; d += 4) for (const r of [R * 0.75, R * 0.95, R * 1.15]) { const a = P.swingA + d * Math.PI / 180; ctx.fillRect(Math.round(c.x + Math.cos(a) * r), Math.round(c.y + Math.sin(a) * r), 2, 2); } }
   if (P.chg > 0) { const c = pCenter(), w = 24; px(ctx, Math.round(c.x - w / 2), Math.round(P.y + 4), w, 4, '#0c0c0c'); px(ctx, Math.round(c.x - w / 2) + 1, Math.round(P.y + 5), Math.round((w - 2) * P.chg), 2, P.chg >= 1 ? '#ffd23f' : '#c8783a'); }
@@ -1835,8 +1837,8 @@ function drawPlayer() {
   // 무기는 조준 방향 쪽 몸 둘레에 붙고, 그 방향에 가장 가까운 방향별 그림을 쓴다. 위를 겨누면 몸 뒤에 그린다
   const wk = P.weapons[P.wi], c = pCenter(), m = aimPoint();
   let a = Math.atan2(m.y - c.y, m.x - c.x);
-  if (WEAP[wk].type === 'melee' && P.swing > 0) { // 휘두르기: 무기마다 휘두르는 폭이 다르다(쇠봉은 짧게 찌른다)
-    const k = 1 - P.swing / 0.16, side = Math.cos(P.swingA) >= 0 ? 1 : -1, s = Math.min(1.2, WEAP[wk].arc); a = P.swingA + side * (-s + 2 * s * k); }
+  if ((WEAP[wk].type === 'melee' || P.swingW) && P.swing > 0) { // 휘두르기: 무기마다 휘두르는 폭이 다르다(쇠봉은 짧게 찌른다)
+    const k = 1 - P.swing / 0.16, side = Math.cos(P.swingA) >= 0 ? 1 : -1, s = Math.min(1.2, (P.swingW || WEAP[wk]).arc); a = P.swingA + side * (-s + 2 * s * k); }
   const pose = weaponPose(a), pv = weaponPivot(a), fr = SPR.wf[wk][pose.k];
   const drawW = () => drawSpr(fr, pose.flip ? pv.x - (40 - WC) : pv.x - WC, pv.y - WC, pose.flip, false);
   const behind = Math.sin(a) < -0.35;
