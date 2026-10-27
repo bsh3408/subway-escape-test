@@ -318,7 +318,7 @@ function wavesFor(zone, st) {
 // ---------- 지도: 역 하나 = 방 3~4개를 격자에 무작위로 잇는다 ----------
 // 타일: 0 빈곳 1 바닥 2 벽 3 닫힌 문 4 가로 선로 5 세로 선로 6 열린 문 7 돌기둥 8 출구(다음 역)
 const CW = 44, CH = 32, GW = 4, GH = 3, MW = CW * GW, MH = CH * GH;
-const SOLID = new Set([0, 2, 3, 7, 10]); // 10: 부서지는 지형지물(props)
+const SOLID = new Set([0, 2, 3, 7, 10, 11]); // 10: 부서지는 지형지물(props), 11: 부서지지 않는 장애물
 let map, rooms, links;
 const ROOMSIZE = { start: [20, 16], fight: [30, 20], supply: [18, 14], exit: [20, 16], boss: [38, 26] };
 const tile = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? 0 : map[y * MW + x];
@@ -393,6 +393,7 @@ function buildMap() {
   }
   for (const r of rooms) if (r.type === 'exit') { const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1); for (let y = cy - 1; y <= cy; y++) for (let x = cx - 1; x <= cx; x++) setT(x, y, 8); }
   for (const r of rooms) if (r.type === 'start' || r.type === 'supply') { setT(r.x0 + 3, r.y0 + 3, 9); setT(r.x0 + 4, r.y0 + 3, 9); } // 조합대
+  for (const r of rooms) placeBlocks(r); // 부서지지 않는 장애물 덩어리
   props = []; for (const r of rooms) placeProps(r);
 }
 function roomAt(wx, wy, margin) {
@@ -1080,7 +1081,7 @@ function craft(k) {
 }
 // ---------- 스킬 트리: 역마다 능력 하나를 고른다. 앞 단계가 있어야 다음 단계가 열린다 (컨셉_확정 5절) ----------
 const TREES = [
-  { id: 'shot', name: '탄', perks: [['range', '장거리탄'], ['bounce', '튕김탄'], ['chain', '연쇄 튕김']] },
+  { id: 'shot', name: '탄', perks: [['range', '장거리탄'], ['power', '강화탄'], ['bounce', '튕김탄'], ['chain', '연쇄 튕김']] },
   { id: 'melee', name: '근접', perks: [['wide', '넓은 휘두르기'], ['stunhit', '기절 타격'], ['counter', '되받아치기'], ['shock', '충격파']] }, // 기절 타격: 근접 기절 +0.5초
   { id: 'life', name: '생존', perks: [['tough', '튼튼한 몸'], ['fastsh', '빠른 방어막'], ['regen', '재생']] },
   { id: 'move', name: '기동', perks: [['swift', '날렵함'], ['quickroll', '짧은 구르기'], ['rollhit', '구르기 돌진']] },
@@ -1165,7 +1166,7 @@ function relicAdd(stat) { let s = 0; for (const k of P.relics || []) if (RELIC[k
 function critChance() { return CRIT + relicAdd('crit'); }
 // 근접 기절 시간: 무기 특수효과 + 능력(기절 타격) + 유물(지질 망치 머리)
 function meleeStun(W0) { return (W0.stun || 0) + (has('stunhit') ? 0.5 : 0) + relicAdd('stun'); }
-function dmgMul(melee) { return relicMul('dmg') * relicMul(melee ? 'melee' : 'ranged'); }
+function dmgMul(melee) { return relicMul('dmg') * relicMul(melee ? 'melee' : 'ranged') * (!melee && has('power') ? 1.25 : 1); } // 강화탄: 원거리 +25%
 // 내 상태 창(E): 직업·스킬, 능력치, 무기, 장비, 상태 이상, 능력, 유물을 한눈에 본다. 여는 동안 멈춘다
 let infoOpen = false;
 function openInfo() {
@@ -1560,7 +1561,7 @@ function drawTiles(cx, cy) {
       else { px(ctx, X, Y + 6, T, 4, '#4a3a2a'); if (mid) { px(ctx, X + 3, Y, 2, T, '#8d96a3'); px(ctx, X + 11, Y, 2, T, '#8d96a3'); } }
     } else if (v === 3) {
       px(ctx, X, Y, T, T, '#2a1414'); for (let i = 1; i < T; i += 5) px(ctx, X + i, Y, 2, T, '#c94a3a'); px(ctx, X, Y + 7, T, 2, '#8a2e24');
-    } else if (v === 7 || v === 10) { const TH = THEME[stage.zone]; px(ctx, X, Y, T, T, (tx + ty) % 2 ? TH.floor[0] : TH.floor[1]); }
+    } else if (v === 7 || v === 10 || v === 11) { const TH = THEME[stage.zone]; px(ctx, X, Y, T, T, (tx + ty) % 2 ? TH.floor[0] : TH.floor[1]); }
     else if (v === 9) { // 조합대(작업대)
       px(ctx, X, Y, T, T, THEME[stage.zone].floor[0]); px(ctx, X, Y + 3, T, 10, '#1a1512'); px(ctx, X + 1, Y + 4, T - 2, 3, '#a07a4a'); px(ctx, X + 1, Y + 7, T - 2, 5, '#6a4a2a');
       if (tile(tx - 1, ty) !== 9) { px(ctx, X + 3, Y + 1, 4, 3, '#e8e0c8'); px(ctx, X + 9, Y + 2, 3, 2, '#8d96a3'); } }
@@ -1571,6 +1572,48 @@ function drawTiles(cx, cy) {
         px(ctx, X + 14, Y + 6 - b, 4, 14, '#f0b429'); px(ctx, X + 10, Y + 10 - b, 12, 2, '#f0b429'); px(ctx, X + 12, Y + 8 - b, 8, 2, '#f0b429'); } }
   }
 }
+// ---------- 부서지지 않는 장애물 덩어리 (2026-10-27 교사 요청: 이동을 막는 장애물이 많으면 좋겠다) ----------
+// 일자·ㄱ자·덩어리·십자 모양을 놓는다. 가운데 십자 줄(통로)은 비우고, 놓을 때마다 방 안 모든 바닥에 걸어갈 수 있는지 확인한다
+const SHAPES = [
+  [[0, 0], [1, 0], [2, 0]], [[0, 0], [0, 1], [0, 2]], [[0, 0], [1, 0], [2, 0], [3, 0]], [[0, 0], [0, 1], [0, 2], [0, 3]],
+  [[0, 0], [1, 0], [0, 1]], [[0, 0], [1, 0], [1, 1]], [[0, 0], [0, 1], [1, 1]], [[1, 0], [0, 1], [1, 1]],
+  [[0, 0], [1, 0], [0, 1], [1, 1]], [[1, 0], [0, 1], [1, 1], [2, 1], [1, 2]], [[0, 0], [1, 0], [2, 0], [0, 1]], [[0, 0], [0, 1], [0, 2], [1, 2]],
+];
+function roomConnected(r) { // 방 안 바닥이 모두 이어져 있는지(가운데에서 칠하기)
+  const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1), seen = new Set([cx + ',' + cy]), q = [[cx, cy]];
+  while (q.length) { const [x, y] = q.pop(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const nx = x + dx, ny = y + dy, k = nx + ',' + ny;
+    if (seen.has(k) || nx <= r.x0 || nx >= r.x0 + r.w - 1 || ny < r.y0 + 2 || ny >= r.y0 + r.h - 1 || SOLID.has(tile(nx, ny))) continue; seen.add(k); q.push([nx, ny]); } }
+  for (let y = r.y0 + 2; y < r.y0 + r.h - 1; y++) for (let x = r.x0 + 1; x < r.x0 + r.w - 1; x++) if (!SOLID.has(tile(x, y)) && !seen.has(x + ',' + y)) return false;
+  return true;
+}
+function placeBlocks(r) {
+  const n = r.type === 'fight' ? 6 + Math.floor(rand() * 4) : r.type === 'boss' ? 3 + Math.floor(rand() * 2) : r.type === 'start' ? 1 : 2;
+  const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
+  for (let i = 0, tries = 0; i < n && tries < 150; tries++) {
+    const S = SHAPES[Math.floor(rand() * SHAPES.length)], ox = r.x0 + 3 + Math.floor(rand() * (r.w - 7)), oy = r.y0 + 4 + Math.floor(rand() * (r.h - 8));
+    const cells = S.map(([x, y]) => [ox + x, oy + y]);
+    // 가운데 십자 줄과 벽 바로 옆은 비우고, 다른 장애물과는 한 칸 띄운다
+    if (cells.some(([x, y]) => Math.abs(x - cx) <= 2 || Math.abs(y - cy) <= 2 || x <= r.x0 + 1 || x >= r.x0 + r.w - 2 || y <= r.y0 + 2 || y >= r.y0 + r.h - 2)) continue;
+    if (cells.some(([x, y]) => { for (let yy = y - 1; yy <= y + 1; yy++) for (let xx = x - 1; xx <= x + 1; xx++) if (tile(xx, yy) !== 1 && tile(xx, yy) !== 6 && !cells.some(([a, b]) => a === xx && b === yy)) return true; return false; })) continue;
+    for (const [x, y] of cells) setT(x, y, 11);
+    if (!roomConnected(r)) { for (const [x, y] of cells) setT(x, y, 1); continue; }
+    i++;
+  }
+}
+// 구역마다 다른 장애물 모양(키 24도트: 바닥 1칸 + 위로 8도트)
+function drawBlock(tx, ty) {
+  const X = tx * T, Y = ty * T, O = '#1a1512', z = stage.zone, up = tile(tx, ty - 1) === 11, dn = tile(tx, ty + 1) === 11, lf = tile(tx - 1, ty) === 11, rt = tile(tx + 1, ty) === 11, h = hash(tx, ty);
+  const top = up ? Y : Y - 8, H = Y + T - top;
+  const C = [['#5a4636', '#8a6a48', '#3a2c22', '#a8845a'], ['#7a5a36', '#9a7a4a', '#5a3e22', '#5f8a3a'], ['#6a5048', '#8a6a5a', '#4a3028', '#9a4a26'], ['#9aa0a6', '#c3c8cc', '#6a7076', '#f0b429']][z];
+  px(ctx, X, top, T, H, O); px(ctx, X + (lf ? 0 : 1), top + 1, T - (lf ? 0 : 1) - (rt ? 0 : 1), H - 2, C[0]);
+  if (!up) px(ctx, X + (lf ? 0 : 1), top + 1, T - (lf ? 0 : 1) - (rt ? 0 : 1), 7, C[1]); // 윗면
+  if (!dn) px(ctx, X + 1, Y + T - 3, T - 2, 2, C[2]);
+  if (z === 0) { px(ctx, X + 2 + (h % 7), Y + 4, 5, 1, C[2]); px(ctx, X + 3, Y + 9 + (h % 3), 7, 1, C[3]); } // 바위: 지층 줄
+  else if (z === 1) { if (!up) { px(ctx, X + 2, top + 2, T - 4, 4, '#4a3426'); if (h % 2) { px(ctx, X + 5, top - 2, 2, 4, C[3]); px(ctx, X + 10, top - 3, 2, 5, C[3]); } } px(ctx, X, Y + 6, T, 1, C[2]); } // 나무 화단
+  else if (z === 2) { px(ctx, X + 3, Y + 3, 2, 2, '#c8c8d0'); px(ctx, X + 11, Y + 3, 2, 2, '#c8c8d0'); px(ctx, X + 3, Y + 11, 2, 2, '#c8c8d0'); if (h % 3 === 0) px(ctx, X + 6, Y + 6, 4, 4, C[3]); } // 녹슨 기계 블록
+  else { if (!up) for (let i = 0; i < 4; i++) px(ctx, X + 1 + i * 4, top + 2, 2, 4, i % 2 ? '#1a1512' : C[3]); px(ctx, X + 4, Y + 8, 8, 1, C[2]); } // 콘크리트 방호벽: 노랑·검정 띠
+}
+
 // ---------- 지형지물: 구역마다 특색 있는, 부서지는 물건 (2026-10-26 교사 요청) ----------
 // 바닥 1칸을 막고(이동·탄 모두 막는 엄폐물), 부수면 에너지·체력·재료가 나온다
 const PROP = {
@@ -1588,6 +1631,7 @@ function placeProps(r) {
     if (Math.abs(tx - cx) <= 2 || Math.abs(ty - cy) <= 2 || tile(tx, ty) !== 1) continue; // 통로 줄과 가운데는 비운다
     if (r.type === 'start' && tx <= r.x0 + 6 && ty <= r.y0 + 4) continue; // 조합대 앞은 비운다
     const k = kinds[Math.floor(rand() * kinds.length)]; setT(tx, ty, 10);
+    if (r.doors && !roomConnected(r)) { setT(tx, ty, 1); continue; } // 길을 막으면 놓지 않는다
     props.push({ kind: k, tx, ty, x: tx * T + 8, y: (ty + 1) * T, w: 16, h: 16, hp: PROP[k].hp, flash: 0, isProp: true }); i++;
   }
 }
@@ -1706,7 +1750,7 @@ function render() {
   // 깊이 정렬
   const list = [];
   const tx0 = Math.floor(cx / T) - 1, ty0 = Math.floor(cy / T) - 1;
-  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) if (tile(tx, ty) === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) });
+  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
   for (const p of props) if (!p.dead && p.tx >= tx0 - 1 && p.tx < tx0 + 54 && p.ty >= ty0 - 1 && p.ty < ty0 + 33) list.push({ y: p.y, f: () => drawProp(p) });
   for (const e of enemies) list.push({ y: e.y, f: () => {
     const s = sprFor(e), alt = Math.round(e.alt || 0);

@@ -14,6 +14,7 @@
     for (let y = y0 + 2; y < y0 + h - 1; y++) for (let x = x0 + 1; x < x0 + w - 1; x++) setT(x, y, 1);
     for (const [x, y] of [[9, 7], [w - 10, 7], [9, h - 5], [w - 10, h - 5]]) setT(x0 + x, y0 + y, 7);
     setT(x0 + 3, y0 + 3, 9); setT(x0 + 4, y0 + 3, 9); // 조합대
+    placeBlocks({ ...rooms[0], type: 'fight' }); // 부서지지 않는 장애물
     props = []; placeProps({ ...rooms[0], type: 'fight' }); placeProps({ ...rooms[0], type: 'fight' }); // 지형지물(구역마다 다름)
   };
   zoneClear = function () { if (arena) { say(P.x, P.y - 50, '보스 처치', 'crit', 'big'); return; } origZoneClear(); };
