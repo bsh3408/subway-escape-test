@@ -176,7 +176,31 @@ const DRAW = {
     ell(g, 50, 30, 30, 20, '#5fb8ff'); ell(g, 50, 30, 12, 12, '#0e1a26'); px(g, 48, 28, 4, 4, '#e6f6ff'); for (let i = 0; i < 6; i++) px(g, 12 + i * 14, 50, 8, 3, i % 2 === (f ? 1 : 0) ? '#7ee07e' : '#2a4a2a');
     px(g, 40, 64, 20, 10, O_); px(g, 42, 64, 16, 8, '#3a4a5a'); },
 };
-const SIZE = { rat: [22, 16], leaf: [24, 18], spore: [26, 26], rust: [26, 24], acid: [22, 22], ember: [24, 22], fog: [32, 24], drone: [26, 20], bias: [26, 26], owl: [96, 80], furnace: [88, 92], ai: [100, 74] };
+// 새 보스 8종 임시 도형 (차분한 표정, 그림은 설계가 끝난 뒤)
+Object.assign(DRAW, {
+  trilo(g, f) { ell(g, 48, 32, 94, 56, O_); ell(g, 48, 32, 90, 52, '#8a6a44'); ell(g, 48, 32, 30, 50, '#a8845a'); for (let i = 10; i < 86; i += 8) px(g, i, 8 + (f && i % 16 ? 1 : 0), 2, 48, '#6a5034');
+    ell(g, 80, 32, 30, 44, O_); ell(g, 80, 32, 26, 40, '#b89468'); px(g, 82, 22, 5, 4, O_); px(g, 82, 38, 5, 4, O_); px(g, 84, 23, 2, 1, '#f3ead7'); px(g, 84, 39, 2, 1, '#f3ead7'); },
+  finch(g, f) { const bird = (x, y, bk) => { ell(g, x, y, 26, 22, O_); ell(g, x, y, 24, 20, '#9a7a54'); ell(g, x - 2, y + 3, 16, 12, '#d8c09a'); px(g, x + 4, y - 4, 3, 3, O_);
+      px(g, x + 11, y - 2, bk, bk > 5 ? 5 : 3, O_); px(g, x + 12, y - 1, bk - 2, bk > 5 ? 3 : 1, '#e3b02a'); px(g, x - 10, y - 4 + (f ? 2 : 0), 8, 5, '#6a5034'); };
+    bird(22, 34, 7); bird(48, 18, 4); bird(70, 38, 5); },
+  frog(g, f) { ell(g, 44, 52, 86, 24, O_); ell(g, 44, 52, 84, 22, '#3f8a4a'); ell(g, 44, 36, 70, 50, O_); ell(g, 44, 36, 66, 46, '#6ab84a'); ell(g, 44, 44, 44, 26, '#c8e09a');
+    for (const x of [26, 62]) { ell(g, x, 14 + (f ? 1 : 0), 18, 18, O_); ell(g, x, 14 + (f ? 1 : 0), 16, 16, '#f3ead7'); px(g, x - 2, 12 + (f ? 1 : 0), 5, 5, O_); }
+    px(g, 34, 40, 20, 2, '#2a5a2a'); },
+  vine(g, f) { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2, x = 46 + Math.cos(a) * 34, y = 56 + Math.sin(a) * 26; stroke(g, 46, 56, Math.cos(a), Math.sin(a) * 0.75, 36, 6, O_); stroke(g, 46, 56, Math.cos(a), Math.sin(a) * 0.75, 36, 4, '#4f7a2a');
+      ell(g, Math.round(x), Math.round(y), 12, 9, O_); ell(g, Math.round(x), Math.round(y), 10, 7, '#7ab84a'); px(g, Math.round(x + 4), Math.round(y - 5), 2, 3, '#c8d0a8'); }
+    ell(g, 46, 40, 26, 30, O_); ell(g, 46, 40, 22, 26, '#5f8a3a'); ell(g, 46, 30, 18, 16, O_); ell(g, 46, 30, 14, 12, f ? '#f0a0c8' : '#e080b0'); px(g, 44, 28, 4, 3, '#fff6a0'); },
+  neutral(g, f) { for (const [x, c] of [[24, '#e8d040'], [72, '#3f7fd0']]) { px(g, x - 20, 10, 40, 60, O_); px(g, x - 18, 12, 36, 56, '#c8d0d8'); px(g, x - 16, 30 + (f ? 2 : 0), 32, 36, c); px(g, x - 14, 32 + (f ? 2 : 0), 4, 2, '#ffffff'); }
+    px(g, 40, 30, 16, 24, O_); px(g, 42, 32, 12, 20, '#5a6470'); px(g, 44, 40, 8, 4, '#4fbf5a'); px(g, 10, 72, 76, 10, O_); px(g, 12, 74, 72, 6, '#3a3f46'); px(g, 18, 16, 6, 4, '#7ee07e'); px(g, 66, 16, 6, 4, '#7ee07e'); },
+  cooler(g, f) { px(g, 10, 14, 68, 62, O_); px(g, 12, 16, 64, 58, '#7a8a9a'); px(g, 12, 16, 64, 6, f ? '#3f7fd0' : '#e08a2e'); for (let y = 30; y < 70; y += 6) px(g, 20, y, 48, 2, '#5a6a7a');
+    for (const x of [0, 76]) { px(g, x, 30, 12, 40, O_); px(g, x + 1, 31, 10, 38, '#7fb2d9'); px(g, x + 1, 40, 10, 2, '#e6f6ff'); } px(g, 30, 24, 8, 4, '#7ee07e'); px(g, 50, 24, 8, 4, '#7ee07e'); px(g, 14, 76, 60, 8, O_); },
+  turbine(g, f) { ell(g, 46, 44, 84, 84, O_); ell(g, 46, 44, 80, 80, '#6a7480'); ell(g, 46, 44, 60, 60, '#3a4048');
+    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + (f ? 0.2 : 0); stroke(g, 46, 44, Math.cos(a), Math.sin(a), 26, 5, '#c3cad3'); }
+    ell(g, 46, 44, 14, 14, O_); ell(g, 46, 44, 10, 10, '#f0b429'); px(g, 30, 84, 32, 8, O_); px(g, 32, 86, 28, 4, '#c8783a'); px(g, 20, 20, 6, 4, '#7ee07e'); px(g, 66, 20, 6, 4, '#7ee07e'); },
+  solar(g, f) { px(g, 46, 40, 8, 50, O_); px(g, 48, 42, 4, 46, '#8d96a3'); for (const [x, y] of [[4, 6], [52, 6], [4, 30], [52, 30]]) { px(g, x, y + (f ? 1 : 0), 44, 22, O_); px(g, x + 2, y + 2 + (f ? 1 : 0), 40, 18, '#1e3a6a');
+      for (let i = 1; i < 4; i++) px(g, x + 2 + i * 10, y + 2 + (f ? 1 : 0), 1, 18, '#5fb8ff'); px(g, x + 2, y + 11 + (f ? 1 : 0), 40, 1, '#5fb8ff'); }
+    px(g, 44, 54, 12, 6, O_); px(g, 45, 55, 4, 4, '#7ee07e'); px(g, 51, 55, 4, 4, '#7ee07e'); px(g, 30, 86, 40, 4, O_); },
+});
+const SIZE = { trilo: [96, 60], finch: [90, 56], frog: [88, 66], vine: [92, 88], neutral: [96, 84], cooler: [88, 84], turbine: [92, 92], solar: [100, 90], rat: [22, 16], leaf: [24, 18], spore: [26, 26], rust: [26, 24], acid: [22, 22], ember: [24, 22], fog: [32, 24], drone: [26, 20], bias: [26, 26], owl: [96, 80], furnace: [88, 92], ai: [100, 74] };
 function sprFor(e) {
   if (e.kind === 'tri') return SPR.tri[e.ph % 2];
   if (e.kind === 'amm') return SPR.amm[0];
@@ -274,8 +298,10 @@ const ZONES = [
   { name: '녹슨 침수 터널', stations: ['산화·환원', '연소·제련', '산·염기와 중화', '에너지 출입'], pool: ['rust', 'acid', 'ember'], boss: 'furnace' },
   { name: '지상 출구', stations: ['온난화', '태양 에너지·발전', '효율·신재생', '빅데이터·AI·윤리'], pool: ['fog', 'drone', 'bias'], boss: 'ai' },
 ];
-let OPEN_ZONES = 4; // 교사가 연 구역 수 (나중에 관리 페이지와 연결). 시험판은 4개 모두 연다
-let stage = { zone: 0, st: 0 };
+let OPEN = [0, 1, 2, 3]; // 교사가 연 구역(단원). 나중에 관리 페이지와 연결. 시험판은 4개 모두 연다
+const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(rand() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+// 판마다 열린 구역의 순서를 섞는다(2026-10-27 교사 요청). zi: 몇 번째 구역인지 → 난이도는 구역 번호가 아니라 들어간 순서로 정한다
+let stage = { order: [0], zi: 0, zone: 0, st: 0 };
 // 역의 전투방 웨이브: 뒤 역일수록 적이 많고 세다
 function wavesFor(zone, st) {
   const Z = ZONES[zone], n = 4 + st, waves = [];
@@ -323,7 +349,7 @@ function buildMap() {
   links = L;
   rooms = defs.map(d => { const [w, h] = ROOMSIZE[d.type];
     return { ...d, w, h, x0: d.gx * CW + ((CW - w) >> 1), y0: d.gy * CH + ((CH - h) >> 1), doors: [], state: 'idle', wi: 0, seen: false,
-      waves: d.type === 'fight' ? wavesFor(stage.zone, stage.st) : d.type === 'boss' ? [[ZONES[stage.zone].boss]] : null }; });
+      waves: d.type === 'fight' ? wavesFor(stage.zone, stage.st) : d.type === 'boss' ? [[pickBoss()]] : null }; });
   for (const r of rooms) {
     for (let y = r.y0; y < r.y0 + r.h; y++) for (let x = r.x0; x < r.x0 + r.w; x++) setT(x, y, 2);
     for (let y = r.y0 + 2; y < r.y0 + r.h - 1; y++) for (let x = r.x0 + 1; x < r.x0 + r.w - 1; x++) setT(x, y, 1);
@@ -424,7 +450,7 @@ const MAX_WEAPONS = 2;
 const starMul = k => 1 + 0.25 * ((P.stars[k] || 1) - 1); // 별 하나마다 피해 +25%
 // 무기 고르기: 뒤 구역일수록 높은 등급이 잘 나온다. minR이 있으면 그 등급 이상만(보스)
 function randomWeapon(minR) {
-  const order = ['w', 'g', 'b', 'p', 'o'], z = stage.zone, wts = { w: 40 - z * 8, g: 30, b: 18 + z * 3, p: 9 + z * 3, o: 3 + z * 2 };
+  const order = ['w', 'g', 'b', 'p', 'o'], z = stage.zi, wts = { w: 40 - z * 8, g: 30, b: 18 + z * 3, p: 9 + z * 3, o: 3 + z * 2 };
   const keys = Object.keys(WEAP).filter(k => !minR || order.indexOf(WEAP[k].r) >= order.indexOf(minR));
   let sum = 0; for (const k of keys) sum += wts[WEAP[k].r]; let x = rand() * sum;
   for (const k of keys) { x -= wts[WEAP[k].r]; if (x <= 0) return k; } return keys[keys.length - 1];
@@ -450,8 +476,20 @@ const EDEF = {
   drone: { hp: 9, bw: 22, bh: 9, w: 26, h: 20, ai: 'shoot', fan: 3, burst: true, bsp: 150, br: 5, cd: 1.6, near: 5, far: 10, speed: 1.8 },
   bias: { hp: 12, bw: 22, bh: 10, w: 26, h: 26, ai: 'shoot', fan: 5, spread: 0.16, side: true, bsp: 105, br: 6, cd: 2.2 },
   ai: { hp: 540, bw: 90, bh: 20, w: 100, h: 74, boss: true, name: '관제 AI' },
+  // 새 보스 8종 (통박사 초안 2026-10-27)
+  trilo: { hp: 440, bw: 80, bh: 22, w: 96, h: 60, boss: true, name: '고생대 삼엽충' },
+  finch: { hp: 420, bw: 70, bh: 20, w: 90, h: 56, boss: true, name: '섬 핀치 무리' },
+  frog: { hp: 460, bw: 70, bh: 22, w: 88, h: 66, boss: true, name: '연못 개구리' },
+  vine: { hp: 500, bw: 70, bh: 24, w: 92, h: 88, boss: true, name: '가시덩굴 군락' },
+  neutral: { hp: 500, bw: 80, bh: 22, w: 96, h: 84, boss: true, name: '중화조 관리 장치' },
+  cooler: { hp: 500, bw: 76, bh: 22, w: 88, h: 84, boss: true, name: '냉각 설비 관리기' },
+  turbine: { hp: 540, bw: 80, bh: 22, w: 92, h: 92, boss: true, name: '터빈 발전기 관리기' },
+  solar: { hp: 520, bw: 70, bh: 20, w: 100, h: 90, boss: true, name: '태양광 추적 어레이' },
 };
-const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle' };
+const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle', trilo: 'walk', finch: 'walk', frog: 'walk', vine: 'walk', neutral: 'walk', cooler: 'walk', turbine: 'walk', solar: 'walk' };
+// 구역마다 보스 3종 중 하나를 무작위로 (2026-10-27 교사 요청)
+const ZONE_BOSSES = [['mam', 'trilo', 'finch'], ['owl', 'frog', 'vine'], ['furnace', 'neutral', 'cooler'], ['ai', 'turbine', 'solar']];
+const pickBoss = () => { const b = ZONE_BOSSES[stage.zone]; return b[Math.floor(rand() * b.length)]; };
 // 재료 종류 (2026-10-26 교사 요청): 생물형은 가죽, 기계형은 부품, 둘 다 아닌 것(방울·숯·기체)은 무작위
 const BIO = new Set(['tri', 'amm', 'mam', 'rat', 'leaf', 'spore', 'owl']), MECH = new Set(['rust', 'drone', 'bias', 'furnace', 'ai']);
 const matOf = k => BIO.has(k) ? 'cloth' : MECH.has(k) ? 'part' : (rand() < 0.5 ? 'cloth' : 'part'); // 'cloth'는 화면에서 가죽
@@ -459,11 +497,11 @@ const isBoss = e => !!EDEF[e.kind].boss;
 // 새 판: 구역 1 역 1부터. 캐릭터 상태는 역을 넘어가도 이어진다
 function reset() {
   rand = rng((Date.now() & 0xffffff) || 1);
-  stage = { zone: 0, st: 0 };
+  { const order = shuffle(OPEN.slice()); stage = { order, zi: 0, zone: order[0], st: 0 }; }
   const J = JOBS[jobKey];
   P = { x: 0, y: 0, bw: 18, bh: 6, hp: J.hp, maxHp: J.hp, sh: J.sh, maxSh: J.sh, en: J.en, maxEn: J.en, noEnT: 0, inv: 0, shT: 0, face: 1,
     job: jobKey, skillCd: 0, skillMax: J.cd, stars: {}, packMode: 'cold', chg: 0,
-    st: {}, bag: {}, mat: { cloth: 1, part: 1 }, worn: new Set(), perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 쓰는 장비, 재료(가죽·부품), 입은 장비
+    st: {}, bag: {}, mat: { cloth: 0, part: 0 }, worn: new Set(), perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 쓰는 장비, 재료(가죽·부품), 입은 장비
     ph: 0, pt: 0, moving: false, vx: 0, vy: 0, dash: 0, dashCd: 0, ddx: 0, ddy: 0, weapons: J.weapons.slice(), wi: 0, cd: 0, swing: 0, swingA: 0 };
   time = 0; ended = false; endT = 0;
   enterStation();
@@ -481,15 +519,15 @@ function enterStation() {
   if (stage.zone === 2) for (const r of rooms) if (r.type === 'fight') for (let i = 0; i < 2; i++) { // 구역 3: 냉매통 둘레 서리 바닥
     const x = (r.x0 + 4 + rand() * (r.w - 8)) * T, y = (r.y0 + 4 + rand() * (r.h - 7)) * T; addHazard(x, y, 'frost'); }
   showBanner();
-  if (stage.zone > 0 || stage.st > 0) openPerk(); // 역을 넘어올 때마다 능력 고르기
-  if (relicAdd('stationHeal') && (stage.zone > 0 || stage.st > 0) && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
+  if (stage.zi > 0 || stage.st > 0) openPerk(); // 역을 넘어올 때마다 능력 고르기
+  if (relicAdd('stationHeal') && (stage.zi > 0 || stage.st > 0) && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
 }
 let trans = 0; // 다음 역으로 넘어가는 중(화면이 어두워짐)
 function nextStation() {
   if (trans > 0) return;
   trans = 0.6; P.vx = P.vy = 0;
 }
-function stationName() { const Z = ZONES[stage.zone]; return `구역 ${stage.zone + 1} ${Z.name} · 역 ${stage.st + 1} ${Z.stations[stage.st]}`; }
+function stationName() { const Z = ZONES[stage.zone]; return `${stage.zi + 1}/${stage.order.length} · 구역 ${stage.zone + 1} ${Z.name} · 역 ${stage.st + 1} ${Z.stations[stage.st]}`; }
 function showBanner() { const b = document.getElementById('banner'); if (!b) return; b.textContent = stationName(); b.classList.remove('show'); void b.offsetWidth; b.classList.add('show'); }
 
 // ---------- 입력 ----------
@@ -861,7 +899,7 @@ function spawnEnemy(kind, x, y, room) {
   if (kind === 'amm') e.shootT = 1.2 + rand() * 1.5;
   if (d.boss) { e.st = BOSS_IDLE[kind]; e.t = 1.4; e.seq = 0; bossRef = e; }
   if (kind === 'drone') e.batt = 10; // 정전 드론: 배터리가 0이 되면 멈춘다
-  const zk = 1 + stage.zone * 0.35; if (!d.boss) { e.hp = e.maxHp = Math.round(d.hp * zk); } // 뒤 구역일수록 튼튼하다
+  const zk = 1 + stage.zi * 0.35; e.hp = e.maxHp = Math.round(d.hp * (d.boss ? 1 + stage.zi * 0.25 : zk)); // 몇 번째로 들어간 구역일수록 튼튼하다
   enemies.push(e); return e;
 }
 function damage(e, n) {
@@ -928,6 +966,7 @@ function updateEnemy(e) {
     firingBoss = true;
     if (e.kind === 'mam') updateBoss(e, dx, dy, dist); else if (e.kind === 'owl') bossOwl(e, dx, dy, dist);
     else if (e.kind === 'furnace') bossFurnace(e, dx, dy, dist); else if (e.kind === 'ai') bossAI(e, dx, dy, dist);
+    else if (BOSS2[e.kind]) bossGeneric(e, dx, dy, dist);
     firingBoss = false;
   }
   else if (AI[EDEF[e.kind].ai]) AI[EDEF[e.kind].ai](e, EDEF[e.kind], dx, dy, dist, pc, ex, ey);
@@ -1111,6 +1150,14 @@ function takeRelic(k) {
   if (R.stat === 'skillcd') P.skillMax = Math.round(P.skillMax * (1 + R.v) * 10) / 10;
   say(P.x, P.y - 46, '유물 · ' + R.name, 'crit', 'big'); burst(P.x, P.y - 16, '#ffd23f', 14);
 }
+// ---------- 창고: 판 밖에 남는 것(가죽·부품, 유물 보관함). 지금은 이 브라우저에 저장하고, 나중에 연구소 서버(재화)와 연결한다 ----------
+const SAVE_KEY = 'makcha.save.v1';
+function loadSave() {
+  try { const s = JSON.parse(localStorage.getItem(SAVE_KEY)); if (s && s.mat) return { mat: { cloth: s.mat.cloth | 0, part: s.mat.part | 0 }, relics: (s.relics || []).filter(k => RELIC[k]) }; } catch (e) { }
+  return { mat: { cloth: 2, part: 2 }, relics: [] };
+}
+function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { } }
+let save = loadSave();
 function dropRelic(x, y) { const left = Object.keys(RELIC).filter(k => !P.relics.includes(k) && !pickups.some(p => p.kind === 'relic' && p.id === k)); if (!left.length) return;
   pickups.push({ kind: 'relic', id: left[Math.floor(rand() * left.length)], x, y }); burst(x, y - 8, '#ffd23f', 12); }
 function relicMul(stat) { let m = 1; for (const k of P.relics || []) if (RELIC[k].stat === stat) m *= 1 + RELIC[k].v; return m; }
@@ -1166,7 +1213,8 @@ const nearBench = () => { const tx = Math.floor(P.x / T), ty = Math.floor((P.y -
 // 바닥 웅덩이: 산성(노랑)·불꽃·열기는 닿으면 피해, 양분은 느려짐
 let hazards = [], corpses = [];
 const HAZ = { acid: { r: 18, life: 4, col: '#e8d040', hurt: true, st: 'acid' }, fire: { r: 16, life: 3, col: '#ff7a2a', hurt: true, st: 'burn' }, heat: { r: 26, life: 4, col: '#ff5a3c', hurt: true, st: 'heat' },
-  nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, frost: { r: 26, life: 9999, col: '#bfe6ff', st: 'frost' } }; // frost: 냉매통 둘레 서리 바닥(구역 3)
+  nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, frost: { r: 26, life: 9999, col: '#bfe6ff', st: 'frost' }, // frost: 냉매통 둘레 서리 바닥(구역 3)
+  frostT: { r: 24, life: 5, col: '#bfe6ff', st: 'frost' } }; // frostT: 냉각 설비 관리기가 남기는 잠깐의 서리
 function addHazard(x, y, kind) { hazards.push({ x, y, kind, t: 0, life: HAZ[kind].life }); }
 function updateHazards() {
   for (const p of props) if (p.flash > 0) p.flash -= DT;
@@ -1239,6 +1287,60 @@ function bossAI(e, dx, dy, dist) {
     else if (e.st === 'black') { e.ft -= DT; if (e.ft <= 0) { e.ft = 0.25; fire(e.x, ey, Math.atan2(P.y - ey, P.x - e.x) + (rand() - 0.5) * 1.2, 80, 7); } if (e.t <= 0) { e.st = 'idle'; e.t = 1.0; } } }
 }
 let clouds = [], dark = 0;
+
+// ---------- 새 보스 8종: 패턴을 조립하는 공통 틀 (통박사 초안 설계_통박사_보스추가.md, 2026-10-27) ----------
+// 모든 패턴은 「!」(patTell)로 먼저 예고하고, 끝나면 잠깐 쉰다. 과학 장치(약점)는 무기·장비 단계에서 붙인다
+// 패턴: fan 부채꼴 / ring 원형 / spin 회전 방사 / charge 돌진 / jump 점프 착지 / laser 레이저 줄 / rays 몸에서 뻗는 줄 / haz 웅덩이 / roots 바닥에서 솟음 / summon 졸개
+const BOSS2 = {
+  trilo: { move: 1.2, seq: [{ t: 'charge', sp: 13, bounce: 1 }, { t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2 }, { t: 'ring', n: 20, sp: 110, r: 7, rep: 2, slow: true }, { t: 'summon', kind: 'tri', n: 4 }, { t: 'roots', n: 5, near: true }] },
+  finch: { move: 1.8, seq: [{ t: 'fan', n: 7, spread: 0.14, sp: 115, r: 5, rep: 2 }, { t: 'fan', n: 3, spread: 0.3, sp: 90, r: 10, rep: 2 }, { t: 'charge', sp: 16, bounce: 0 }, { t: 'ring', n: 22, sp: 95, r: 7, rep: 2, gap: 2 }, { t: 'haz', hz: 'nutri', n: 3 }] },
+  frog: { move: 0.6, seq: [{ t: 'jump' }, { t: 'laser', n: 1, len: 300 }, { t: 'fan', n: 5, spread: 0.2, sp: 115, r: 7, rep: 2 }, { t: 'summon', kind: 'leaf', n: 3 }, { t: 'haz', hz: 'nutri', n: 4 }] },
+  vine: { move: 0, seq: [{ t: 'rays', n: 3 }, { t: 'ring', n: 24, sp: 100, r: 7, rep: 2 }, { t: 'roots', n: 4 }, { t: 'summon', kind: 'spore', n: 3 }, { t: 'spin', arms: 3, dur: 2.4, sp: 100, r: 6, spin: 1.8 }] },
+  neutral: { move: 0.8, seq: [{ t: 'fan', n: 5, spread: 0.22, sp: 110, r: 7, rep: 2, hz: 'acid' }, { t: 'laser', n: 1, len: 360 }, { t: 'ring', n: 20, sp: 100, r: 7, rep: 2 }, { t: 'haz', hz: 'acid', n: 5 }] },
+  cooler: { move: 0.9, seq: [{ t: 'fan', n: 5, spread: 0.2, sp: 110, r: 7, rep: 2, st: 'frost' }, { t: 'laser', n: 1, len: 340 }, { t: 'ring', n: 20, sp: 95, r: 7, rep: 2, st: 'heat' }, { t: 'fan', n: 2, spread: 0.6, sp: 70, r: 12, rep: 2 }, { t: 'haz', hz: 'frostT', n: 4 }] },
+  turbine: { move: 0.5, seq: [{ t: 'spin', arms: 6, dur: 2.6, sp: 110, r: 6, spin: 2.6 }, { t: 'laser', n: 2, len: 380 }, { t: 'haz', hz: 'heat', n: 3 }, { t: 'roots', n: 3, near: true }, { t: 'ring', n: 26, sp: 120, r: 7, rep: 1 }] },
+  solar: { move: 0.4, seq: [{ t: 'laser', n: 2, len: 420, seqDelay: 0.35 }, { t: 'fan', n: 7, spread: 0.14, sp: 140, r: 6, rep: 2 }, { t: 'haz', hz: 'heat', n: 1, big: true }, { t: 'summon', kind: 'drone', n: 2 }, { t: 'ring', n: 24, sp: 110, r: 7, rep: 2 }] },
+};
+function bossGeneric(e, dx, dy, dist) {
+  const B = BOSS2[e.kind], ey = e.y - e.h / 2, r = e.room; e.t -= DT;
+  if (e.st === 'walk') {
+    if (B.move) { e.face = dx >= 0 ? 1 : -1; move(e, dx / dist * B.move * T * DT, dy / dist * B.move * T * DT); }
+    if (e.t <= 0) { e.pat = B.seq[e.seq++ % B.seq.length]; e.st = 'patTell'; e.t = e.pat.t === 'charge' ? 0.9 : 0.75; e.n = 0;
+      const p = e.pat, a = Math.atan2(P.y - 16 - ey, P.x - e.x); e.aim = a;
+      if (p.t === 'laser') e.lines = Array.from({ length: p.n }, (_, i) => { const aa = a + (i - (p.n - 1) / 2) * 0.35; return { x1: e.x, y1: ey, x2: e.x + Math.cos(aa) * p.len, y2: ey + Math.sin(aa) * p.len }; });
+      if (p.t === 'rays') { const o = rand() * Math.PI * 2; e.lines = Array.from({ length: p.n }, (_, i) => { const aa = o + i * Math.PI * 2 / p.n; const [x2, y2] = rayEnd(e.x, ey, aa); return { x1: e.x, y1: ey, x2, y2 }; }); }
+      if (p.t === 'jump') { e.tx = P.x; e.ty = P.y; marks.push({ t: 'land', x: P.x, y: P.y, life: 1.6, max: 1.6 }); }
+      if (p.t === 'haz') for (let i = 0; i < p.n; i++) { const x = p.big ? (r.x0 + r.w / 2) * T : P.x + (rand() - 0.5) * 140, y = p.big ? (r.y0 + r.h / 2) * T : P.y + (rand() - 0.5) * 90;
+        marks.push({ t: 'haz', hz: p.hz, x, y, big: p.big, life: 0.9, max: 0.9 }); }
+      if (p.t === 'roots') for (let i = 0; i < p.n; i++) { const a2 = rand() * Math.PI * 2, d2 = p.near ? 30 + rand() * 50 : 60 + rand() * 80; marks.push({ t: 'rock', x: P.x + Math.cos(a2) * d2, y: P.y + Math.sin(a2) * d2 * 0.7, life: 1.0, max: 1.0 }); }
+    }
+    return;
+  }
+  const p = e.pat;
+  if (e.st === 'patTell') { if (e.t > 0) return; e.st = 'pat'; e.t = 0; e.ft = 0; if (p.t === 'spin') { e.o = rand() * Math.PI; e.t = p.dur; } if (p.t === 'charge') { e.t = 2.5; e.bn = p.bounce; } if (p.t === 'jump') { e.st = 'fly'; e.invul = true; e.t = 0.8; } }
+  if (e.st === 'fly') { e.alt = Math.min(60, (e.alt || 0) + 180 * DT); if (e.t <= 0) { e.x = e.tx; e.y = e.ty; e.alt = 0; e.invul = false; shake = 9;
+      if (Math.hypot(P.x - e.x, (P.y - e.y) * 1.3) < 46) hurt(BOSS_DMG); for (let i = 0; i < 16; i++) fire(e.x, e.y - 16, i / 16 * Math.PI * 2, 100, 7); for (let i = 0; i < 12; i++) fire(e.x, e.y - 16, (i + 0.5) / 12 * Math.PI * 2, 70, 7);
+      return endPat(e, 1.0); } return; }
+  const done = () => endPat(e, 1.1);
+  if (p.t === 'fan') { e.t -= 0; if (e.ft > 0) { e.ft -= DT; return; } const a = Math.atan2(P.y - 16 - ey, P.x - e.x);
+    for (let i = 0; i < p.n; i++) { fire(e.x, ey, a + (i - (p.n - 1) / 2) * p.spread + (e.n % 2) * p.spread / 2, p.sp, p.r, p.hz); if (p.st) ebul[ebul.length - 1].st = p.st; }
+    e.n++; e.ft = 0.45; if (e.n >= (p.rep || 1)) done(); }
+  else if (p.t === 'ring') { if (e.ft > 0) { e.ft -= DT; return; } const o = rand() * Math.PI;
+    for (let i = 0; i < p.n; i++) { const a = o + (i + (e.n % 2) * 0.5) / p.n * Math.PI * 2; if (p.gap && i % Math.floor(p.n / p.gap) === 0) continue; fire(e.x, ey, a, p.slow && e.n ? p.sp * 0.6 : p.sp, p.r); if (p.st) ebul[ebul.length - 1].st = p.st; }
+    e.n++; e.ft = 0.45; if (e.n >= (p.rep || 1)) done(); }
+  else if (p.t === 'spin') { e.ft -= DT; e.o += p.spin * DT; if (e.ft <= 0) { e.ft = 0.11; for (let i = 0; i < p.arms; i++) fire(e.x, ey, e.o + i * Math.PI * 2 / p.arms, p.sp, p.r); } if (e.t <= 0) done(); }
+  else if (p.t === 'charge') { const hit = move(e, Math.cos(e.aim) * p.sp * T * DT, Math.sin(e.aim) * p.sp * T * DT);
+    if (rand() < 0.6) fx.push({ t: 'dust', x: e.x + (rand() - 0.5) * 50, y: e.y - 2, life: 0.4, max: 0.4 });
+    if (hit) { shake = 7; if (e.bn > 0) { e.bn--; e.aim = Math.atan2(P.y - e.y, P.x - e.x); } else { say(e.x, e.y - e.h - 16, '허점', 'stun'); endPat(e, 1.4); } } else if (e.t <= 0) done(); }
+  else if (p.t === 'laser' || p.t === 'rays') { // 예고했던 줄을 따라 레이저(줄 위에 있으면 피해)
+    const pc = pCenter(); let hitMe = false;
+    e.lines.forEach((L, i) => { const k = p.seqDelay ? i * p.seqDelay : 0; setTimeout0(k, () => { if (segDist(pc.x, pc.y, L) < 11 && !hitMe) { hitMe = true; hurt(BOSS_DMG); } fx.push({ t: 'laser2', ...L, life: 0.25, max: 0.25 }); }); });
+    shake = Math.max(shake, 4); done(); }
+  else if (p.t === 'summon') { for (let i = 0; i < p.n; i++) { const a = rand() * Math.PI * 2; addSpawn(p.kind, e.x + Math.cos(a) * 70, e.y + Math.sin(a) * 50, r); } done(); }
+  else done(); // haz·roots는 예고 표시(marks)가 시간이 되면 스스로 터진다
+}
+function endPat(e, rest) { e.st = 'walk'; e.t = rest; e.pat = null; e.lines = null; }
+function segDist(px0, py0, L) { const vx = L.x2 - L.x1, vy = L.y2 - L.y1, l2 = vx * vx + vy * vy || 1; const k = Math.max(0, Math.min(1, ((px0 - L.x1) * vx + (py0 - L.y1) * vy) / l2)); return Math.hypot(px0 - (L.x1 + vx * k), py0 - (L.y1 + vy * k)); }
 function updateBossExtras() {
   for (const c of clouds) { c.t -= DT; c.x += c.vx * DT; c.y += c.vy * DT; if (solidAt(c.x, c.y)) { c.vx *= -1; c.vy *= -1; }
     if (Math.hypot(P.x - c.x, (P.y - 12 - c.y) * 1.3) < 30) { hurt(BOSS_DMG); applyStatus('acid'); }
@@ -1368,6 +1470,7 @@ function updateFx() {
   fx = fx.filter(f => f.life > 0);
   for (const m of marks) { m.life -= DT; if (m.life <= 0) {
     if (m.t === 'spawn') spawnEnemy(m.kind, m.x, m.y, m.room);
+    else if (m.t === 'haz') { if (m.big) { for (let i = 0; i < 5; i++) addHazard(m.x + (i - 2) * 30, m.y + (i % 2) * 14, m.hz); } else addHazard(m.x, m.y, m.hz); }
     else if (m.t === 'rock') { burst(m.x, m.y - 4, '#8b7d6b', 8); shake = Math.max(shake, 4); if (Math.hypot(P.x - m.x, (P.y - m.y) * 1.3) < 18) hurt(BOSS_DMG); }
   } }
   marks = marks.filter(m => m.life > 0);
@@ -1411,7 +1514,7 @@ function finish(win) {
 }
 // 보스를 잡으면 구역 통과: 열린 구역이 더 있으면 다음 구역 역 1로, 없으면 막차에 타고 끝난다
 function zoneClear() {
-  if (stage.zone + 1 < Math.min(OPEN_ZONES, ZONES.length)) { say(P.x, P.y - 50, `구역 ${stage.zone + 1} 통과`, 'heal', 'big'); zoneNext = 1.8; }
+  if (stage.zi + 1 < stage.order.length) { say(P.x, P.y - 50, `구역 ${stage.zone + 1} 통과`, 'heal', 'big'); zoneNext = 1.8; }
   else finish(true);
 }
 let zoneNext = 0;
@@ -1421,7 +1524,7 @@ function step() {
   if (!ended) time += DT;
   if (trans > 0) { trans -= DT; if (trans <= 0) { stage.st++; enterStation(); } return; }
   updateStatus();
-  if (zoneNext > 0) { zoneNext -= DT; if (zoneNext <= 0) { stage = { zone: stage.zone + 1, st: 0 }; enterStation(); return; } }
+  if (zoneNext > 0) { zoneNext -= DT; if (zoneNext <= 0) { stage = { order: stage.order, zi: stage.zi + 1, zone: stage.order[stage.zi + 1], st: 0 }; enterStation(); return; } }
   updatePlayer();
   for (const e of enemies) updateEnemy(e);
   updateBullets(); updateSkills(); updateFx(); updateRooms(); updateTexts(); updateTimers(); updateHazards(); updateBossExtras();
@@ -1563,6 +1666,7 @@ function render() {
   for (const m of marks) {
     const k = 1 - m.life / m.max;
     if (m.t === 'rock') { ringPx(m.x, m.y, 16, 'rgba(255,60,60,0.8)'); ell(ctx, Math.round(m.x), Math.round(m.y), Math.round(32 * k) | 1, Math.round(19 * k) | 1, 'rgba(255,60,60,0.35)'); }
+    else if (m.t === 'haz') { const R = m.big ? 80 : 24; ringPx(m.x, m.y, R, 'rgba(255,140,60,0.85)'); ell(ctx, Math.round(m.x), Math.round(m.y), Math.round(R * 2 * k) | 1, Math.round(R * 1.2 * k) | 1, 'rgba(255,140,60,0.3)'); }
     else if (m.t === 'land') { ringPx(m.x, m.y, 46, 'rgba(255,60,60,0.85)'); ell(ctx, Math.round(m.x), Math.round(m.y), Math.round(92 * k) | 1, Math.round(56 * k) | 1, 'rgba(255,60,60,0.3)'); }
     else ringPx(m.x, m.y - 4, 6 + 8 * (1 - k), 'rgba(255,220,140,0.8)');
   }
@@ -1572,6 +1676,10 @@ function render() {
     if (ai === 'charge' && e.st === 'tell') line(e.x, e.y - 6, e.x + Math.cos(e.aim) * 44, e.y - 6 + Math.sin(e.aim) * 44, 'rgba(255,60,60,0.75)', 1);
     if ((e.kind === 'owl' && e.st === 'featherTell') || (e.kind === 'furnace' && (e.st === 'flameTell' || e.st === 'pourTell'))) { const ey2 = e.y - e.h / 2, a = e.st === 'pourTell' ? e.aim : Math.atan2(P.y - 16 - ey2, P.x - e.x);
       for (const o of e.st === 'pourTell' ? [0] : [-0.45, 0, 0.45]) { const [x2, y2] = rayEnd(e.x, ey2, a + o); line(e.x, ey2, x2, y2, 'rgba(255,60,60,0.55)', e.st === 'pourTell' ? 5 : 1); } }
+    if (e.st === 'patTell' && e.pat) { const p = e.pat, ey2 = e.y - e.h / 2; // 새 보스 예고선
+      if (p.t === 'fan') for (const o of [-0.45, 0, 0.45]) { const [x2, y2] = rayEnd(e.x, ey2, e.aim + o); line(e.x, ey2, x2, y2, 'rgba(255,60,60,0.5)', 1); }
+      if (p.t === 'charge') { const [x2, y2] = rayEnd(e.x, e.y - 10, e.aim); line(e.x, e.y - 10, x2, y2, 'rgba(255,60,60,0.55)', 5); }
+      if (e.lines) for (const L of e.lines) line(L.x1, L.y1, L.x2, L.y2, Math.floor(time * 12) % 2 ? 'rgba(255,60,60,0.8)' : 'rgba(255,160,60,0.6)', 2); }
     if (e.kind === 'amm' && e.st === 'tell') { const [x2, y2] = rayEnd(e.x, e.y - e.h / 2, e.aim); line(e.x, e.y - e.h / 2, x2, y2, 'rgba(255,60,60,0.75)', 1); }
     if (e.kind === 'tri' && e.st === 'tell') line(e.x, e.y - 6, e.x + Math.cos(e.aim) * 40, e.y - 6 + Math.sin(e.aim) * 40, 'rgba(255,60,60,0.75)', 1);
     if (e.kind === 'mam' && e.st === 'fanTell') { const ey2 = e.y - e.h / 2, a = Math.atan2(P.y - 16 - ey2, P.x - e.x);
@@ -1646,6 +1754,7 @@ function render() {
     else if (f.t === 'boom') { const k = 1 - f.life / f.max, R = f.r || 48; ringPx(f.x, f.y - 4, R * k + 8, 'rgba(255,190,90,0.9)'); if (k < 0.5) { ctx.globalAlpha = 0.5 * (1 - k * 2); ell(ctx, Math.round(f.x), Math.round(f.y - 4), Math.round(R * 1.4 * k + 10) | 1, Math.round(R * 0.9 * k + 8) | 1, '#ffd27a'); ctx.globalAlpha = 1; } }
     else if (f.t === 'zap') { const mx = (f.x + f.x2) / 2 + (rand() - 0.5) * 14, my = (f.y + f.y2) / 2 + (rand() - 0.5) * 14; line(f.x, f.y, mx, my, '#9fd8ff', 2); line(mx, my, f.x2, f.y2, '#9fd8ff', 2); line(f.x, f.y, mx, my, '#ffffff', 1); }
     else if (f.t === 'beam') { const k = f.life / f.max; line(f.x, f.y, f.x2, f.y2, `rgba(255,246,160,${0.5 + 0.5 * k})`, 3); line(f.x, f.y, f.x2, f.y2, '#ffffff', 1); }
+    else if (f.t === 'laser2') { const k = f.life / f.max; line(f.x1, f.y1, f.x2, f.y2, `rgba(255,120,90,${0.5 + 0.5 * k})`, 6); line(f.x1, f.y1, f.x2, f.y2, '#fff4e0', 2); }
     else if (f.t === 'laser') { const r = f.r; ctx.fillStyle = 'rgba(255,90,90,0.85)'; if (f.v) ctx.fillRect(Math.round(f.x) - 3, r.y0 * T, 6, r.h * T); else ctx.fillRect(r.x0 * T, Math.round(f.y) - 3, r.w * T, 6); }
   }
   ctx.restore();
@@ -1756,16 +1865,45 @@ function drawHud() {
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
 
 // ---------- 화면 전환 ----------
-function start() { reset(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · 우클릭'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
+function start() { reset(); applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · 우클릭'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
 function showResult() {
   if (!running) return; running = false;
+  // 판에서 모은 가죽·부품은 이기든 지든 창고에 남는다(2026-10-27 교사 결정). 들고 간 장비와 판에서 주운 유물은 사라진다
+  save.mat.cloth += P.mat.cloth; save.mat.part += P.mat.part; writeSave();
   document.getElementById('resTitle').textContent = ended === 'win' ? '막차에 탔다' : '쓰러졌다';
-  document.getElementById('resText').textContent = ended === 'win' ? `걸린 시간 ${fmt(time)}` : `${stationName()} · 버틴 시간 ${fmt(time)}`;
+  document.getElementById('resText').textContent = (ended === 'win' ? `걸린 시간 ${fmt(time)}` : `${stationName()} · 버틴 시간 ${fmt(time)}`) + ` · 창고에 가죽 +${P.mat.cloth} · 부품 +${P.mat.part}`;
   document.getElementById('result').classList.remove('hide');
 }
+function toLobby() { running = false; document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
 document.getElementById('startBtn').onclick = start;
-document.getElementById('againBtn').onclick = start;
-document.getElementById('jobBtn').onclick = () => { running = false; document.getElementById('result').classList.add('hide'); document.getElementById('title').classList.remove('hide'); };
+document.getElementById('againBtn').onclick = toLobby;
+document.getElementById('jobBtn').onclick = toLobby;
+
+// ---------- 대기실: 직업, 들고 갈 유물(3개까지), 미리 만들 장비(1개) ----------
+let loadout = { relics: [], gear: null };
+function applyLoadout() {
+  for (const k of loadout.relics) if (save.relics.includes(k)) { P.relics.push(k); const R = RELIC[k];
+    if (R.stat === 'shield') { P.maxSh += R.v; P.sh += R.v; } if (R.stat === 'hp') { P.maxHp += R.v; P.hp += R.v; } if (R.stat === 'skillcd') P.skillMax = Math.round(P.skillMax * (1 + R.v) * 10) / 10; }
+  if (loadout.gear) { const G = GEAR[loadout.gear]; if (G.wear) P.worn = new Set([loadout.gear]); else P.bag[loadout.gear] = 1; loadout.gear = null; } // 장비는 그 판에서만
+}
+function renderLobby() {
+  const rb = document.getElementById('lobbyRelics'); rb.innerHTML = '';
+  if (!save.relics.length) rb.innerHTML = '<i>아직 없다 · 연구소 재화로 얻는다(연결 예정)</i>';
+  for (const k of save.relics) { const b = document.createElement('button'); b.className = 'lob' + (loadout.relics.includes(k) ? ' on' : ''); b.textContent = RELIC[k].name;
+    b.onclick = () => { const i = loadout.relics.indexOf(k); if (i >= 0) loadout.relics.splice(i, 1); else if (loadout.relics.length < 3) loadout.relics.push(k); renderLobby(); }; rb.appendChild(b); }
+  document.getElementById('lobbyRelicN').textContent = `${loadout.relics.length} / 3`;
+  document.getElementById('lobbyMat').textContent = `창고 가죽 ${save.mat.cloth} · 부품 ${save.mat.part}`;
+  const gb = document.getElementById('lobbyGear'); gb.innerHTML = '';
+  const back = loadout.gear ? GEAR[loadout.gear] : { cloth: 0, part: 0 }; // 바꿔 고르면 앞의 장비 재료를 되돌려 받는다
+  for (const k in GEAR) { const G = GEAR[k], on = loadout.gear === k, ok = on || (save.mat.cloth + back.cloth >= G.cloth && save.mat.part + back.part >= G.part);
+    const b = document.createElement('button'); b.className = 'lob' + (on ? ' on' : '') + (ok ? '' : ' off');
+    b.innerHTML = `${G.name}<small>${[G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join('·')}</small>`;
+    b.onclick = () => { // 하나만 만들어 들고 간다. 다른 것을 고르면 앞의 것을 되돌린다
+      if (on) { save.mat.cloth += G.cloth; save.mat.part += G.part; loadout.gear = null; }
+      else if (ok) { if (loadout.gear) { const O = GEAR[loadout.gear]; save.mat.cloth += O.cloth; save.mat.part += O.part; } save.mat.cloth -= G.cloth; save.mat.part -= G.part; loadout.gear = k; }
+      writeSave(); renderLobby(); };
+    gb.appendChild(b); }
+}
 // 직업 고르기: 카드에는 이름만 적는다
 function jobPicker() {
   const box = document.getElementById('jobs');
@@ -1783,4 +1921,4 @@ let acc = 0, last = performance.now();
 function loop(now) { acc += Math.min(0.25, (now - last) / 1000); last = now;
   while (acc >= DT) { step(); acc -= DT; }
   render(); requestAnimationFrame(loop); }
-buildSprites(); jobPicker(); reset(); fit(); requestAnimationFrame(loop);
+buildSprites(); jobPicker(); renderLobby(); reset(); fit(); requestAnimationFrame(loop);

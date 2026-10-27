@@ -56,6 +56,16 @@
   .panel .note { font-size:0.85em; color:#9a927f; }
   .panel button { font:inherit; font-size:1.1em; padding:0.5em 1.6em; border-radius:0.4em; border:0; background:#f0b429; color:#111; cursor:pointer; font-weight:700; }
   .hide { display:none !important; }
+  #title { gap:0.5em; overflow-y:auto; }
+  #title h1 { font-size:1.8em; }
+  .lobrow { width:84%; display:flex; flex-direction:column; gap:0.3em; text-align:left; }
+  .lobrow > b { font-size:0.9em; color:#f0b429; } .lobrow > b span { color:#9a927f; font-weight:400; margin-left:0.5em; }
+  #lobbyRelics, #lobbyGear { display:flex; flex-wrap:wrap; gap:0.35em; font-size:0.8em; }
+  #lobbyRelics i { color:#6b6458; font-style:normal; }
+  .panel button.lob { background:#26221c; color:#e6dcc6; border:2px solid #3a342a; font-size:0.85em; font-weight:500; padding:0.3em 0.6em; display:flex; flex-direction:column; align-items:center; }
+  .panel button.lob small { color:#ffe08a; font-size:0.85em; }
+  .panel button.lob.on { border-color:#f0b429; background:#3a3020; color:#fff; }
+  .panel button.lob.off { opacity:0.4; cursor:default; }
   #jobs { display:grid; grid-template-columns:repeat(6, 1fr); gap:0.5em; margin:0.3em 0; }
   .panel button.job { display:flex; flex-direction:column; align-items:center; gap:0.3em; padding:0.5em 0.4em; background:#26221c; color:#e6dcc6; font-size:0.85em; font-weight:600; border:2px solid #3a342a; }
   .panel button.job.on { border-color:#f0b429; background:#3a3020; color:#fff; }
@@ -110,9 +120,11 @@
   <div class="ui" id="bossname"></div>
   <div class="panel" id="title">
     <h1>막차</h1>
-    <p>구역 1 지층 터널 · 역 1 시험판</p>
+    <p>대기실 · 구역 순서는 판마다 무작위로 바뀐다</p>
     <div id="jobs"></div>
-    <p>WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대·내 상태 · Q 무기 바꾸기 · 1~5 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
+    <div class="lobrow"><b>유물 <span id="lobbyRelicN"></span></b><div id="lobbyRelics"></div></div>
+    <div class="lobrow"><b>장비 1개 <span id="lobbyMat"></span></b><div id="lobbyGear"></div></div>
+    <p style="font-size:0.75em">WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대·내 상태 · Q 무기 바꾸기 · 1~5 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
     <button id="startBtn">시작</button>
   </div>
@@ -120,7 +132,7 @@
     <h1 id="resTitle"></h1>
     <p id="resText"></p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다.</p>
-    <div style="display:flex;gap:0.8em"><button id="againBtn">다시 하기</button><button id="jobBtn" class="sub">직업 고르기</button></div>
+    <div style="display:flex;gap:0.8em"><button id="againBtn">대기실로</button><button id="jobBtn" class="sub hide">직업 고르기</button></div>
   </div>
 </div>
 <script src="game.js"></script>

@@ -28,7 +28,7 @@
 
   // ---------- 단추판 ----------
   const ENEMY = { tri: '삼엽충', amm: '암모나이트', rat: '텃밭 쥐', leaf: '잎벌레', spore: '곰팡이 포자', rust: '녹 덩어리', acid: '산성 방울', ember: '불씨 덩이', fog: '온실기체 안개', drone: '정전 드론', bias: '편향 자료 조각' };
-  const BOSS = { mam: '매머드', owl: '포식자 여왕', furnace: '제련로 관리 로봇', ai: '관제 AI' };
+  const BOSS = {}; for (const zb of ZONE_BOSSES) for (const k of zb) BOSS[k] = EDEF[k].name; // 구역 순서대로 보스 12종
   const ZN = ZONES.map(z => z.name);
   const css = document.createElement('style');
   css.textContent = `
@@ -57,11 +57,11 @@
 
   // 무대
   let r = sec('무대', '시험방: 적이 저절로 나오지 않는 넓은 방이다. 역으로 가면 본 게임처럼 진행된다.');
-  ZN.forEach((n, z) => btn(r, `시험방 · 구역 ${z + 1}`, () => { arena = true; stage = { zone: z, st: 0 }; enter(); }));
+  ZN.forEach((n, z) => btn(r, `시험방 · 구역 ${z + 1}`, () => { arena = true; stage = { order: [z], zi: 0, zone: z, st: 0 }; enter(); }));
   r = sec('역으로 가기');
   const selZ = document.createElement('select'); ZN.forEach((n, z) => { const o = document.createElement('option'); o.value = z; o.textContent = `구역 ${z + 1} ${n}`; selZ.appendChild(o); }); r.appendChild(selZ);
   const selS = document.createElement('select'); [1, 2, 3, 4].forEach(s => { const o = document.createElement('option'); o.value = s - 1; o.textContent = `역 ${s}${s === 4 ? ' (보스)' : ''}`; selS.appendChild(o); }); r.appendChild(selS);
-  btn(r, '가기', () => { arena = false; stage = { zone: +selZ.value, st: +selS.value }; enter(); });
+  btn(r, '가기', () => { arena = false; stage = { order: [+selZ.value], zi: 0, zone: +selZ.value, st: +selS.value }; enter(); });
   tp.appendChild(now);
 
   // 적
@@ -103,6 +103,11 @@
   for (const k in RELIC) btn(r, RELIC[k].name, () => takeRelic(k));
   r = sec('');
   btn(r, '유물 하나 떨어뜨리기', () => dropRelic(P.x + 50, P.y));
+  r = sec('대기실 시험', '유물 보관함(나중에 연구소 재화로 얻음)과 창고 재료를 채운 뒤 대기실에서 고른다.');
+  btn(r, '보관함에 유물 모두 넣기', () => { save.relics = Object.keys(RELIC); writeSave(); renderLobby(); });
+  btn(r, '보관함 비우기', () => { save.relics = []; loadout.relics = []; writeSave(); renderLobby(); });
+  btn(r, '창고 재료 20개씩', () => { save.mat = { cloth: 20, part: 20 }; writeSave(); renderLobby(); });
+  btn(r, '대기실 열기', () => toLobby());
   btn(r, '유물 모두 지우기(처음부터)', () => { arena = true; start(); });
 
   // 직업과 스킬
