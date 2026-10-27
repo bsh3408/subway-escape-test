@@ -226,7 +226,23 @@ Object.assign(DRAW, {
     for (let i = 0; i < 44; i++) { const a = i * 0.45 + (f ? 0.4 : 0), r = 4 + i * 0.95; px(g, Math.round(46 + Math.cos(a) * r), Math.round(44 + Math.sin(a) * r * 0.9), 4, 3, i % 2 ? '#e6f6ff' : '#9fd8ff'); }
     ell(g, 48, 46, 16, 14, O_); ell(g, 48, 46, 12, 10, '#e6f6ff'); px(g, 43, 43, 3, 3, O_); px(g, 51, 43, 3, 3, O_); px(g, 30, 86, 36, 4, O_); }, // 도는 찬 공기
 });
-const SIZE = { conduct: [28, 20], convect: [26, 30], radiate: [24, 30], methane: [22, 24], fox: [28, 20], snow: [34, 26], dome: [100, 70], vortex: [96, 90], trilo: [96, 60], finch: [90, 56], frog: [88, 66], vine: [92, 88], neutral: [96, 84], cooler: [88, 84], turbine: [92, 92], solar: [100, 90], rat: [22, 16], leaf: [24, 18], spore: [26, 26], rust: [26, 24], acid: [22, 22], ember: [24, 22], fog: [32, 24], drone: [26, 20], bias: [26, 26], owl: [96, 80], furnace: [88, 92], ai: [100, 74] };
+Object.assign(DRAW, {
+  greenhouse(g, f) { for (const [x, y, w, h] of [[48, 44, 92, 58], [26, 36, 44, 40], [70, 34, 44, 40], [48, 24, 50, 40]]) ell(g, x, y, w, h, O_);
+    for (const [x, y, w, h] of [[48, 44, 88, 54], [26, 36, 40, 36], [70, 34, 40, 36], [48, 24, 46, 36]]) ell(g, x, y, w, h, '#8a8478'); ell(g, 44, 20, 24, 10, '#a8a296');
+    for (const [x, y] of [[22, 40], [48, 54], [72, 40], [36, 26], [62, 24]]) { ell(g, x, y + (f ? 1 : 0), 7, 7, '#2a2520'); ell(g, x - 6, y + (f ? 1 : 0), 5, 5, '#d9483b'); ell(g, x + 6, y + (f ? 1 : 0), 5, 5, '#d9483b'); } // 이산화 탄소 분자(O=C=O)
+    px(g, 40, 64, 4, 3, O_); px(g, 54, 64, 4, 3, O_); for (const x of [20, 48, 76]) px(g, x, 72 + (f ? 2 : 0), 2, 6, '#ff7a2a'); }, // 아래로 되돌려 보내는 열
+  sandstorm(g, f) { for (let i = 0; i < 6; i++) { const y = 8 + i * 13, w = 88 - i * 12, x = 46 + Math.round(Math.sin(i * 1.1 + (f ? 0.8 : 0)) * 5); ell(g, x, y, w + 2, 15, O_); ell(g, x, y, w, 12, i % 2 ? '#d8b878' : '#c8a060'); }
+    for (let i = 0; i < 16; i++) px(g, (i * 37 + (f ? 5 : 0)) % 90, (i * 23) % 80, 2, 2, '#a88848'); px(g, 38, 20, 4, 3, O_); px(g, 52, 20, 4, 3, O_); },
+  glacier(g, f) { g.fillStyle = O_; g.beginPath(); g.moveTo(2, 64); g.lineTo(22, 14); g.lineTo(40, 26); g.lineTo(58, 2); g.lineTo(80, 22); g.lineTo(98, 64); g.fill();
+    g.fillStyle = '#bfe6ff'; g.beginPath(); g.moveTo(6, 62); g.lineTo(23, 18); g.lineTo(40, 30); g.lineTo(58, 7); g.lineTo(78, 25); g.lineTo(94, 62); g.fill();
+    g.fillStyle = '#f4fbff'; g.beginPath(); g.moveTo(50, 16); g.lineTo(58, 7); g.lineTo(66, 15); g.fill(); px(g, 30, 36, 1, 14, '#5fa0d0'); px(g, 64, 30, 1, 18, '#5fa0d0');
+    px(g, 40, 44, 4, 3, O_); px(g, 56, 44, 4, 3, O_); px(g, 2, 62, 96, 8, '#3f8fd0'); for (const x of [18, 46, 74]) px(g, x, 64 + (f ? 2 : 0), 3, 4, '#7fc8ff'); }, // 녹아 흘러내리는 물
+  boiler(g, f) { px(g, 60, 0, 14, 30, O_); px(g, 62, 2, 10, 28, '#5a5a62'); for (const [x, y] of [[66, -4], [70, -10]]) ell(g, x + (f ? 2 : 0), y + 8, 10, 8, '#6a6a72'); // 굴뚝과 연기
+    px(g, 6, 24, 76, 62, O_); px(g, 8, 26, 72, 58, '#8a4a2a'); px(g, 8, 26, 72, 6, '#a8603a'); for (const y of [40, 60]) px(g, 8, y, 72, 2, '#5a2a12');
+    px(g, 26, 46, 36, 22, O_); px(g, 28, 48, 32, 18, f ? '#ffd23f' : '#ff7a2a'); for (const x of [32, 42, 52]) px(g, x, 60, 6, 4, '#2a2520'); // 석탄이 타는 화구
+    px(g, 20, 32, 6, 4, '#7ee07e'); px(g, 62, 32, 6, 4, '#7ee07e'); px(g, 10, 86, 16, 6, O_); px(g, 62, 86, 16, 6, O_); },
+});
+const SIZE = { greenhouse: [96, 80], sandstorm: [92, 88], glacier: [100, 72], boiler: [88, 92], conduct: [28, 20], convect: [26, 30], radiate: [24, 30], methane: [22, 24], fox: [28, 20], snow: [34, 26], dome: [100, 70], vortex: [96, 90], trilo: [96, 60], finch: [90, 56], frog: [88, 66], vine: [92, 88], neutral: [96, 84], cooler: [88, 84], turbine: [92, 92], solar: [100, 90], rat: [22, 16], leaf: [24, 18], spore: [26, 26], rust: [26, 24], acid: [22, 22], ember: [24, 22], fog: [32, 24], drone: [26, 20], bias: [26, 26], owl: [96, 80], furnace: [88, 92], ai: [100, 74] };
 function sprFor(e) {
   if (e.kind === 'tri') return SPR.tri[e.ph % 2];
   if (e.kind === 'amm') return SPR.amm[0];
@@ -563,11 +579,15 @@ const EDEF = {
   convect: { hp: 12, bw: 22, bh: 10, w: 26, h: 30, ai: 'convect', speed: 1.6, name: '대류 회오리', desc: '대류: 데워진 공기가 올라가고 찬 공기가 내려오며 열이 이동한다' },
   radiate: { hp: 12, bw: 20, bh: 9, w: 24, h: 30, ai: 'shoot', fan: 3, spread: 0.18, bsp: 120, br: 5, cd: 2.6, near: 6, far: 11, speed: 0.9, name: '복사열 램프', desc: '복사: 물질 없이 전자기파로 열이 이동한다. 장애물 뒤 그늘에서는 줄어든다' },
   dome: { hp: 520, bw: 84, bh: 22, w: 100, h: 70, boss: true, name: '열돔', desc: '열돔: 상공의 고기압이 한곳에 머물며 뜨거운 공기를 가둬 폭염이 심해진다' },
+  greenhouse: { hp: 500, bw: 80, bh: 22, w: 96, h: 80, boss: true, name: '온실 기체 구름', desc: '온실 기체: 지표가 방출한 지구 복사 에너지를 흡수했다가 일부를 지표로 다시 방출해 지구를 데운다' },
+  sandstorm: { hp: 500, bw: 76, bh: 22, w: 92, h: 88, boss: true, name: '사막화 모래 폭풍', desc: '사막화: 가뭄과 지나친 방목·벌목으로 땅이 메말라 사막이 넓어진다' },
   // 구역 6 영구 동토층 터널
   methane: { hp: 6, bw: 18, bh: 9, w: 22, h: 24, ai: 'bomb', speed: 1.6, name: '메테인 거품', desc: '메테인: 온실 기체. 영구 동토층이 녹으면 방출되어 온난화를 키운다. 연소하면 열이 나온다' },
   fox: { hp: 9, bw: 22, bh: 9, w: 28, h: 20, ai: 'charge', speed: 3.4, lunge: 12, tell: 0.35, name: '북극여우', desc: '북극여우: 귀·주둥이가 작아 열이 덜 빠져나간다. 추위에 알맞게 자연선택된 형질이다' },
   snow: { hp: 12, bw: 26, bh: 10, w: 34, h: 26, ai: 'snow', speed: 1.2, name: '눈구름', desc: '눈: 구름 속 수증기가 얼음 결정이 되어 내린다. 맞으면 몸이 빨리 식는다' },
   vortex: { hp: 540, bw: 80, bh: 22, w: 96, h: 90, boss: true, name: '극 소용돌이', desc: '극 소용돌이: 극지방 상공을 도는 찬 공기 흐름. 약해지면 찬 공기가 내려와 한파가 온다' },
+  glacier: { hp: 560, bw: 86, bh: 22, w: 100, h: 72, boss: true, name: '녹는 빙하', desc: '빙하: 지구 온난화로 육지의 빙하가 녹아 바다로 흘러들면 해수면이 높아진다' },
+  boiler: { hp: 520, bw: 70, bh: 22, w: 88, h: 92, boss: true, name: '화석 연료 보일러', desc: '화석 연료: 산소와 반응해 연소하면 열과 함께 이산화 탄소가 나와 지구 온난화를 키운다' },
   // 새 보스 8종 (통박사 초안 2026-10-27)
   trilo: { hp: 440, bw: 80, bh: 22, w: 96, h: 60, boss: true, name: '고생대 삼엽충' },
   finch: { hp: 420, bw: 70, bh: 20, w: 90, h: 56, boss: true, name: '섬 핀치 무리' },
@@ -578,12 +598,12 @@ const EDEF = {
   turbine: { hp: 540, bw: 80, bh: 22, w: 92, h: 92, boss: true, name: '터빈 발전기 관리기' },
   solar: { hp: 520, bw: 70, bh: 20, w: 100, h: 90, boss: true, name: '태양광 추적 어레이' },
 };
-const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle', trilo: 'walk', finch: 'walk', frog: 'walk', vine: 'walk', neutral: 'walk', cooler: 'walk', turbine: 'walk', solar: 'walk', dome: 'walk', vortex: 'walk' };
+const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle', trilo: 'walk', finch: 'walk', frog: 'walk', vine: 'walk', neutral: 'walk', cooler: 'walk', turbine: 'walk', solar: 'walk', dome: 'walk', vortex: 'walk', greenhouse: 'walk', sandstorm: 'walk', glacier: 'walk', boiler: 'walk' };
 // 구역마다 보스 3종 중 하나를 무작위로 (2026-10-27 교사 요청)
-const ZONE_BOSSES = [['mam', 'trilo', 'finch'], ['owl', 'frog', 'vine'], ['furnace', 'neutral', 'cooler'], ['ai', 'turbine', 'solar'], ['dome'], ['vortex']];
+const ZONE_BOSSES = [['mam', 'trilo', 'finch'], ['owl', 'frog', 'vine'], ['furnace', 'neutral', 'cooler'], ['ai', 'turbine', 'solar'], ['dome', 'greenhouse', 'sandstorm'], ['vortex', 'glacier', 'boiler']];
 const pickBoss = () => { const b = ZONE_BOSSES[stage.zone]; return b[Math.floor(rand() * b.length)]; };
 // 재료 종류 (2026-10-26 교사 요청): 생물형은 가죽, 기계형은 부품, 둘 다 아닌 것(방울·숯·기체)은 무작위
-const BIO = new Set(['tri', 'amm', 'mam', 'rat', 'leaf', 'spore', 'owl', 'fox']), MECH = new Set(['rust', 'drone', 'bias', 'furnace', 'ai', 'conduct', 'radiate']);
+const BIO = new Set(['tri', 'amm', 'mam', 'rat', 'leaf', 'spore', 'owl', 'fox']), MECH = new Set(['rust', 'drone', 'bias', 'furnace', 'ai', 'conduct', 'radiate', 'boiler']);
 const matOf = k => BIO.has(k) ? 'cloth' : MECH.has(k) ? 'part' : (rand() < 0.5 ? 'cloth' : 'part'); // 'cloth'는 화면에서 가죽
 const isBoss = e => !!EDEF[e.kind].boss;
 // 새 판: 구역 1 역 1부터. 캐릭터 상태는 역을 넘어가도 이어진다
@@ -1254,7 +1274,7 @@ function updateClimate() {
   const room = roomAt(P.x, P.y - 3, 0), c = room && room.clim;
   if (c !== P.climIn) { P.climIn = c; if (c) { say(P.x, P.y - 66, CLIM[c].tag, c === 'hot' ? 'hurt' : 'stun'); say(P.x, P.y - 50, CLIM[c].hint, 'block', 'small'); } }
   climFlash.t = Math.max(0, climFlash.t - DT);
-  const water = inHaz('water'), lava = inHaz('lava', 80), warm = lava || warmWeapon();
+  const water = inHaz('water'), lava = inHaz('lava', 80) || inHaz('fire', 50), warm = lava || warmWeapon(); // 불꽃 웅덩이 곁도 따뜻하다(닿으면 화상)
   let rad = false; for (const e of enemies) { e.ray = !e.dead && e.kind === 'radiate' && Math.hypot(P.x - e.x, P.y - e.y) < 9 * T && !wallBetween(e.x, e.y - 20, P.x, P.y - 10); if (e.ray) rad = true; } // 복사열: 램프가 보이면 더위가 더 쌓이고, 장애물 뒤 그늘이면 막힌다
   if (rad && !water && !(P.guard.heat > 0)) P.heatX = Math.min(EXPOSE, P.heatX + 1.5 * DT);
   if (water) { // 물: 몸을 식히고, 산·염기를 씻어 낸다
@@ -1441,7 +1461,7 @@ let hazards = [], corpses = [];
 // acid·base: 산성(BTB 노랑)·염기성(BTB 파랑) 웅덩이 → 화학 화상 / water: 물웅덩이(몸 식히기·제독) / lava: 용암 틈(닿으면 화상, 곁에 있으면 몸이 녹는다)
 const HAZ = { acid: { r: 18, life: 6, col: '#e8d040', hurt: true, st: 'acid' }, base: { r: 18, life: 6, col: '#3f7fd0', hurt: true, st: 'acid' }, fire: { r: 16, life: 3, col: '#ff7a2a', hurt: true, st: 'burn' },
   nutri: { r: 22, life: 5, col: '#e8e0c8', slow: true }, water: { r: 22, life: 1e9, col: '#4aa0e0' }, lava: { r: 15, life: 1e9, col: '#ff5a1e', hurt: true, st: 'burn' },
-  frostT: { r: 24, life: 5, col: '#bfe6ff', cold: true } }; // frostT: 냉각 설비 관리기가 남기는 서리(밟으면 몸이 빨리 식는다)
+  frostT: { r: 24, life: 5, col: '#bfe6ff', cold: true }, sand: { r: 26, life: 6, col: '#d8b878', slow: true } }; // sand: 사막화 모래 더미(밟으면 느려짐) // frostT: 냉각 설비 관리기가 남기는 서리(밟으면 몸이 빨리 식는다)
 function addHazard(x, y, kind) { hazards.push({ x, y, kind, t: 0, life: HAZ[kind].life }); }
 function updateHazards() {
   for (const p of props) if (p.flash > 0) p.flash -= DT;
@@ -1552,6 +1572,10 @@ const BOSS2 = {
   turbine: { move: 0.5, seq: [{ t: 'spin', arms: 6, dur: 2.6, sp: 110, r: 6, spin: 2.6 }, { t: 'laser', n: 2, len: 380 }, { t: 'haz', hz: 'fire', n: 3 }, { t: 'roots', n: 3, near: true }, { t: 'ring', n: 26, sp: 120, r: 7, rep: 1 }] },
   dome: { move: 0.5, seq: [{ t: 'wave', kind: 'heat' }, { t: 'ring', n: 22, sp: 95, r: 7, rep: 2, st: 'heat' }, { t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2 }, { t: 'summon', kind: 'convect', n: 2 }, { t: 'wave', kind: 'heat' }, { t: 'haz', hz: 'fire', n: 3 }, { t: 'summon', kind: 'radiate', n: 1 }] },
   vortex: { move: 0.7, seq: [{ t: 'spin', arms: 4, dur: 2.8, sp: 100, r: 6, spin: 2.2, st: 'frost' }, { t: 'wave', kind: 'cold' }, { t: 'fan', n: 7, spread: 0.15, sp: 120, r: 6, rep: 2 }, { t: 'summon', kind: 'methane', n: 3 }, { t: 'snows', n: 6 }, { t: 'wave', kind: 'cold' }, { t: 'summon', kind: 'fox', n: 2 }] },
+  greenhouse: { move: 0.6, seq: [{ t: 'ring', n: 18, sp: 110, r: 7, rep: 1, ret: true }, { t: 'fan', n: 5, spread: 0.2, sp: 115, r: 7, rep: 2, st: 'heat' }, { t: 'wave', kind: 'heat' }, { t: 'ring', n: 24, sp: 90, r: 6, rep: 2, ret: true }, { t: 'summon', kind: 'radiate', n: 1 }] },
+  sandstorm: { move: 1.0, seq: [{ t: 'spin', arms: 5, dur: 2.6, sp: 110, r: 5, spin: 2.4 }, { t: 'charge', sp: 14, bounce: 2 }, { t: 'haz', hz: 'sand', n: 5 }, { t: 'fan', n: 9, spread: 0.12, sp: 150, r: 4, rep: 2 }, { t: 'wave', kind: 'heat' }, { t: 'summon', kind: 'conduct', n: 2 }] },
+  glacier: { move: 0.4, seq: [{ t: 'charge', sp: 9, bounce: 1 }, { t: 'roots', n: 6 }, { t: 'ring', n: 20, sp: 90, r: 8, rep: 2, st: 'frost' }, { t: 'haz', hz: 'frostT', n: 4 }, { t: 'wave', kind: 'cold' }, { t: 'summon', kind: 'fox', n: 2 }] },
+  boiler: { move: 0.6, seq: [{ t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2, hz: 'fire' }, { t: 'ring', n: 22, sp: 100, r: 7, rep: 2 }, { t: 'summon', kind: 'methane', n: 3 }, { t: 'haz', hz: 'fire', n: 4 }, { t: 'laser', n: 2, len: 360 }, { t: 'wave', kind: 'cold' }] },
   solar: { move: 0.4, seq: [{ t: 'laser', n: 2, len: 420, seqDelay: 0.35 }, { t: 'fan', n: 7, spread: 0.14, sp: 140, r: 6, rep: 2 }, { t: 'haz', hz: 'fire', n: 1, big: true }, { t: 'summon', kind: 'drone', n: 2 }, { t: 'ring', n: 24, sp: 110, r: 7, rep: 2 }] },
 };
 function bossGeneric(e, dx, dy, dist) {
@@ -1581,7 +1605,7 @@ function bossGeneric(e, dx, dy, dist) {
     for (let i = 0; i < p.n; i++) { fire(e.x, ey, a + (i - (p.n - 1) / 2) * p.spread + (e.n % 2) * p.spread / 2, p.sp, p.r, p.hz); if (p.st) ebul[ebul.length - 1].st = p.st; }
     e.n++; e.ft = 0.45; if (e.n >= (p.rep || 1)) done(); }
   else if (p.t === 'ring') { if (e.ft > 0) { e.ft -= DT; return; } const o = rand() * Math.PI;
-    for (let i = 0; i < p.n; i++) { const a = o + (i + (e.n % 2) * 0.5) / p.n * Math.PI * 2; if (p.gap && i % Math.floor(p.n / p.gap) === 0) continue; fire(e.x, ey, a, p.slow && e.n ? p.sp * 0.6 : p.sp, p.r); if (p.st) ebul[ebul.length - 1].st = p.st; }
+    for (let i = 0; i < p.n; i++) { const a = o + (i + (e.n % 2) * 0.5) / p.n * Math.PI * 2; if (p.gap && i % Math.floor(p.n / p.gap) === 0) continue; fire(e.x, ey, a, p.slow && e.n ? p.sp * 0.6 : p.sp, p.r); if (p.st) ebul[ebul.length - 1].st = p.st; if (p.ret) ebul[ebul.length - 1].ret = 0.9; }
     e.n++; e.ft = 0.45; if (e.n >= (p.rep || 1)) done(); }
   else if (p.t === 'spin') { e.ft -= DT; e.o += p.spin * DT; if (e.ft <= 0) { e.ft = 0.11; for (let i = 0; i < p.arms; i++) { fire(e.x, ey, e.o + i * Math.PI * 2 / p.arms, p.sp, p.r); if (p.st) ebul[ebul.length - 1].st = p.st; } } if (e.t <= 0) done(); }
   else if (p.t === 'wave') { const hot = p.kind === 'heat', safe = hot ? inHaz('water') : (inHaz('lava', 80) || warmWeapon()); // 폭염·한파: 방 전체에 더위·추위를 크게 쌓는다
@@ -1767,7 +1791,8 @@ function wallBetween(x0, y0, x1, y1) { const n = Math.ceil(Math.hypot(x1 - x0, y
   for (let i = 1; i < n; i++) if (solidAt(x0 + (x1 - x0) * i / n, y0 + (y1 - y0) * i / n)) return true; return false; }
 function updateBullets() {
   const pc = pCenter();
-  for (const b of ebul) { if (b.g) { b.vy += b.g * DT; if (b.convect && b.vy > 0) { b.st = null; b.cool = true; } } b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
+  for (const b of ebul) { if (b.ret !== undefined && !b.back) { b.ret -= DT; if (b.ret <= 0) { b.back = true; b.vx = -b.vx; b.vy = -b.vy; b.st = 'heat'; } } // 온실 기체: 퍼졌던 탄이 되돌아온다(다시 방출되는 복사 에너지)
+    if (b.g) { b.vy += b.g * DT; if (b.convect && b.vy > 0) { b.st = null; b.cool = true; } } b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
     if (bulletWall(b) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
     if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
       const s = b.st || (b.hz === 'fire' ? 'burn' : null);
