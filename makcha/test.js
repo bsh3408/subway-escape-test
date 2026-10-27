@@ -82,11 +82,11 @@
   btn(r, '바닥에 모두 깔기', () => { const ks = Object.keys(WEAP); ks.forEach((k, i) => { const a = i / ks.length * Math.PI * 2; pickups.push({ kind: k, x: P.x + Math.cos(a) * 80, y: P.y + Math.sin(a) * 55 }); }); });
 
   // 장비
-  r = sec('장비', '재료를 채운 뒤 조합대 창에서 만든다. 쓰는 장비는 숫자 키 1~5.');
+  r = sec('장비', '한 번에 1개만 든다. G 키로 쓰면 사라진다.');
   btn(r, '재료 99개', () => { P.mat = { cloth: 99, part: 99 }; });
   btn(r, '조합대 열기', () => openCraft());
-  btn(r, '쓰는 장비 5개씩', () => { for (const k in GEAR) if (!GEAR[k].wear) P.bag[k] = 5; });
-  btn(r, '입은 장비 벗기', () => { P.worn = new Set(); });
+  for (const k in GEAR) btn(r, GEAR[k].name + ' 들기', () => { P.gear = k; });
+  btn(r, '장비·막기 효과 지우기', () => { P.gear = null; P.guard = {}; P.solarT = 0; });
   r = sec('상태 이상 걸기');
   for (const k in STATUS) btn(r, STATUS[k].name, () => applyStatus(k));
   btn(r, '감염(세균)', () => { delete P.st.infect; applyStatus('infect'); P.st.infect.type = '세균'; P.st.infect.life = 1e9; });

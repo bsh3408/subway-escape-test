@@ -409,24 +409,25 @@ let P, enemies, ebul, shots, fx, marks, pickups, cam, shake, time, running, ende
 // en: 한 번 쓸 때 드는 에너지, len: 손잡이에서 총구까지 길이(탄이 나가는 곳)
 const RARITY = { w: '#e8e8e8', g: '#7ee07e', b: '#5fb8ff', p: '#c08aff', o: '#ffae42' };
 const WEAP = {
-  sling: { name: '새총', r: 'w', type: 'shot', cd: 0.32, en: 2, dmg: 2, sp: 320, br: 3.5, len: 15 },
-  nail: { name: '못총', r: 'w', type: 'shot', cd: 0.13, en: 1, dmg: 1, sp: 380, br: 2.5, spread: 0.07, len: 16 },
+  sling: { name: '새총', r: 'w', type: 'shot', cd: 0.32, en: 0.5, dmg: 2, sp: 320, br: 3.5, len: 15 },
+  nail: { name: '못총', r: 'w', type: 'shot', cd: 0.13, en: 0.25, dmg: 1, sp: 380, br: 2.5, spread: 0.07, len: 16 },
   umbrella: { name: '우산', r: 'w', type: 'melee', cd: 0.45, en: 0, dmg: 2, arc: 2.1, range: 46, kb: 0.6, deflect: 2.4, deflN: 4 },
   ladle: { name: '국자', r: 'w', type: 'melee', cd: 0.38, en: 0, dmg: 3, arc: 1.4, range: 40, kb: 0.8, deflect: 1.6, scoop: true },
   hammer: { name: '망치', r: 'g', type: 'melee', cd: 0.4, en: 0, dmg: 4, arc: 1.2, range: 38, kb: 1, deflect: 1.75, stun: 0.5 }, // stun: 특수효과 기절(초)
   rod: { name: '손잡이 쇠봉', r: 'g', type: 'melee', cd: 0.22, en: 0, dmg: 3, arc: 0.5, range: 58, kb: 0.5, deflect: 0.6, deflN: 2 },
-  base: { name: '수산화 칼슘 분사기', r: 'b', type: 'spray', cd: 0.2, en: 2, dmg: 1, n: 5, spread: 0.35, sp: 260, life: 0.35, br: 3, tag: 'base', len: 15 },
-  reduct: { name: '환원제 분사기', r: 'b', type: 'shot', cd: 0.16, en: 2, dmg: 2, sp: 420, br: 2.5, tag: 'red', len: 16 },
-  pack: { name: '냉온 팩탄', r: 'p', type: 'shot', cd: 0.45, en: 3, dmg: 3, sp: 260, br: 5, tag: 'pack', len: 14 },
-  beam: { name: '빛줄기 창', r: 'p', type: 'beam', cd: 0.5, en: 4, dmg: 4, len: 18 },
+  base: { name: '수산화 칼슘 분사기', r: 'b', type: 'spray', cd: 0.2, en: 1.5, dmg: 1, n: 5, spread: 0.35, sp: 260, life: 0.35, br: 3, tag: 'base', len: 15 },
+  reduct: { name: '환원제 분사기', r: 'b', type: 'shot', cd: 0.16, en: 0.8, dmg: 2, sp: 420, br: 2.5, tag: 'red', len: 16 },
+  pack: { name: '냉온 팩탄', r: 'p', type: 'shot', cd: 0.45, en: 1.5, dmg: 3, sp: 260, br: 5, tag: 'pack', len: 14 },
+  beam: { name: '빛줄기 창', r: 'p', type: 'beam', cd: 0.5, en: 3, dmg: 4, len: 18 },
   coil: { name: '유도 코일 충전기', r: 'o', type: 'charge', cd: 0.2, en: 5, dmg: 6, len: 14 },
+  // 에너지는 위력에 맞춘다: 약한 총은 적게, 강한 총은 많이(2026-10-27 교사 요청)
   // 실제 총기를 본뜬 무기 (2026-10-26 교사 요청): 연사·피해·흩어짐·에너지를 다르게
-  pistol: { name: '권총', r: 'w', type: 'shot', cd: 0.28, en: 1, dmg: 3, sp: 420, br: 3, len: 12 },
-  revolver: { name: '리볼버', r: 'g', type: 'shot', cd: 0.55, en: 2, dmg: 7, sp: 480, br: 3.5, len: 14 },
-  smg: { name: '기관단총', r: 'g', type: 'shot', cd: 0.08, en: 0.6, dmg: 1.5, sp: 400, br: 2.5, spread: 0.12, len: 13 },
+  pistol: { name: '권총', r: 'w', type: 'shot', cd: 0.28, en: 0.5, dmg: 3, sp: 420, br: 3, len: 12 },
+  revolver: { name: '리볼버', r: 'g', type: 'shot', cd: 0.55, en: 1.5, dmg: 7, sp: 480, br: 3.5, len: 14 },
+  smg: { name: '기관단총', r: 'g', type: 'shot', cd: 0.08, en: 0.4, dmg: 1.5, sp: 400, br: 2.5, spread: 0.12, len: 13 },
   shotgun: { name: '산탄총', r: 'b', type: 'shot', cd: 0.65, en: 3, dmg: 2, n: 6, spread: 0.4, sp: 380, life: 0.45, br: 3, len: 17 },
-  rifle: { name: '돌격소총', r: 'b', type: 'shot', cd: 0.12, en: 1, dmg: 2.5, sp: 460, br: 3, spread: 0.05, len: 17 },
-  sniper: { name: '저격소총', r: 'p', type: 'shot', cd: 1.1, en: 4, dmg: 15, sp: 800, br: 3, pierce: 3, life: 1.2, len: 19 },
+  rifle: { name: '돌격소총', r: 'b', type: 'shot', cd: 0.12, en: 0.6, dmg: 2.5, sp: 460, br: 3, spread: 0.05, len: 17 },
+  sniper: { name: '저격소총', r: 'p', type: 'shot', cd: 1.1, en: 5, dmg: 15, sp: 800, br: 3, pierce: 3, life: 1.2, len: 19 },
   lmg: { name: '기관총', r: 'o', type: 'shot', cd: 0.06, en: 0.8, dmg: 2, sp: 440, br: 3, spread: 0.14, len: 18 },
   // 폭발 무기 (2026-10-26 교사 요청): 적에게만 피해, 둘레의 적을 밀어낸다
   rocket: { name: '로켓포', r: 'o', type: 'shot', cd: 1.0, en: 6, dmg: 4, sp: 230, br: 5, len: 18, boom: { r: 56, dmg: 14 } },
@@ -491,7 +492,7 @@ function reset() {
   const J = JOBS[jobKey];
   P = { x: 0, y: 0, bw: 18, bh: 6, hp: J.hp, maxHp: J.hp, sh: J.sh, maxSh: J.sh, en: J.en, maxEn: J.en, noEnT: 0, inv: 0, shT: 0, face: 1,
     job: jobKey, skillCd: 0, skillMax: J.cd, stars: {}, packMode: 'cold', chg: 0,
-    st: {}, bag: {}, mat: { cloth: 0, part: 0 }, worn: new Set(), perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 쓰는 장비, 재료(가죽·부품), 입은 장비
+    st: {}, gear: null, guard: {}, solarT: 0, mat: { cloth: 0, part: 0 }, perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 장비(1개), 상태 이상 막는 시간, 재료(가죽·부품)
     ph: 0, pt: 0, moving: false, vx: 0, vy: 0, dash: 0, dashCd: 0, ddx: 0, ddy: 0, weapons: J.weapons.slice(), wi: 0, cd: 0, swing: 0, swingA: 0 };
   time = 0; ended = false; endT = 0;
   enterStation();
@@ -523,7 +524,7 @@ function showBanner() { const b = document.getElementById('banner'); if (!b) ret
 // ---------- 입력 ----------
 const keys = {}; const mouse = { sx: 0, sy: 0, down: false };
 // 글자 대신 키 위치(e.code)로 읽는다: 한글 입력 상태나 Shift를 누른 채여도 똑같이 동작
-const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Escape: 'esc' };
+const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', KeyG: 'g', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Escape: 'esc' };
 addEventListener('keydown', e => {
   const k = CODE[e.code]; if (k) keys[k] = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'ShiftRight') e.preventDefault();
@@ -533,7 +534,7 @@ addEventListener('keydown', e => {
   if (choosing) return; // 능력은 하나 골라야 창이 닫힌다
   if (crafting) { if (k === 'e' || k === 'esc') closeCraft(); return; }
   if (infoOpen) { if (k === 'e' || k === 'esc') closeInfo(); return; }
-  if (k >= '1' && k <= '5') { const g = Object.keys(GEAR).find(x => GEAR[x].key === +k); if (g) useGear(g); }
+  if (k === 'g' || k === '1') useGear(); // 장비 쓰기
   // 구르기: Shift (2026-10-26 교사 요청은 오른쪽 Shift). 키보드마다 오른쪽 Shift 신호가 다르게 올 수 있어 양쪽 Shift를 모두 받는다
   if (e.key === 'Shift' || e.code === 'ShiftRight' || e.code === 'ShiftLeft') tryDash();
   if (k === 'q' && P.weapons.length > 1) P.wi = (P.wi + 1) % P.weapons.length;
@@ -1017,19 +1018,21 @@ const STATUS = {
   acid: { name: '산성 화상', dur: 6, col: '#e8d040' }, burn: { name: '화상', dur: 5, col: '#ff7a2a' }, corrode: { name: '부식', dur: 10, col: '#c26a3a' },
   heat: { name: '열사병', dur: 8, col: '#ff5a3c' }, frost: { name: '동상', dur: 6, col: '#9fd8ff' }, infect: { name: '감염', col: '#c08aff' },
 };
+// 장비: 한 번에 1개만 들고, G 키로 한 번 쓰면 사라진다(2026-10-27 교사 요청: 입는/쓰는 장비 구분 없앰)
+// guard: 쓴 뒤 그 상태 이상에 걸리지 않는 시간(초)
 const GEAR = {
-  hotpack: { name: '핫팩', cloth: 1, part: 1, key: 1, cures: 'frost' },
-  coldpack: { name: '냉찜질 팩', cloth: 1, part: 1, key: 2, cures: 'heat' },
-  pad: { name: '중화 패드', cloth: 1, part: 2, key: 3, cures: 'acid', note: '게임 연출' }, // 실제 응급 처치는 흐르는 물로 씻기(통박사 정정)
-  kit: { name: '진단 키트', cloth: 0, part: 2, key: 4 },
-  amp: { name: '항생제 앰플', cloth: 1, part: 2, key: 5 },
-  coat: { name: '방수 코팅 외투', cloth: 2, part: 1, wear: true, blocks: 'corrode' },
-  gloves: { name: '단열 장갑', cloth: 2, part: 1, wear: true, blocks: 'burn' },
-  solar: { name: '태양광 충전 배낭', cloth: 1, part: 2, wear: true },
+  hotpack: { name: '핫팩', cloth: 1, part: 1, cures: 'frost', guard: 20, desc: '동상을 바로 낫게 하고, 20초 동안 동상에 걸리지 않는다' },
+  coldpack: { name: '냉찜질 팩', cloth: 1, part: 1, cures: 'heat', guard: 20, desc: '열사병을 바로 낫게 하고, 20초 동안 열사병에 걸리지 않는다' },
+  pad: { name: '중화 패드', cloth: 1, part: 2, cures: 'acid', guard: 20, note: '게임 연출', desc: '산성 화상을 바로 낫게 하고, 20초 동안 산성 화상을 입지 않는다' }, // 실제 응급 처치는 흐르는 물로 씻기(통박사 정정)
+  coat: { name: '방수 코팅 외투', cloth: 2, part: 1, cures: 'corrode', guard: 30, desc: '부식을 바로 없애고, 30초 동안 부식되지 않는다' },
+  gloves: { name: '단열 장갑', cloth: 2, part: 1, cures: 'burn', guard: 30, desc: '화상을 바로 낫게 하고, 30초 동안 불꽃 웅덩이에 다치지 않는다' },
+  solar: { name: '태양광 충전 배낭', cloth: 1, part: 2, desc: '30초 동안 에너지가 1초에 3씩 찬다' },
+  kit: { name: '진단·항생제 키트', cloth: 1, part: 2, desc: '감염됐을 때 쓴다. 병원체를 확인해 세균이면 항생제로 낫게 한다. 바이러스에는 항생제가 듣지 않아 키트를 아껴 둔다' },
 };
+const gearCost = G => [G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ');
 function applyStatus(k) {
   if (ended) return;
-  for (const g in GEAR) if (GEAR[g].blocks === k && P.worn.has(g)) { if (!(P.blockMsg > 0)) { say(P.x, P.y - 46, GEAR[g].name + ' · 막음', 'block', 'small'); P.blockMsg = 1.5; } return; }
+  if (P.guard[k] > 0) { if (!(P.blockMsg > 0)) { say(P.x, P.y - 46, STATUS[k].name + ' 막음', 'block', 'small'); P.blockMsg = 1.5; } return; }
   if (k === 'infect') { if (P.st.infect) return; const virus = rand() < 0.5; P.st.infect = { t: 0, type: virus ? '바이러스' : '세균', known: false, life: virus ? 14 : 1e9 }; say(P.x, P.y - 46, '감염', 'conf'); return; }
   if (!(P.st[k] > 0)) say(P.x, P.y - 46, STATUS[k].name, 'hurt', 'small');
   P.st[k] = STATUS[k].dur;
@@ -1046,28 +1049,26 @@ function updateStatus() {
     if (k === 'heat') P.en = Math.max(0, P.en - 2 * DT); // 열사병: 에너지가 준다
     if (P.st[k] <= 0) delete P.st[k];
   }
-  if (P.worn.has('solar')) P.en = Math.min(P.maxEn, P.en + 1.2 * DT); // 태양광 충전 배낭
+  for (const g in P.guard) P.guard[g] -= DT;
+  if (P.solarT > 0) { P.solarT -= DT; P.en = Math.min(P.maxEn, P.en + 3 * DT); } // 태양광 충전 배낭
   P.en = Math.min(P.maxEn, P.en + relicAdd('enregen') * DT); // 태양 전지판 조각
 }
 const statusSpeed = () => (P.st.heat ? 0.8 : 1) * (P.st.frost ? 0.7 : 1);
-function useGear(k) {
-  const G = GEAR[k]; if (!G || G.wear || !running || ended) return;
-  if (!(P.bag[k] > 0)) { say(P.x, P.y - 46, G.name + ' 없음', 'block', 'small'); return; }
-  if (G.cures) { if (!P.st[G.cures]) { say(P.x, P.y - 46, '쓸 필요가 없다', 'block', 'small'); return; } P.bag[k]--; cure(G.cures, G.name + ' · ' + STATUS[G.cures].name + ' 나음'); return; }
-  const inf = P.st.infect;
-  if (k === 'kit') { if (!inf) { say(P.x, P.y - 46, '확인할 감염이 없다', 'block', 'small'); return; } if (inf.known) { say(P.x, P.y - 46, '이미 확인했다 · ' + inf.type, 'block', 'small'); return; }
-    P.bag[k]--; inf.known = true; say(P.x, P.y - 46, '병원체 확인 · ' + inf.type, 'conf'); return; }
-  if (k === 'amp') { if (!inf) { say(P.x, P.y - 46, '쓸 필요가 없다', 'block', 'small'); return; }
-    if (!inf.known) { say(P.x, P.y - 46, '진단 키트로 먼저 확인해야 한다', 'block', 'small'); return; }
-    if (inf.type === '바이러스') { say(P.x, P.y - 46, '항생제는 바이러스에 효과가 없다', 'block', 'small'); return; }
-    P.bag[k]--; cure('infect', '항생제 앰플 · 감염 나음'); }
+function useGear() {
+  const k = P.gear, G = GEAR[k]; if (!running || ended) return;
+  if (!G) { say(P.x, P.y - 46, '장비 없음', 'block', 'small'); return; }
+  if (k === 'kit') { const inf = P.st.infect;
+    if (!inf) { say(P.x, P.y - 46, '감염됐을 때 쓴다', 'block', 'small'); return; }
+    if (inf.type === '바이러스') { inf.known = true; say(P.x, P.y - 46, '바이러스 · 항생제가 듣지 않는다', 'block', 'small'); return; } // 키트는 남는다
+    P.gear = null; cure('infect', '세균 확인 · 항생제로 나음'); return; }
+  P.gear = null;
+  if (k === 'solar') { P.solarT = 30; say(P.x, P.y - 46, '태양광 충전 30초', 'energy', 'small'); return; }
+  P.guard[G.cures] = G.guard; cure(G.cures, G.name + ' · ' + G.guard + '초 동안 ' + STATUS[G.cures].name + ' 막음');
 }
-function craft(k) {
+function craft(k) { // 장비는 한 번에 1개만: 들고 있으면 먼저 써야 만들 수 있다
   const G = GEAR[k];
-  if (P.mat.cloth < G.cloth || P.mat.part < G.part || (G.wear && P.worn.has(k))) return;
-  P.mat.cloth -= G.cloth; P.mat.part -= G.part;
-  if (G.wear) { P.worn = new Set([k]); if (G.blocks) cure(G.blocks); } // 입는 장비는 하나만: 새로 만들면 갈아입는다(2026-10-26 교사 요청)
-  else P.bag[k] = (P.bag[k] || 0) + 1;
+  if (P.gear || P.mat.cloth < G.cloth || P.mat.part < G.part) return;
+  P.mat.cloth -= G.cloth; P.mat.part -= G.part; P.gear = k;
   renderCraft();
 }
 // ---------- 스킬 트리: 역마다 능력 하나를 고른다. 앞 단계가 있어야 다음 단계가 열린다 (컨셉_확정 5절) ----------
@@ -1176,8 +1177,7 @@ function openInfo() {
     </div>
     <div class="icol">
       <h3>무기</h3>${wl}
-      <h3>입은 장비</h3><div class="ilist">${list([...P.worn].map(k => GEAR[k].name), '없음')}</div>
-      <h3>쓰는 장비</h3><div class="ilist">${list(Object.keys(GEAR).filter(k => P.bag[k] > 0).map(k => `${GEAR[k].key}번 ${GEAR[k].name} ×${P.bag[k]}`), '없음')}</div>
+      <h3>장비 · G 키</h3><div class="ilist">${P.gear ? `<b>${GEAR[P.gear].name}</b><br>${GEAR[P.gear].desc}` : '<i>없음</i>'}</div>
       <h3>상태 이상</h3><div class="ilist">${list(Object.keys(P.st).map(k => k === 'infect' ? '감염' + (P.st.infect.known ? '(' + P.st.infect.type + ')' : '') : STATUS[k].name), '없음')}</div>
     </div>
     <div class="icol">
@@ -1195,9 +1195,10 @@ function closeCraft() { crafting = false; document.getElementById('craft').class
 function renderCraft() {
   document.getElementById('craftMat').textContent = `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}`;
   const box = document.getElementById('craftList'); box.innerHTML = '';
-  for (const k in GEAR) { const G = GEAR[k], worn = G.wear && P.worn.has(k), ok = P.mat.cloth >= G.cloth && P.mat.part >= G.part && !worn;
+  if (P.gear) document.getElementById('craftMat').textContent += ` · 들고 있는 장비: ${GEAR[P.gear].name} (먼저 써야 새로 만들 수 있다)`;
+  for (const k in GEAR) { const G = GEAR[k], ok = !P.gear && P.mat.cloth >= G.cloth && P.mat.part >= G.part;
     const b = document.createElement('button'); b.className = 'gear' + (ok ? '' : ' off');
-    b.innerHTML = `<b>${G.name}</b>${G.note ? `<i>${G.note}</i>` : ''}<span>${[G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join(' · ')}</span><em>${G.wear ? (worn ? '착용 중' : P.worn.size ? '입는 장비 · 갈아입기' : '입는 장비') : (G.key + '번 · ' + (P.bag[k] || 0) + '개')}</em>`;
+    b.innerHTML = `<b>${G.name}</b>${G.note ? `<i>${G.note}</i>` : ''}<small>${G.desc}</small><span>${gearCost(G)}</span>${P.gear === k ? '<em>들고 있음</em>' : ''}`;
     b.onclick = () => craft(k); box.appendChild(b); }
 }
 const nearBench = () => { const tx = Math.floor(P.x / T), ty = Math.floor((P.y - 3) / T); for (let y = ty - 1; y <= ty + 1; y++) for (let x = tx - 1; x <= tx + 1; x++) if (tile(x, y) === 9) return true; return false; };
@@ -1212,7 +1213,7 @@ function updateHazards() {
   for (const p of props) if (p.flash > 0) p.flash -= DT;
   for (const h of hazards) { h.t += DT; const H0 = HAZ[h.kind];
     if (Math.hypot(P.x - h.x, (P.y - h.y) * 1.6) < H0.r) {
-      if (h.kind === 'fire' && P.worn.has('gloves')) continue; // 단열 장갑: 불꽃 웅덩이의 열이 몸에 덜 전해진다
+      if (h.kind === 'fire' && P.guard.burn > 0) continue; // 단열 장갑: 불꽃 웅덩이의 열이 몸에 덜 전해진다
       if (H0.hurt) hurt(1); if (H0.slow) P.slowT = 0.2; if (H0.st) applyStatus(H0.st); } }
   hazards = hazards.filter(h => h.t < h.life);
   for (const c of corpses) c.t -= DT; corpses = corpses.filter(c => c.t > 0);
@@ -1666,9 +1667,9 @@ function hitProp(p, n) {
   if (X === 'nutri') addHazard(x, y, 'nutri');
   const orbs = (n) => { for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2; pickups.push({ kind: 'energy', x, y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 45, t: 0 }); } };
   if (X === 'energy') orbs(6); // 서버 상자: 에너지 많이
-  if (X === 'mat') pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x: x + 10, y }); // 화석 바위: 재료 하나 더
-  const d = rand(); // 떨어지는 것: 에너지 45%, 재료 25%, 체력 15%
-  if (d < 0.45) orbs(2 + Math.floor(rand() * 2)); else if (d < 0.70) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x, y }); else if (d < 0.85) pickups.push({ kind: 'heal', x, y });
+  if (X === 'mat' && rand() < 0.3) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x: x + 10, y }); // 화석 바위: 가끔 재료 하나 더
+  const d = rand(); // 떨어지는 것: 에너지 85%, 재료 6%, 체력 4% (2026-10-27 교사 요청: 아이템은 드물게, 에너지는 잘)
+  if (d < 0.85) orbs(2 + Math.floor(rand() * 2)); else if (d < 0.91) pickups.push({ kind: rand() < 0.5 ? 'cloth' : 'part', x, y }); else if (d < 0.95) pickups.push({ kind: 'heal', x, y });
 }
 function drawProp(p) {
   const X = p.tx * T, Y = p.ty * T, O = '#1a1512', k = p.kind, dmg = 1 - p.hp / PROP[k].hp;
@@ -1920,10 +1921,10 @@ function drawHud() {
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   setTxt('prompt', nearExit() ? 'E 다음 역으로' : nearBench() ? 'E 조합대' : near ? 'E ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
-  setTxt('mat', `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}` + (P.worn.size ? ' · 착용 ' + [...P.worn].map(k => GEAR[k].name).join(', ') : ''));
+  setTxt('mat', `가죽 ${P.mat.cloth} · 부품 ${P.mat.part}`);
   const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name} ${Math.ceil(P.st[k])}</span>`).join(' ');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
-  setTxt('bag', Object.keys(GEAR).filter(k => P.bag[k] > 0).map(k => `${GEAR[k].key} ${GEAR[k].name} ×${P.bag[k]}`).join('   '));
+  setTxt('bag', (P.gear ? 'G 장비 · ' + GEAR[P.gear].name : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
 }
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
@@ -1948,7 +1949,7 @@ let loadout = { relics: [], gear: null };
 function applyLoadout() {
   for (const k of loadout.relics) if (save.relics.includes(k)) { P.relics.push(k); const R = RELIC[k];
     if (R.stat === 'shield') { P.maxSh += R.v; P.sh += R.v; } if (R.stat === 'hp') { P.maxHp += R.v; P.hp += R.v; } if (R.stat === 'skillcd') P.skillMax = Math.round(P.skillMax * (1 + R.v) * 10) / 10; }
-  if (loadout.gear) { const G = GEAR[loadout.gear]; if (G.wear) P.worn = new Set([loadout.gear]); else P.bag[loadout.gear] = 1; loadout.gear = null; } // 장비는 그 판에서만
+  if (loadout.gear) { P.gear = loadout.gear; loadout.gear = null; } // 장비는 그 판에서만
 }
 function renderLobby() {
   const rb = document.getElementById('lobbyRelics'); rb.innerHTML = '';
@@ -1961,12 +1962,14 @@ function renderLobby() {
   const back = loadout.gear ? GEAR[loadout.gear] : { cloth: 0, part: 0 }; // 바꿔 고르면 앞의 장비 재료를 되돌려 받는다
   for (const k in GEAR) { const G = GEAR[k], on = loadout.gear === k, ok = on || (save.mat.cloth + back.cloth >= G.cloth && save.mat.part + back.part >= G.part);
     const b = document.createElement('button'); b.className = 'lob' + (on ? ' on' : '') + (ok ? '' : ' off');
-    b.innerHTML = `${G.name}<small>${[G.cloth ? '가죽 ' + G.cloth : '', G.part ? '부품 ' + G.part : ''].filter(Boolean).join('·')}</small>`;
+    b.innerHTML = `${G.name}<small>${gearCost(G)}</small>`;
+    b.onmouseenter = () => { document.getElementById('lobbyGearDesc').textContent = G.name + ' · ' + G.desc; };
     b.onclick = () => { // 하나만 만들어 들고 간다. 다른 것을 고르면 앞의 것을 되돌린다
       if (on) { save.mat.cloth += G.cloth; save.mat.part += G.part; loadout.gear = null; }
       else if (ok) { if (loadout.gear) { const O = GEAR[loadout.gear]; save.mat.cloth += O.cloth; save.mat.part += O.part; } save.mat.cloth -= G.cloth; save.mat.part -= G.part; loadout.gear = k; }
       writeSave(); renderLobby(); };
     gb.appendChild(b); }
+  document.getElementById('lobbyGearDesc').textContent = loadout.gear ? GEAR[loadout.gear].name + ' · ' + GEAR[loadout.gear].desc : '장비에 마우스를 올리면 설명이 나온다 · 한 판에 한 번 쓰면 사라진다';
 }
 // 직업 고르기: 카드에는 이름만 적는다
 function jobPicker() {
