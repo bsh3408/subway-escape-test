@@ -273,6 +273,24 @@ const WDRAW = {
   saw(g, ux, uy) { bar(g, 8, 3, '#d9483b', ux, uy); const x = Math.round(WC + ux * 13), y = Math.round(WC + uy * 13); ell(g, x, y, 13, 13, '#1a1512'); ell(g, x, y, 11, 11, '#c3cad3'); ell(g, x, y, 4, 4, '#3a3f46');
     for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; px(g, Math.round(x + Math.cos(a) * 6), Math.round(y + Math.sin(a) * 6), 1, 1, '#1a1512'); } },
   saber(g, ux, uy) { bar(g, 5, 3, '#3a3f46', ux, uy); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 4, '#ff6ad5'); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 2, '#ffe6f8'); },
+  watergun(g, ux, uy) { bar(g, 9, 5, '#3f9fe0', ux, uy); bar(g, 3, 2, '#ffd23f', ux, uy, 9); blob(g, ux, uy, 2, 4, 4, '#f0b429'); }, // 파란 장난감 물총
+  rubber(g, ux, uy) { bar(g, 11, 2, '#c8a070', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 11 - vx * 2, WC + uy * 11 - vy * 2, vx, vy, 4, 1, '#d9483b'); }, // 나무젓가락과 고무줄
+  dart(g, ux, uy) { bar(g, 7, 2, '#3a3f46', ux, uy, 2); stroke(g, WC + ux * 9, WC + uy * 9, ux, uy, 3, 1, '#c3cad3'); blob(g, ux, uy, 1, 3, 3, '#ffd23f'); }, // 깃 달린 다트
+  bb(g, ux, uy) { bar(g, 10, 4, '#4a6a3a', ux, uy, 1); bar(g, 3, 2, '#2a2a30', ux, uy, 11); blob(g, ux, uy, 2, 3, 4, '#f0b429'); }, // 장난감 비비탄총
+  straw(g, ux, uy) { bar(g, 14, 2, '#f4f4f0', ux, uy); stroke(g, WC + ux * 4, WC + uy * 4, ux, uy, 3, 2, '#d9483b'); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 2, 2, '#d9483b'); }, // 줄무늬 빨대
+  paint(g, ux, uy) { bar(g, 11, 4, '#3a3f46', ux, uy, 1); blob(g, ux, uy, 6, 5, 5, '#ff6ad5'); }, // 위에 페인트 통
+  crossbow(g, ux, uy) { bar(g, 12, 3, '#8a5a2e', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 10 - vx * 6, WC + uy * 10 - vy * 6, vx, vy, 12, 2, '#5a3a22'); stroke(g, WC + ux * 3, WC + uy * 3, ux, uy, 12, 1, '#c3cad3'); }, // 활대와 화살
+  tennis(g, ux, uy) { bar(g, 12, 6, '#2e4470', ux, uy); blob(g, ux, uy, 13, 4, 4, '#d8f04a'); }, // 발사관 끝에 공
+  extinguisher(g, ux, uy) { bar(g, 8, 7, '#d9483b', ux, uy, -1); bar(g, 6, 2, '#2a2a30', ux, uy, 8); blob(g, ux, uy, 0, 4, 3, '#c3cad3'); }, // 빨간 소화기
+  mop(g, ux, uy) { bar(g, 16, 2, '#8a5a2e', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 17 - vx * 5, WC + uy * 17 - vy * 5, vx, vy, 10, 4, '#e8e0c8'); }, // 막대 끝 걸레
+  broom(g, ux, uy) { bar(g, 14, 2, '#c8a070', ux, uy); const vx = -uy, vy = ux; for (let i = -3; i <= 3; i++) stroke(g, WC + ux * 15 + vx * i, WC + uy * 15 + vy * i, ux, uy, 4, 1, i % 2 ? '#b8935f' : '#d8b878'); }, // 싸리비
+  ruler(g, ux, uy) { bar(g, 18, 2, '#c3cad3', ux, uy); g.fillStyle = '#3a3f46'; for (let t = 3; t < 18; t += 3) g.fillRect(Math.round(WC + ux * t), Math.round(WC + uy * t), 1, 1); }, // 눈금 있는 쇠자
+  flashlight(g, ux, uy) { bar(g, 9, 4, '#3a3f46', ux, uy); blob(g, ux, uy, 11, 5, 5, '#5a6470'); blob(g, ux, uy, 13, 3, 3, '#fff6a0'); }, // 손전등
+  shovel(g, ux, uy) { bar(g, 13, 2, '#8a5a2e', ux, uy); const x = Math.round(WC + ux * 16), y = Math.round(WC + uy * 16); ell(g, x, y, 9, 9, '#1a1512'); ell(g, x, y, 7, 7, '#8d96a3'); }, // 삽날
+  pan(g, ux, uy) { bar(g, 8, 2, '#2a2a30', ux, uy); const x = Math.round(WC + ux * 14), y = Math.round(WC + uy * 14); ell(g, x, y, 13, 13, '#1a1512'); ell(g, x, y, 11, 11, '#3a3f46'); ell(g, x, y, 7, 7, '#5a6470'); }, // 프라이팬
+  wrench(g, ux, uy) { bar(g, 11, 3, '#8d96a3', ux, uy); const vx = -uy, vy = ux; blob(g, ux, uy, 13, 6, 6, '#8d96a3'); px(g, Math.round(WC + ux * 14 + vx), Math.round(WC + uy * 14 + vy), 2, 2, '#1a1512'); }, // 몽키 스패너
+  steelpipe(g, ux, uy) { bar(g, 18, 3, '#6a7480', ux, uy); blob(g, ux, uy, 18, 4, 4, '#5a6470'); }, // 쇠파이프
+  bat(g, ux, uy) { bar(g, 6, 2, '#5a3a22', ux, uy); bar(g, 12, 4, '#c8a070', ux, uy, 6); }, // 손잡이가 가는 나무 방망이
   rail(g, ux, uy) { bar(g, 6, 5, '#2a2a30', ux, uy, -2); const vx = -uy, vy = ux; stroke(g, WC + ux * 3 + vx * 2, WC + uy * 3 + vy * 2, ux, uy, 16, 2, '#8d96a3'); stroke(g, WC + ux * 3 - vx * 2, WC + uy * 3 - vy * 2, ux, uy, 16, 2, '#8d96a3');
     stroke(g, WC + ux * 4, WC + uy * 4, ux, uy, 13, 1, '#7fd8ff'); blob(g, ux, uy, 2, 4, 4, '#3f7fd0'); }, // 레일 두 줄 사이로 전류
   nitro(g, ux, uy) { bar(g, 9, 7, '#c3cad3', ux, uy, -1); bar(g, 2, 7, '#8d96a3', ux, uy, 3); bar(g, 7, 2, '#8d96a3', ux, uy, 8); blob(g, ux, uy, 15, 3, 3, '#e6f6ff'); }, // 은빛 보온통과 노즐
@@ -441,6 +459,25 @@ const WEAP = {
   // 폭발 무기 (2026-10-26 교사 요청): 적에게만 피해, 둘레의 적을 밀어낸다
   rocket: { name: '로켓포', r: 'o', type: 'shot', cd: 1.0, en: 5, dmg: 4, sp: 230, br: 5, len: 18, boom: { r: 56, dmg: 14 }, shape: 'rocket' },
   grenade: { name: '유탄 발사기', r: 'p', type: 'lob', cd: 0.7, en: 3, dmg: 10, len: 15, boom: { r: 48, dmg: 10 } },
+  // 약한 기본 무기: 지하철에서 주운 생활 도구. 흰색·초록, 에너지 1 이하 (2026-10-27 교사 요청). col: 탄 색
+  watergun: { name: '물총', r: 'w', type: 'shot', cd: 0.35, en: 1, dmg: 1, burst: 2, gap: 0.08, sp: 300, br: 3, life: 0.9, len: 13, shape: 'drop', col: '#5fb8ff' },
+  rubber: { name: '고무줄총', r: 'w', type: 'shot', cd: 0.3, en: 1, dmg: 2, sp: 380, br: 2, life: 0.8, len: 13, shape: 'needle', col: '#d9483b' },
+  dart: { name: '다트', r: 'w', type: 'shot', cd: 0.45, en: 1, dmg: 3, sp: 400, br: 2, life: 0.9, len: 10, shape: 'needle', col: '#ffd23f' },
+  bb: { name: '비비탄총', r: 'w', type: 'shot', cd: 0.32, en: 1, dmg: 1, burst: 3, gap: 0.07, sp: 380, br: 2.5, spread: 0.1, len: 13, shape: 'dot', col: '#f4f4f0' },
+  straw: { name: '빨대 콩알총', r: 'w', type: 'shot', cd: 0.25, en: 1, dmg: 1, n: 2, spread: 0.15, sp: 340, br: 2.5, life: 0.8, len: 12, shape: 'pellet', col: '#7fbf4f' },
+  paint: { name: '페인트볼총', r: 'w', type: 'shot', cd: 0.4, en: 1, dmg: 2, sp: 330, br: 4, len: 14, shape: 'stone', col: '#ff6ad5' },
+  crossbow: { name: '석궁', r: 'g', type: 'shot', cd: 0.7, en: 1, dmg: 5, sp: 520, br: 2.5, pierce: 1, len: 14, shape: 'needle', col: '#c8a070' },
+  tennis: { name: '테니스공 발사기', r: 'g', type: 'shot', cd: 0.5, en: 1, dmg: 3, sp: 300, br: 5, len: 15, shape: 'stone', col: '#d8f04a' },
+  extinguisher: { name: '소화기', r: 'g', type: 'spray', cd: 0.35, en: 1, dmg: 1, n: 6, spread: 0.4, sp: 240, life: 0.35, br: 3, len: 12, shape: 'mist', push: true, desc: '이산화 탄소를 뿜어 적을 조금 밀어낸다' },
+  mop: { name: '대걸레', r: 'w', type: 'melee', cd: 0.5, en: 0, dmg: 1, arc: 2.0, range: 46, kb: 0.5, deflect: 2.2, deflN: 3 },
+  broom: { name: '빗자루', r: 'w', type: 'melee', cd: 0.4, en: 0, dmg: 1, arc: 1.8, range: 44, kb: 0.7, deflect: 1.8, deflN: 2 },
+  ruler: { name: '쇠자', r: 'w', type: 'melee', cd: 0.25, en: 0, dmg: 1, arc: 0.8, range: 40, kb: 0.3, deflect: 0.8 },
+  flashlight: { name: '손전등', r: 'w', type: 'melee', cd: 0.35, en: 0, dmg: 2, arc: 1.0, range: 32, kb: 0.5, deflect: 1.0 },
+  shovel: { name: '삽', r: 'w', type: 'melee', cd: 0.5, en: 0, dmg: 3, arc: 1.3, range: 48, kb: 1, deflect: 1.4 },
+  pan: { name: '프라이팬', r: 'g', type: 'melee', cd: 0.45, en: 0, dmg: 3, arc: 1.4, range: 36, kb: 1.1, deflect: 2.6, deflN: 5, desc: '넓은 바닥으로 적의 탄을 잘 튕겨낸다' },
+  wrench: { name: '몽키 스패너', r: 'g', type: 'melee', cd: 0.38, en: 0, dmg: 3, arc: 1.0, range: 36, kb: 0.8, deflect: 1.2, stun: 0.3 },
+  steelpipe: { name: '쇠파이프', r: 'g', type: 'melee', cd: 0.45, en: 0, dmg: 4, arc: 1.2, range: 44, kb: 1, deflect: 1.4 },
+  bat: { name: '야구 방망이', r: 'g', type: 'melee', cd: 0.5, en: 0, dmg: 3, arc: 1.5, range: 44, kb: 1.6, deflect: 1.6, desc: '적을 멀리 날려 보낸다' },
   // 과학 원리 무기: 에너지를 많이 쓰는 대신 강하다 (2026-10-27 교사 요청)
   rail: { name: '전자기 레일건', r: 'o', type: 'beam', cd: 1.4, en: 8, dmg: 24, len: 20, rail: true, desc: '자기장 속에서 전류가 흐르는 도체가 전자기력을 받아 탄이 빠르게 가속된다. 벽까지 곧게 뻗어 길 위의 적을 모두 꿰뚫는다' },
   nitro: { name: '액체 질소 분사기', r: 'p', type: 'spray', cd: 0.7, en: 6, dmg: 2, n: 8, spread: 0.45, sp: 240, life: 0.45, br: 3, tag: 'n2', len: 16, shape: 'mist', desc: '액체 질소가 기화하면서 주변의 열을 흡수한다. 맞은 적은 느려지고, 여러 번 맞으면 얼어붙는다' },
@@ -697,7 +734,7 @@ function shootOnce(wk, W0, dm) {
     const sa = a2 + (n > 1 ? (rand() - 0.5) * 2 * W0.spread : (W0.spread ? (rand() - 0.5) * 2 * W0.spread : 0)), sp = W0.sp * (n > 1 ? 0.8 + rand() * 0.4 : 1);
     const lr = has('range') ? 1.15 : 1; // 장거리탄: 더 빠르고 멀리
     shots.push({ x: gx, y: gy, vx: Math.cos(sa) * sp * lr, vy: Math.sin(sa) * sp * lr, life: (W0.life || 1.3) * (has('range') ? 1.4 : 1), dmg: W0.dmg * dm, r: W0.br, tag: W0.tag, mode: W0.tag === 'pack' ? P.packMode : undefined,
-      boom: W0.boom ? { r: W0.boom.r, dmg: W0.boom.dmg * dm } : undefined, rocket: !!W0.boom, pierce: W0.pierce || 0, shape: W0.shape });
+      boom: W0.boom ? { r: W0.boom.r, dmg: W0.boom.dmg * dm } : undefined, rocket: !!W0.boom, pierce: W0.pierce || 0, shape: W0.shape, col: W0.col, push: W0.push });
   }
 }
 // 빛줄기 창: 벽에 닿을 때까지 곧게 뻗어 길 위의 적을 모두 꿰뚫는다
@@ -1534,15 +1571,15 @@ function drawShot(s, x, y, d) {
   const v = Math.hypot(s.vx, s.vy) || 1, ux = s.vx / v, uy = s.vy / v;
   if (s.deflect) { ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, '#fff3b0'); return; }
   switch (s.shape) {
-    case 'stone': ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, '#9a9182'); px(ctx, x - 2, y - 2, 2, 2, '#d8d0c0'); return; // 새총: 둥근 돌
-    case 'needle': streak(x, y, ux, uy, 8, 1, '#d8dde3'); px(ctx, x - 1, y - 1, 2, 2, '#ffffff'); return; // 못: 가는 바늘
+    case 'stone': ell(ctx, x, y, d + 2, d + 2, '#2a2520'); ell(ctx, x, y, d, d, s.col || '#9a9182'); px(ctx, x - 2, y - 2, 2, 2, '#d8d0c0'); return; // 새총: 둥근 돌
+    case 'needle': streak(x, y, ux, uy, 8, 1, s.col || '#d8dde3'); px(ctx, x - 1, y - 1, 2, 2, '#ffffff'); return; // 못: 가는 바늘
     case 'bullet': streak(x, y, ux, uy, 4, 3, '#2a2520'); streak(x, y, ux, uy, 3, 2, '#e0b04a'); return; // 권총: 짧은 놋쇠 탄
     case 'slug': streak(x - ux * 4, y - uy * 4, ux, uy, 8, 1, '#ffe9a8'); streak(x, y, ux, uy, 5, 4, '#2a2520'); streak(x, y, ux, uy, 4, 3, '#c8783a'); return; // 리볼버: 굵은 탄과 꼬리
-    case 'dot': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, '#ffe14a'); return; // 기관단총: 작은 점
+    case 'dot': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, s.col || '#ffe14a'); return; // 기관단총: 작은 점
     case 'tracer': streak(x, y, ux, uy, 11, 2, '#ff9a3c'); streak(x, y, ux, uy, 4, 2, '#fff2b0'); return; // 소총·기관총: 예광탄 줄
-    case 'pellet': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, '#c9c2b4'); return; // 산탄: 작은 알갱이
+    case 'pellet': px(ctx, x - 1, y - 1, 3, 3, '#2a2520'); px(ctx, x - 1, y - 1, 2, 2, s.col || '#c9c2b4'); return; // 산탄: 작은 알갱이
     case 'line': ctx.globalAlpha = 0.5; streak(x, y, ux, uy, 26, 1, '#bfe6ff'); ctx.globalAlpha = 1; streak(x, y, ux, uy, 6, 2, '#ffffff'); return; // 저격: 긴 흰 선
-    case 'drop': { const col = s.tag === 'base' ? '#f4f4f0' : '#9ad08a'; ell(ctx, x, y, d + 1, d + 1, '#2a2520'); ell(ctx, x, y, d, d, col); streak(x - ux * 2, y - uy * 2, ux, uy, 3, 1, col); return; } // 분사기: 물방울
+    case 'drop': { const col = s.col || (s.tag === 'base' ? '#f4f4f0' : '#9ad08a'); ell(ctx, x, y, d + 1, d + 1, '#2a2520'); ell(ctx, x, y, d, d, col); streak(x - ux * 2, y - uy * 2, ux, uy, 3, 1, col); return; } // 분사기: 물방울
     case 'pack': { const col = s.mode === 'hot' ? '#ff7a2a' : '#7fc8ff'; px(ctx, x - 5, y - 4, 10, 8, '#2a2520'); px(ctx, x - 4, y - 3, 8, 6, col); px(ctx, x - 1, y - 3, 2, 6, '#f4f4f0'); return; } // 팩: 네모난 주머니
     case 'rocket': streak(x - ux * 7, y - uy * 7, ux, uy, 5, 3, rand() < 0.5 ? '#ffd23f' : '#ff5a1e'); streak(x, y, ux, uy, 8, 4, '#2a2520'); streak(x, y, ux, uy, 7, 3, '#8a9096'); px(ctx, Math.round(x - 1), Math.round(y - 1), 3, 3, '#d04030'); return; // 로켓: 몸통·탄두·불꽃
     case 'mist': ctx.globalAlpha = Math.min(1, s.life / 0.2); ell(ctx, x, y, d + 3, d + 3, '#e6f6ff'); px(ctx, x - 1, y - 1, 2, 2, '#ffffff'); ctx.globalAlpha = 1; return; // 액체 질소: 하얀 냉기
@@ -1575,6 +1612,7 @@ function updateBullets() {
       if (s.tag === 'base' && e.kind === 'acid') d *= 2; // 수산화 칼슘(염기) → 산성 방울에 강하다
       if (s.tag === 'red' && e.kind === 'rust') d *= 2; // 환원제 → 녹(산화철)에 강하다
       damage(e, Math.max(1, Math.round(d)));
+      if (s.push && !e.dead && !isBoss(e)) { e.kx = s.vx * 0.8; e.ky = s.vy * 0.8; }
       if (s.tag === 'n2' && !e.dead) { e.slowT = 2.5; e.frz = (e.frz || 0) + 1; e.frzT = 1.2; // 액체 질소: 느려지고, 짧은 사이에 3번 넘게 맞으면 얼어붙는다
         if (e.frz >= 3 && !isBoss(e)) { if (!(e.stun > 0)) say(e.x, e.y - e.h - 16, '얼어붙음', 'stun', 'small'); e.stun = Math.max(e.stun || 0, 1.2); e.frz = 0; } }
       if (s.tag === 'pack' && !e.dead) { if (s.mode === 'hot') { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } else { if (!(e.slowT > 0)) say(e.x, e.y - e.h - 16, '느려짐', 'stun', 'small'); e.slowT = 2.5; } }
