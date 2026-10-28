@@ -478,21 +478,23 @@ const tile = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? 0 : map[y * MW +
 const setT = (x, y, v) => { map[y * MW + x] = v; };
 // 칸 무작위 걸음: 시작 → 전투 → 전투 → 출구(또는 보스), 가끔 전투방 옆에 보급방이 붙는다
 function layoutStation(isBossSt) {
-  for (let tries = 0; tries < 200; tries++) {
-    const path = [[0, Math.floor(rand() * GH)]], used = new Set([path[0].join()]);
+  for (let tries = 0; tries < 400; tries++) {
+    const nf = rand() < 0.5 ? 2 : 3, len = nf + 2;
+    const path = [[Math.floor(rand() * GW), Math.floor(rand() * GH)]], used = new Set([path[0].join()]);
     let ok = true;
-    for (let i = 1; i < 4 && ok; i++) {
-      const [x, y] = path[i - 1], opts = [[x + 1, y], [x + 1, y], [x, y - 1], [x, y + 1]].filter(([a, b]) => a >= 0 && a < GW && b >= 0 && b < GH && !used.has(a + ',' + b));
+    for (let i = 1; i < len && ok; i++) {
+      const [x, y] = path[i - 1], opts = [[x + 1, y], [x - 1, y], [x, y - 1], [x, y + 1]].filter(([a, b]) => a >= 0 && a < GW && b >= 0 && b < GH && !used.has(a + ',' + b));
       if (!opts.length) ok = false; else { const n = opts[Math.floor(rand() * opts.length)]; path.push(n); used.add(n.join()); }
     }
     if (!ok) continue;
-    const types = ['start', 'fight', 'fight', isBossSt ? 'boss' : 'exit'];
+    const types = ['start', ...Array(nf).fill('fight'), isBossSt ? 'boss' : 'exit'];
     const defs = path.map(([gx, gy], i) => ({ id: 'r' + i, gx, gy, type: types[i] }));
     const L = []; for (let i = 1; i < defs.length; i++) L.push([defs[i - 1].id, defs[i].id]);
     const side = (type, id) => { // 큰길 방(출구·보스방 제외) 옆 빈칸에 곁방을 붙인다
-      for (const f of shuffle(defs.slice(0, 3))) { const cand = [[f.gx + 1, f.gy], [f.gx - 1, f.gy], [f.gx, f.gy - 1], [f.gx, f.gy + 1]].filter(([a, b]) => a >= 0 && a < GW && b >= 0 && b < GH && !used.has(a + ',' + b));
-        if (cand.length) { const [gx, gy] = cand[Math.floor(rand() * cand.length)]; used.add(gx + ',' + gy); defs.push({ id, gx, gy, type }); L.push([f.id, id]); return; } } };
-    side('aid', 'aid'); side('crate', 'crt'); if (rand() < 0.6) side('supply', 'sup');
+      for (const f of shuffle(defs.slice(0, len - 1))) { const cand = [[f.gx + 1, f.gy], [f.gx - 1, f.gy], [f.gx, f.gy - 1], [f.gx, f.gy + 1]].filter(([a, b]) => a >= 0 && a < GW && b >= 0 && b < GH && !used.has(a + ',' + b));
+        if (cand.length) { const [gx, gy] = cand[Math.floor(rand() * cand.length)]; used.add(gx + ',' + gy); defs.push({ id, gx, gy, type }); L.push([f.id, id]); return true; } } return false; };
+    if (!side('aid', 'aid')) continue; // 구호실은 반드시
+    if (rand() < 0.75) side('crate', 'crt'); if (rand() < 0.5) side('supply', 'sup'); if (rand() < 0.35) side('fight', 'sf');
     return { defs, L };
   }
 }
@@ -500,7 +502,8 @@ function buildMap() {
   map = new Uint8Array(MW * MH);
   const isBossSt = stage.st === 3, { defs, L } = layoutStation(isBossSt);
   links = L;
-  rooms = defs.map(d => { const [w, h] = ROOMSIZE[d.type];
+  rooms = defs.map(d => { const [w0, h0] = ROOMSIZE[d.type], v = d.type === 'fight' || d.type === 'crate'; // 전투방·지형지물 방은 크기가 조금씩 다르다
+    const w = w0 + (v ? Math.floor(rand() * 5) * 2 - 4 : 0), h = h0 + (v ? Math.floor(rand() * 3) * 2 - 2 : 0);
     return { ...d, w, h, x0: d.gx * CW + ((CW - w) >> 1), y0: d.gy * CH + ((CH - h) >> 1), doors: [], state: d.type === 'crate' || d.type === 'aid' ? 'clear' : 'idle', wi: 0, seen: false, passed: d.type === 'start' || d.type === 'exit',
       waves: d.type === 'fight' ? wavesFor(stage.zone, stage.st) : d.type === 'boss' ? [[pickBoss()]] : null }; });
   for (const r of rooms) {
@@ -533,6 +536,7 @@ function buildMap() {
       }
     }
   }
+  for (const [a, b] of links) { if (a === 'r0') R(b).passed = true; if (b === 'r0') R(a).passed = true; }
   for (const r of rooms) if (r.type === 'exit') { const cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1); for (let y = cy - 1; y <= cy; y++) for (let x = cx - 1; x <= cx; x++) setT(x, y, 8); }
   // 조합대 없음(2026-10-28 장비 제거)
   for (const r of rooms) placeBlocks(r); // 부서지지 않는 장애물 덩어리
@@ -1614,7 +1618,7 @@ function openInfo() {
       <span>피해 ${Math.round(dmg * starMul(k) * dmgMul(W0.type === 'melee'))} · 간격 ${W0.cd}초 · 에너지 ${enCost(W0.en)}</span>${W0.desc ? `<span>${W0.desc}</span>` : ''}</div>`; }).join('');
   const list = (arr, empty) => arr.length ? arr.join(', ') : `<i>${empty}</i>`;
   const Q = stage.quiz;
-  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">다음 관문 문제 힌트 쪽지 ${Q.hints} / 3장을 모았다</p>` : '') + `
+  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 쪽지 ${Q.hints} / 3장을 모았다</p>` : '') + `
     <div class="icol">
       <h3>${J.name}</h3>
       ${g('스킬', `${J.skill} · ${Math.round(P.skillMax * 10) / 10}초`)}
@@ -1674,15 +1678,29 @@ function quizHtml(Q, gate, label) {
   if (Q.msg) h += `<p class="qm">${Q.msg}</p>`;
   return h + '</div>';
 }
-function openQuiz(onSolve, kind) { // kind: 'room' 방 입장 / 'station' 다음 역 / 'zone' 다음 구역(단원)
+const OXB = typeof OX_BANK !== 'undefined' ? OX_BANK : [];
+function newOX() { const used = P.usedOX || (P.usedOX = new Set());
+  let pool = OXB.filter(q => q.zone === stage.zone && !used.has(q.id)); if (!pool.length) { for (const q of OXB) if (q.zone === stage.zone) used.delete(q.id); pool = OXB.filter(q => q.zone === stage.zone); }
+  if (!pool.length) return null; const q = pool[Math.floor(rand() * pool.length)]; used.add(q.id); return q; }
+function openOX(onSolve) {
+  let q = newOX(), msg = ''; if (!q) { onSolve(); return; }
+  const done = () => { closeCraft(); onSolve(); };
+  const pick = v => { if (v === q.answer) { openModal('정답', `<div class="qz"><p class="qq">${esc(q.explain || '')}</p><button class="qb" id="qgo">들어가기</button></div>`, b => { b.querySelector('#qgo').onclick = done; }, { e: done }); return; }
+    time += 30; say(P.x, P.y - 44, '오답 · 기록 +30초', 'hurt'); msg = '틀렸다 · ' + esc(q.explain || '') + '<br>새 문제를 맞혀야 들어갈 수 있다'; q = newOX() || q; draw(); };
+  const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div>${msg ? `<p class="qm">${msg}</p>` : ''}</div>`,
+    b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false) });
+  draw();
+}
+function openQuiz(onSolve, kind) {
+  if (kind === 'room') { openOX(onSolve); return; } // kind: 'room' 방 입장 / 'station' 다음 역 / 'zone' 다음 구역(단원)
   if (!stage.quiz) stage.quiz = newQuiz(); const Q = stage.quiz; if (!Q) { onSolve(); return; }
-  const label = kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록에 5분이 더해진다' : kind === 'room' ? '이 문제를 풀어야 방에 들어간다' : '이 문제를 풀어야 다음 역으로 간다';
+  const label = kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록 +5분' : '다음 역으로 가는 문제 · 틀리면 기록 +1분';
   const go = () => { closeCraft(); stage.quiz = newQuiz(); onSolve(); }; // 다음 관문은 새 문제(힌트도 새로 모은다)
   const check = ok => { if (ok) { Q.solved = true; openModal('정답', `<div class="qz"><p class="qq">${esc(Q.q.explain || '')}</p><button class="qb" id="qgo">계속</button></div>`, b => { b.querySelector('#qgo').onclick = go; }, { e: go }); burst(P.x, P.y - 16, '#9fe0ff', 16); return; }
     if (kind === 'zone') { time += 300; say(P.x, P.y - 44, '오답 · 기록 +5분', 'hurt', 'big'); } // 2026-10-28 교사 요청
-    else { if (P.sh > 0) P.sh--; else if (P.hp > 1) P.hp--; say(P.x, P.y - 44, '오답 -1', 'hurt'); } // 틀리면 방어막이나 체력 1(쓰러지지는 않는다)
+    else { time += 60; say(P.x, P.y - 44, '오답 · 기록 +1분', 'hurt'); } // 역 관문: 틀리면 1분
     draw(); };
-  const draw = () => openModal(kind === 'zone' ? '단원 관문 문제' : kind === 'room' ? '방 관문 문제' : '역 관문 문제', quizHtml(Q, true, label), b => {
+  const draw = () => openModal(kind === 'zone' ? '단원 관문 문제' : '역 관문 문제', quizHtml(Q, true, label), b => {
     b.querySelectorAll('[data-i]').forEach(x => x.onclick = () => { const i = +x.dataset.i; if (i === Q.q.answer) check(true); else { Q.wrong.add(i); Q.msg = '틀렸다. 힌트 쪽지를 더 모아 보자'; check(false); } });
     const ok = b.querySelector('#qok'); if (ok) { const inp = b.querySelector('#qnum'); inp.focus(); const go = () => { if (inp.value === '') return; if (+inp.value === Q.q.answer) check(true); else { Q.msg = `입력한 값(${esc(inp.value)}${esc(Q.q.unit || '')})은 답이 아니다`; check(false); } };
       ok.onclick = go; inp.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') go(); if (ev.key === 'Escape') closeCraft(); }; }
@@ -2243,7 +2261,6 @@ const LAYOUT_FIGHT = ['pillars', 'roomInRoom', 'corners', 'checker', 'cross'], /
  LAYOUT_BOSS = ['pillars', 'corners', 'checker', 'cross'];
 function placeBlocks(r) {
   if (r.type !== 'fight' && r.type !== 'boss') return; // 보급방·곁방에는 덩어리 장애물을 두지 않는다
-  if (r.type === 'fight' && rand() < 0.5) return; // 2026-10-28 교사 요청: 장애물이 너무 많다 → 전투방 절반은 비운다
   const ix0 = r.x0 + 1, iy0 = r.y0 + 2, iw = r.w - 2, ih = r.h - 3, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
   const list = shuffle((r.type === 'boss' ? LAYOUT_BOSS : r.type === 'supply' ? ['pillars', 'corners'] : LAYOUT_FIGHT).slice());
   for (const name of list) {
@@ -2285,7 +2302,7 @@ const PROP = {
 };
 let props = [];
 function placeProps(r) {
-  const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 3 + Math.floor(rand() * 2) : r.type === 'boss' ? 2 : r.type === 'start' ? 2 : r.type === 'aid' ? 0 : 1; // 지형지물 방: 부서지는 지형지물만 가득
+  const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 4 + Math.floor(rand() * 2) : r.type === 'boss' ? 3 : r.type === 'start' ? 2 : r.type === 'aid' ? 0 : 1; // 지형지물 방: 부서지는 지형지물만 가득
   const kinds = Object.keys(PROP).filter(k => PROP[k].z === VIS[stage.zone]), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
   for (let i = 0, tries = 0; i < n && tries < 80; tries++) {
     const tx = r.x0 + 2 + Math.floor(rand() * (r.w - 4)), ty = r.y0 + 3 + Math.floor(rand() * (r.h - 5));
@@ -2601,7 +2618,7 @@ function drawHud() {
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   if (loreT <= time && loreQ.length) { setTxt('lore', loreQ.shift()); loreT = time + 4; } else if (loreT <= time) setTxt('lore', '');
-  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? '다음 관문 문제 힌트 ' + stage.quiz.hints + '/3' : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
+  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? '역 관문 문제 힌트 ' + stage.quiz.hints + '/3' : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
 }
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
