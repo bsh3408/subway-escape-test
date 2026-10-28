@@ -2383,7 +2383,7 @@ function drawDevice(d) { const x = Math.round(d.x), y = Math.round(d.y), O = '#1
   else if (d.k === 'stove') { px(ctx, x - 11, y - 18, 22, 18, O); px(ctx, x - 10, y - 17, 20, 16, '#5a4a42'); px(ctx, x - 6, y - 13, 12, 8, Math.floor(time * 3) % 2 ? '#ff7a2a' : '#ffb347');
     px(ctx, x - 2, y - 26, 4, 8, O); px(ctx, x - 9, y - 24, 6, 6, O); px(ctx, x - 8, y - 23, 4, 4, '#c8c8d0'); }
   else { px(ctx, x - 12, y - 30, 24, 30, O); px(ctx, x - 11, y - 29, 22, 28, '#e6eef4'); px(ctx, x - 2, y - 26, 4, 10, '#d9483b'); px(ctx, x - 6, y - 23, 12, 4, '#d9483b'); px(ctx, x - 8, y - 12, 16, 8, '#3f7fd0'); px(ctx, x - 6, y - 10, 12, 4, '#9fe0ff'); }
-  if (d === nearDev()) { ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(DEV[d.k].name, x + 1, y - 33); ctx.fillStyle = '#f3ead7'; ctx.fillText(DEV[d.k].name, x, y - 34); }
+  if (d === nearDev()) { ctx.font = '10px DungGeunMo, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(DEV[d.k].name, x + 1, y - 33); ctx.fillStyle = '#f3ead7'; ctx.fillText(DEV[d.k].name, x, y - 34); }
 }
 function drawPillar(tx, ty) { const X = tx * T, Y = ty * T, [b, l, d, s] = THEME[VIS[stage.zone]].pillar;
   px(ctx, X, Y - T, T, T * 2, '#1b1916'); px(ctx, X + 1, Y - T + 1, T - 2, T * 2 - 2, b);
@@ -2485,7 +2485,7 @@ function render() {
     if (e.battOut) ctx.globalAlpha = 0.5;
     drawSpr(s, e.x - s.w / 2, e.y - s.h - alt, e.face < 0, flash); ctx.globalAlpha = 1;
     if (!isBoss(e) && Math.hypot(e.x - P.x, e.y - P.y) < 80) { const nm = ((ZONES[stage.zone].ov || {})[e.kind] || {}).name || EDEF[e.kind].name; // 2026-10-28 교사 요청: 가까이 가면 몬스터 이름
-      if (nm) { const tx = Math.round(e.x), ty = Math.round(e.y - s.h - alt - 4); ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(nm, tx + 1, ty + 1); ctx.fillStyle = '#ffe08a'; ctx.fillText(nm, tx, ty); } }
+      if (nm) { const tx = Math.round(e.x), ty = Math.round(e.y - s.h - alt - 4); ctx.font = '10px DungGeunMo, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(nm, tx + 1, ty + 1); ctx.fillStyle = '#ffe08a'; ctx.fillText(nm, tx, ty); } }
     if (e.batt !== undefined && !e.battOut) { const k = Math.max(0, e.batt / 10); px(ctx, Math.round(e.x - 8), Math.round(e.y - e.h - 5), 16, 3, '#0c0c0c'); px(ctx, Math.round(e.x - 7), Math.round(e.y - e.h - 4), Math.round(14 * k), 1, k > 0.3 ? '#7ee07e' : '#ff5a3c'); }
   } });
   for (const d of devices) list.push({ y: d.y, f: () => drawDevice(d) });
@@ -2589,19 +2589,21 @@ const SKILL_ICON = {
   medic: (cx, cy, a) => { ctx.globalAlpha = a; px(ctx, cx - 4, cy - 10, 8, 20, '#1a1512'); px(ctx, cx - 10, cy - 4, 20, 8, '#1a1512'); px(ctx, cx - 3, cy - 9, 6, 18, '#f3f3f3'); px(ctx, cx - 9, cy - 3, 18, 6, '#f3f3f3'); px(ctx, cx - 2, cy - 8, 4, 16, '#d9483b'); px(ctx, cx - 8, cy - 2, 16, 4, '#d9483b'); ctx.globalAlpha = 1; },
 };
 const BARS = [
-  { v: 'hp', m: 'maxHp', col: '#d9483b', hi: '#f27a6a', bg: '#3a1515', icon: (x, y) => heart(x - 1, y + 1, true) },
-  { v: 'sh', m: 'maxSh', col: '#8a97a6', hi: '#c3cdd8', bg: '#1d2228', icon: (x, y) => { px(ctx, x, y, 9, 10, '#0c1218'); px(ctx, x + 1, y + 1, 7, 6, '#9fb0c2'); px(ctx, x + 2, y + 7, 5, 1, '#9fb0c2'); px(ctx, x + 3, y + 8, 3, 1, '#9fb0c2'); } },
-  { v: 'en', m: 'maxEn', col: '#3f8fe0', hi: '#7fc0ff', bg: '#10203a', icon: (x, y) => { px(ctx, x + 3, y, 3, 10, '#0b2340'); px(ctx, x + 1, y + 2, 7, 6, '#0b2340'); px(ctx, x + 4, y + 1, 1, 8, '#5fb8ff'); px(ctx, x + 2, y + 3, 5, 4, '#5fb8ff'); } },
+  { v: 'hp', m: 'maxHp', col: '#e43b44', hi: '#ff8a8a', bg: '#3a0e14', icon: (x, y) => heart(x - 1, y + 1, true) },
+  { v: 'sh', m: 'maxSh', col: '#9aa8b8', hi: '#e0e8f0', bg: '#22262e', icon: (x, y) => { px(ctx, x, y, 9, 10, '#0c1218'); px(ctx, x + 1, y + 1, 7, 6, '#9fb0c2'); px(ctx, x + 2, y + 7, 5, 1, '#9fb0c2'); px(ctx, x + 3, y + 8, 3, 1, '#9fb0c2'); } },
+  { v: 'en', m: 'maxEn', col: '#2fb6f0', hi: '#9fe8ff', bg: '#0d2236', icon: (x, y) => { px(ctx, x + 3, y, 3, 10, '#0b2340'); px(ctx, x + 1, y + 2, 7, 6, '#0b2340'); px(ctx, x + 4, y + 1, 1, 8, '#5fb8ff'); px(ctx, x + 2, y + 3, 5, 4, '#5fb8ff'); } },
 ];
+const PIX = { ink: '#0b0a12', pnl: '#25213a', rim: '#6b6390', hi: '#8f86b8' };
+function pframe(x, y, w, h, fill) { px(ctx, x, y + 2, w, h, 'rgba(0,0,0,0.45)'); px(ctx, x, y, w, h, PIX.ink); px(ctx, x + 2, y + 2, w - 4, h - 4, PIX.rim); px(ctx, x + 2, y + 2, w - 4, 1, PIX.hi); px(ctx, x + 4, y + 4, w - 8, h - 8, fill || PIX.pnl); }
 function drawHud() {
   // 체력·방어막·에너지 막대 (숫자는 화면 위 글자로 겹쳐 띄운다)
-  px(ctx, 6, 6, 150, 46, 'rgba(10,8,6,0.72)');
+  pframe(4, 4, 154, 50);
   BARS.forEach((b, i) => {
     const y = 10 + i * 13, v = P[b.v], m = P[b.m];
     b.icon(20 - 6, y);
-    px(ctx, 25, y, 127, 10, '#050505'); px(ctx, 26, y + 1, 125, 8, b.bg);
+    px(ctx, 25, y, 127, 10, PIX.ink); px(ctx, 26, y + 1, 125, 8, b.bg);
     const fw = Math.round(125 * Math.max(0, Math.min(1, v / m)));
-    px(ctx, 26, y + 1, fw, 8, v > m ? '#9fd8ff' : b.col); px(ctx, 26, y + 1, fw, 2, b.hi);
+    px(ctx, 26, y + 1, fw, 8, v > m ? '#9fd8ff' : b.col); px(ctx, 26, y + 1, fw, 2, b.hi); px(ctx, 26, y + 7, fw, 2, 'rgba(0,0,0,0.25)');
     const el = document.getElementById('bar' + i); if (el) el.textContent = `${Math.floor(v)} / ${m}`;
   });
   // 오른쪽 아래: 스킬 칸(큰 원)과 그 위 구르기(작은 원). 쿨타임 동안 시계 방향으로 차오른다
@@ -2611,8 +2613,15 @@ function drawHud() {
   cdCircle(SLOT.dash.x, SLOT.dash.y, SLOT.dash.r, dk, '#2c3a2a', '#121612');
   dashIcon(SLOT.dash.x, SLOT.dash.y, dk >= 1);
   setTxt('skillCd', sk < 1 ? Math.ceil(P.skillCd) : ''); setTxt('dashCd', '');
+  { const k = P.weapons[P.wi], W0 = WEAP[k], bx = W - 214, by = H - 60; pframe(bx, by, 64, 50, '#1a1730');
+    px(ctx, bx + 4, by + 4, 56, 2, RARITY[W0.r]); // 등급 색 띠
+    const fr = SPR.wf[k] && SPR.wf[k][0]; if (fr) ctx.drawImage(fr.c, bx + 4, by + 2, 56, 56 * fr.h / fr.w);
+    ctx.font = '10px DungGeunMo, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.fillText('J', bx + 7, by + 45); ctx.fillStyle = '#ffe08a'; ctx.fillText('J', bx + 6, by + 44);
+    if (W0.en) { ctx.textAlign = 'right'; px(ctx, bx + 40, by + 37, 5, 5, '#2fb6f0'); ctx.fillStyle = '#000'; ctx.fillText(String(enCost(W0.en)), bx + 59, by + 45); ctx.fillStyle = '#9fe8ff'; ctx.fillText(String(enCost(W0.en)), bx + 58, by + 44); }
+    if (P.weapons.length > 1) { const o = P.weapons[(P.wi + 1) % P.weapons.length], f2 = SPR.wf[o] && SPR.wf[o][0]; pframe(bx - 34, by + 18, 32, 32, '#1a1730'); if (f2) { ctx.globalAlpha = 0.7; ctx.drawImage(f2.c, bx - 32, by + 18, 28, 28); ctx.globalAlpha = 1; }
+      ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.fillText('Q', bx - 29, by + 47); ctx.fillStyle = '#ffe08a'; ctx.fillText('Q', bx - 30, by + 46); } } // 두 번째 무기(Q로 바꾼다)
   // 미니맵
-  const mx = W - 10 - GW * 18, my = 10;
+  const mx = W - 10 - GW * 18, my = 12; pframe(mx - 8, my - 8, GW * 18 + 11, GH * 14 + 11, 'rgba(26,23,48,0.85)');
   for (const [a, b] of links) { const A = rooms.find(r => r.id === a), B = rooms.find(r => r.id === b); if (!A.seen && !B.seen) continue;
     line(mx + A.gx * 18 + 6, my + A.gy * 14 + 4, mx + B.gx * 18 + 6, my + B.gy * 14 + 4, '#6b6458', 1); }
   const cur = roomAt(P.x, P.y - 3, 0);
@@ -2625,7 +2634,7 @@ function drawHud() {
   else bn.textContent = '';
   document.getElementById('timer').textContent = fmt(time);
   { const k = P.weapons[P.wi], W0 = WEAP[k], s = P.stars[k] || 1, el = document.getElementById('weapon');
-    setTxt('weapon', W0.name + (s > 1 ? ' ' + '★'.repeat(s) : '') + (k === 'pack' ? (P.packMode === 'cold' ? ' · 흡열(F)' : ' · 발열(F)') : '') + (W0.en ? ' · 에너지 ' + W0.en : '') + (P.weapons.length > 1 ? '  (Q 바꾸기)' : ''));
+    setTxt('weapon', W0.name + (s > 1 ? ' ' + '★'.repeat(s) : '') + (k === 'pack' ? (P.packMode === 'cold' ? ' · 흡열(F)' : ' · 발열(F)') : ''));
     el.style.color = RARITY[W0.r]; }
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   const dv = nearDev();
