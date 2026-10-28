@@ -806,6 +806,7 @@ addEventListener('keydown', e => {
   if (k === 'k') useSkill(); // 스킬: K
   if (k === 'q' && P.weapons.length > 1) P.wi = (P.wi + 1) % P.weapons.length;
   if (k === 'e') tryPick();
+  if (k === 'g') pickWeapon();
   if (k === 'r') start();
   if (k === 'f' && P.weapons[P.wi] === 'pack') { P.packMode = P.packMode === 'cold' ? 'hot' : 'cold'; say(P.x, P.y - 46, P.packMode === 'cold' ? '흡열(파랑)' : '발열(빨강)', P.packMode === 'cold' ? 'stun' : 'hurt', 'small'); }
 });
@@ -830,9 +831,11 @@ const nearExit = () => tile(Math.floor(P.x / T), Math.floor((P.y - 3) / T)) === 
 function tryPick() {
   if (stage.gate) { openQuiz(goNextZone, 'zone'); return; } // 보스를 잡은 뒤 다음 구역으로 가는 관문
   if (nearExit()) { openQuiz(nextStation, 'station'); return; }
-  const dv = nearDev(); if (dv && !nearWeapon()) { openDevice(dv); return; }
+  const dv = nearDev(); if (dv) { openDevice(dv); return; }
   if (nearBench()) { openCraft(); return; }
-  if (!nearWeapon()) { openInfo(); return; } // 주변에 아무것도 없으면 내 상태 보기
+  openInfo(); // 주변에 출구·장치가 없으면 내 상태 보기
+}
+function pickWeapon() { // 무기 줍기: G
   // 무기 줍기: 이미 가진 무기면 별(★)이 하나 늘고(최대 3), 두 칸이 차 있으면 손에 든 무기와 바꾼다
   const p = nearWeapon(); if (!p) return;
   p.dead = true; const k = p.kind;
@@ -2657,7 +2660,7 @@ function drawHud() {
     el.style.color = RARITY[W0.r]; }
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   const dv = nearDev();
-  setTxt('prompt', nearExit() ? 'E 다음 역으로' : dv && !near ? 'E ' + DEV[dv.k].name : near ? 'E ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
+  setTxt('prompt', nearExit() ? 'E 다음 역으로' : dv ? 'E ' + DEV[dv.k].name : near ? 'G ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
   const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name}${STATUS[k].keep ? '' : ' ' + Math.ceil(P.st[k])}</span>`).join(' ')
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
