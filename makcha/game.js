@@ -40,8 +40,9 @@ function ell(g, cx, cy, w, h, c) {
   for (let j = 0; j < h; j++) { const yy = j + 0.5 - b; const half = Math.round(a * Math.sqrt(Math.max(0, 1 - yy * yy / (b * b))));
     if (half > 0) g.fillRect(Math.round(cx - half), Math.round(cy - b + j), half * 2, 1); }
 }
-function sprite(w, h, draw) {
+function sprite(w, h, draw, done) {
   const mk = (a, b) => { const k = document.createElement('canvas'); k.width = a; k.height = b; return k; };
+  if (done) { const c = mk(w, h); draw(c.getContext('2d')); const f = mk(w, h), fg = f.getContext('2d'); fg.drawImage(c, 0, 0); fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = '#fff'; fg.fillRect(0, 0, w, h); return { c, f, w, h, pad: 0 }; } // 완성된 그림: 후처리 없이
   const raw = mk(w, h); draw(raw.getContext('2d'));
   const sil = mk(w, h), sg = sil.getContext('2d'); sg.drawImage(raw, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = '#0b0a12'; sg.fillRect(0, 0, w, h);
   const c = mk(w + 2, h + 2), g = c.getContext('2d');
@@ -351,6 +352,11 @@ function buildSprites() {
   SPR.tiger = [0, 1].map(f => sprite(36, 22, g => drawTiger(g, f)));
   SPR.human = { idle: [0, 1].map(p => sprite(34, 40, g => drawHero(g, p, false, HUMAN_LOOK))) };
   SPR.hero = {};
+  const HCW = 47, HCH = 57, HORDER = ['driver', 'geo', 'eco', 'chem', 'weather', 'medic'], heroImg = new Image();
+  heroImg.onload = () => { HORDER.forEach((k, i) => { if (!JOBS[k]) return; const fr = r => sprite(HCW, HCH, g => g.drawImage(heroImg, i * HCW, r * HCH, HCW, HCH, 0, 0, HCW, HCH), true);
+      const f0 = fr(0), f1 = fr(1), f2 = fr(2); SPR.hero[k] = { idle: [f0, f0], walk: [f1, f0, f2, f0] }; });
+    document.querySelectorAll('#jobs canvas').forEach(cv => { const k = cv.dataset.k; if (!SPR.hero[k]) return; cv.width = HCW; cv.height = HCH; const g = cv.getContext('2d'); g.clearRect(0, 0, HCW, HCH); g.drawImage(SPR.hero[k].idle[0].c, 0, 0); }); };
+  heroImg.src = 'heroes.png'; // 불러오기 전까지는 아래 그림을 쓴다
   for (const k in JOBS) SPR.hero[k] = { idle: [0, 1].map(p => sprite(34, 40, g => drawHero(g, p, false, JOBS[k].look))), walk: [0, 1, 2, 3].map(p => sprite(34, 40, g => drawHero(g, p, true, JOBS[k].look))) };
   SPR.tri = [0, 1].map(f => sprite(22, 16, g => drawTri(g, f)));
   SPR.amm = [sprite(30, 30, drawAmm)];
@@ -2565,7 +2571,8 @@ function drawPlayer() {
   const behind = Math.sin(a) < -0.35;
   if (behind) drawW();
   const stk = Object.keys(P.st)[0]; // 상태 이상에 걸리면 몸 색이 그 상태 이상 색으로 물든다(2026-10-28 교사 요청)
-  if (stk && STATUS[stk]) drawTinted(s, x - 17, y - 39, P.face < 0, STATUS[stk].col); else drawSpr(s, x - 17, y - 39, P.face < 0, false, heroSq());
+  const hx = x - Math.floor(s.w / 2), hy = y - s.h + 1; // 발밑 기준
+  if (stk && STATUS[stk]) drawTinted(s, hx, hy, P.face < 0, STATUS[stk].col); else drawSpr(s, hx, hy, P.face < 0, false, heroSq());
   if (!behind) drawW();
 }
 function heart(x, y, full) { const c = full ? '#e04848' : '#3a2a2a';
@@ -2691,7 +2698,7 @@ function jobPicker() {
   const box = document.getElementById('jobs');
   for (const k in JOBS) {
     const b = document.createElement('button'); b.className = 'job'; b.dataset.k = k;
-    const cv = document.createElement('canvas'); cv.width = 36; cv.height = 42; cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0);
+    const cv = document.createElement('canvas'); cv.dataset.k = k; cv.width = 36; cv.height = 42; cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0);
     const nm = document.createElement('span'); nm.textContent = JOBS[k].name;
     b.append(cv, nm); b.onclick = () => { jobKey = k; mark(); }; box.appendChild(b);
   }
