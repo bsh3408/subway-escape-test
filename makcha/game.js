@@ -758,19 +758,27 @@ function showBanner() { const b = document.getElementById('banner'); if (!b) ret
 // ---------- 입력 ----------
 const keys = {}; const mouse = { sx: 0, sy: 0, down: false };
 // 글자 대신 키 위치(e.code)로 읽는다: 한글 입력 상태나 Shift를 누른 채여도 똑같이 동작
-const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', KeyG: 'g', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Escape: 'esc' };
+const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', KeyG: 'g', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Digit6: '6', Escape: 'esc', KeyJ: 'j', KeyK: 'k', KeyL: 'l', KeyO: 'o', KeyX: 'x', Enter: 'enter', NumpadEnter: 'enter' };
+const atkHeld = () => mouse.down || keys.j; // 공격: J를 누르고 있거나 왼쪽 클릭
+let mouseT = -1e9; // 마우스를 마지막으로 움직인 때: 최근에 움직였을 때만 마우스 쪽을 조준한다
 addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') return; // 숫자 답 입력 중
   const k = CODE[e.code]; if (k) keys[k] = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'ShiftRight') e.preventDefault();
+  if (!running && !e.repeat) { // 대기실·결과 화면: 숫자로 직업, Enter로 시작
+    const title = !document.getElementById('title').classList.contains('hide');
+    if (title && k >= '1' && k <= '6') { const b = document.querySelectorAll('#jobs .job')[+k - 1]; if (b) b.click(); }
+    if (k === 'enter') { e.preventDefault(); if (title) start(); else if (!document.getElementById('result').classList.contains('hide')) document.getElementById('againBtn').click(); }
+    return; }
   if (!running || e.repeat) return;
   if (e.code === 'Tab') { e.preventDefault(); if (!crafting && !choosing) toggleTree(); return; }
   if (viewingTree) { if (k === 'esc') toggleTree(); return; }
-  if (choosing) return; // 능력은 하나 골라야 창이 닫힌다
-  if (crafting) { if (modalKeys && modalKeys[k]) modalKeys[k](); else if (k === 'e' || k === 'esc') closeCraft(); return; }
+  if (choosing) { if (k >= '1' && k <= '3') { const b = document.querySelectorAll('#perkList .perk')[+k - 1]; if (b) b.click(); } return; } // 능력은 숫자로 하나 골라야 창이 닫힌다
+  if (crafting) { const kk = k === 'enter' && modalKeys && modalKeys.e ? 'e' : k; if (modalKeys && modalKeys[kk]) modalKeys[kk](); else if (k === 'e' || k === 'esc') closeCraft(); return; }
   if (infoOpen) { if (k === 'e' || k === 'esc') closeInfo(); return; }
   // 구르기: Shift (2026-10-26 교사 요청은 오른쪽 Shift). 키보드마다 오른쪽 Shift 신호가 다르게 올 수 있어 양쪽 Shift를 모두 받는다
-  if (e.key === 'Shift' || e.code === 'ShiftRight' || e.code === 'ShiftLeft') tryDash();
+  if (e.key === 'Shift' || e.code === 'ShiftRight' || e.code === 'ShiftLeft' || k === 'l') tryDash(); // 구르기: L 또는 Shift
+  if (k === 'k') useSkill(); // 스킬: K
   if (k === 'q' && P.weapons.length > 1) P.wi = (P.wi + 1) % P.weapons.length;
   if (k === 'e') tryPick();
   if (k === 'r') start();
@@ -778,7 +786,7 @@ addEventListener('keydown', e => {
 });
 addEventListener('keyup', e => { const k = CODE[e.code]; if (k) keys[k] = false; });
 addEventListener('blur', () => { for (const k in keys) keys[k] = false; mouse.down = false; });
-view.addEventListener('mousemove', e => { const r = view.getBoundingClientRect(); mouse.sx = (e.clientX - r.left) / r.width * W; mouse.sy = (e.clientY - r.top) / r.height * H; });
+view.addEventListener('mousemove', e => { mouseT = performance.now(); const r = view.getBoundingClientRect(); mouse.sx = (e.clientX - r.left) / r.width * W; mouse.sy = (e.clientY - r.top) / r.height * H; });
 view.addEventListener('mousedown', e => { if (e.button === 0) mouse.down = true; if (e.button === 2) useSkill(); });
 addEventListener('mouseup', () => { mouse.down = false; });
 view.addEventListener('contextmenu', e => e.preventDefault());
@@ -842,7 +850,7 @@ function findTarget() {
       if (d < pd && seeLine(c.x, c.y, p.x, p.y - 8, p)) { pd = d; best = p; } } }
   target = best;
 }
-const aimPoint = () => target ? { x: target.x, y: target.y - target.h / 2 } : mWorld();
+const aimPoint = () => target ? { x: target.x, y: target.y - target.h / 2 } : performance.now() - mouseT < 1500 ? mWorld() : { x: P.x + (P.ldx ?? P.face) * 80, y: P.y - 16 + (P.ldy || 0) * 80 };
 // 에너지가 모자라면 든 무기를 그냥 휘두른다(2026-10-27 교사 요청). 약하지만 탄 1개는 막거나 튕긴다
 const BASH = { type: 'melee', cd: 0.4, dmg: 2, range: 30, arc: 1.0, kb: 0.7, deflect: 0.8, deflN: 1 };
 function attack() {
@@ -951,7 +959,7 @@ function fireTesla(x, y, a, dmg, n) {
 // 유도 코일 충전기: 누르고 있으면 충전, 떼면 충전한 만큼 강한 탄
 function updateCharge() {
   const wk = P.weapons[P.wi]; if (WEAP[wk].type !== 'charge' || ended) { P.chg = 0; return; }
-  if (mouse.down) { if (!P.chg && P.en < enCost(WEAP[wk].en)) return; // 에너지가 없으면 attack()에서 휘두른다
+  if (atkHeld()) { if (!P.chg && P.en < enCost(WEAP[wk].en)) return; // 에너지가 없으면 attack()에서 휘두른다
     P.chg = Math.min(1, (P.chg || 0) + DT / 1.1); }
   else if (P.chg > 0) {
     if (P.chg > 0.15) { spendEn(enCost(WEAP[wk].en)); const c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x), pose = weaponPose(a), pv = weaponPivot(a);
@@ -1154,9 +1162,10 @@ function updatePlayer() {
   if (vx && move(P, vx, 0)) P.vx = 0;
   if (vy && move(P, 0, vy)) P.vy = 0;
   P.moving = Math.hypot(P.vx, P.vy) > 30;
+  if (P.moving) { const l = Math.hypot(P.vx, P.vy); P.ldx = P.vx / l; P.ldy = P.vy / l; } // 마지막으로 움직인 방향(적이 없을 때 이쪽으로 쏜다)
   P.pt += DT; if (P.pt > (P.moving ? 0.08 : 0.4)) { P.pt = 0; P.ph++; }
   updateBurst();
-  if (mouse.down && P.cd <= 0 && !ended) attack();
+  if (atkHeld() && P.cd <= 0 && !ended) attack();
   updateCharge();
   for (const p of pickups) if (p.kind === 'energy') {
     p.t += DT; p.x += p.vx * DT; p.y += p.vy * DT; p.vx *= 0.9; p.vy *= 0.9;
@@ -1692,7 +1701,7 @@ function openOX(onSolve) {
   const pick = v => { if (v === q.answer) { openModal('정답', `<div class="qz"><p class="qq">${esc(q.explain || '')}</p><button class="qb" id="qgo">들어가기</button></div>`, b => { b.querySelector('#qgo').onclick = done; }, { e: done }); return; }
     time += 30; say(P.x, P.y - 44, '오답 · 기록 +30초', 'hurt'); msg = '틀렸다 · ' + esc(q.explain || '') + '<br>새 문제를 맞혀야 들어갈 수 있다'; q = newOX() || q; draw(); };
   const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div>${msg ? `<p class="qm">${msg}</p>` : ''}</div>`,
-    b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false) });
+    b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false) });
   draw();
 }
 function openQuiz(onSolve, kind) {
@@ -2135,7 +2144,10 @@ function updateBullets() {
       const s = b.st || (b.hz === 'fire' ? 'burn' : null);
       if (s === 'heat') { if (!inHaz('water') && stOk('heat')) P.heatX = Math.min(EXPOSE, P.heatX + 2.5); } else if (s === 'frost') { if (stOk('frost')) P.coldX = Math.min(EXPOSE, P.coldX + 2.5); } else if (s) applyStatus(s); } } // 열기·냉기 탄은 몸에 더위·추위를 쌓는다
   ebul = ebul.filter(b => !b.dead && b.life > 0);
-  for (const s of shots) { s.x += s.vx * DT; s.y += s.vy * DT; s.life -= DT;
+  for (const s of shots) { if (!s.deflect && target && !target.dead) { // 자동 추적 탄(2026-10-28 교사 요청): 1초에 최대 3.5rad씩 대상 쪽으로 꺾인다
+      const sp = Math.hypot(s.vx, s.vy), a = Math.atan2(s.vy, s.vx); let d = Math.atan2(target.y - (target.h || 0) / 2 - s.y, target.x - s.x) - a;
+      while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; const na = a + Math.max(-3.5 * DT, Math.min(3.5 * DT, d)); s.vx = Math.cos(na) * sp; s.vy = Math.sin(na) * sp; }
+    s.x += s.vx * DT; s.y += s.vy * DT; s.life -= DT;
     if (solidAt(s.x, s.y)) { hitProp(propAtPx(s.x, s.y), s.dmg); // 지형지물에 맞으면 부서진다
       if (has('bounce') && !s.bounced && !s.deflect) { // 튕김탄: 벽에서 한 번 튕긴다
         s.x -= s.vx * DT; s.y -= s.vy * DT; if (solidAt(s.x + s.vx * DT, s.y)) s.vx *= -1; if (solidAt(s.x, s.y + s.vy * DT)) s.vy *= -1; s.bounced = true; burst(s.x, s.y, '#fff3b0', 2); continue; }
@@ -2630,7 +2642,7 @@ function drawHud() {
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
 
 // ---------- 화면 전환 ----------
-function start() { reset(); zoneNext = 0; trans = 0; applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · 우클릭'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
+function start() { reset(); zoneNext = 0; trans = 0; applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · K'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
 function showResult() {
   if (!running) return; running = false;
   document.getElementById('resTitle').textContent = ended === 'win' ? '막차에 탔다' : '쓰러졌다';
