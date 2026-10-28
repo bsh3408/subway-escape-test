@@ -148,7 +148,8 @@
   <div class="panel hide" id="info">
     <h1 style="font-size:1.5em">내 상태</h1>
     <div id="infoBody"></div>
-    <p class="note">E 또는 Esc 닫기</p>
+    <div style="display:flex;gap:0.8em;align-items:center"><button id="saveBtn">중간 저장</button><span id="saveMsg" style="font-size:0.85em;color:#9fe0ff"></span></div>
+    <p class="note">Esc 닫기</p>
   </div>
   <div class="ui" id="banner"></div>
   <div class="ui" id="timer"></div>
@@ -160,9 +161,9 @@
     <p>대기실 · 구역 순서는 판마다 무작위로 바뀐다</p>
     <div id="jobs"></div>
     <div class="lobrow"><b>유물 <span id="lobbyRelicN"></span></b><div id="lobbyRelics"></div></div>
-    <p style="font-size:0.75em">숫자 1~6 직업 고르기 · Enter 시작<br>WASD(방향키) 이동 · J 공격(가까운 적을 자동 추적) · K 스킬 · L 구르기<br>E 장치·문·내 상태 · G 무기 줍기 · Q 무기 바꾸기 · Tab 스킬 트리 · R 다시 하기</p>
+    <p style="font-size:0.75em">숫자 1~6 직업 고르기 · Enter 시작<br>WASD(방향키) 이동 · J 공격(가까운 적을 자동 추적) · K 스킬 · L 구르기<br>E 장치·문 · G 무기 줍기 · Esc 내 상태·중간 저장 · Q 무기 바꾸기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
-    <button id="startBtn">시작</button>
+    <div style="display:flex;gap:0.8em"><button id="startBtn">시작</button><button id="contBtn" class="sub hide">이어하기</button></div>
   </div>
   <div class="panel hide" id="result">
     <h1 id="resTitle"></h1>

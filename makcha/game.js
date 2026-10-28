@@ -769,8 +769,8 @@ function enterStation() {
   placeDevices(); P.test = null;
   stage.gate = false; stage.quiz = newQuiz(); // 다음에 풀 문제(방·역·구역을 넘어갈 때마다 새 문제)
   showBanner();
-  if (stage.zi > 0 || stage.st > 0) openPerk(); // 역을 넘어올 때마다 능력 고르기
-  if (relicAdd('stationHeal') && (stage.zi > 0 || stage.st > 0) && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
+  if ((stage.zi > 0 || stage.st > 0) && !P.loaded) openPerk(); // 역을 넘어올 때마다 능력 고르기(이어하기로 불러온 역은 빼고)
+  if (relicAdd('stationHeal') && (stage.zi > 0 || stage.st > 0) && !P.loaded && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
 }
 let trans = 0; // 다음 역으로 넘어가는 중(화면이 어두워짐)
 function nextStation() {
@@ -805,6 +805,7 @@ addEventListener('keydown', e => {
   if (e.key === 'Shift' || e.code === 'ShiftRight' || e.code === 'ShiftLeft' || k === 'l') tryDash(); // 구르기: L 또는 Shift
   if (k === 'k') useSkill(); // 스킬: K
   if (k === 'q' && P.weapons.length > 1) P.wi = (P.wi + 1) % P.weapons.length;
+  if (k === 'esc') { openInfo(); return; } // 내 상태: Esc
   if (k === 'e') tryPick();
   if (k === 'g') pickWeapon();
   if (k === 'r') start();
@@ -833,7 +834,6 @@ function tryPick() {
   if (nearExit()) { openQuiz(nextStation, 'station'); return; }
   const dv = nearDev(); if (dv) { openDevice(dv); return; }
   if (nearBench()) { openCraft(); return; }
-  openInfo(); // 주변에 출구·장치가 없으면 내 상태 보기
 }
 function pickWeapon() { // 무기 줍기: G
   // 무기 줍기: 이미 가진 무기면 별(★)이 하나 늘고(최대 3), 두 칸이 차 있으면 손에 든 무기와 바꾼다
@@ -1652,7 +1652,7 @@ function meleeStun(W0) { return (W0.stun || 0) + (has('stunhit') ? 0.5 : 0) + re
 function dmgMul(melee) { return relicMul('dmg') * relicMul(melee ? 'melee' : 'ranged') * (!melee && has('power') ? 1.25 : 1); } // 강화탄: 원거리 +25%
 // 내 상태 창(E): 직업·스킬, 능력치, 무기, 장비, 상태 이상, 능력, 유물을 한눈에 본다. 여는 동안 멈춘다
 let infoOpen = false;
-function openInfo() {
+function openInfo() { document.getElementById('saveMsg').textContent = '';
   infoOpen = true; const J = JOBS[P.job], g = (t, v) => `<div class="irow"><span>${t}</span><b>${v}</b></div>`;
   const wl = P.weapons.map((k, i) => { const W0 = WEAP[k], s = P.stars[k] || 1, dmg = W0.boom ? W0.boom.dmg : W0.dmg * (W0.n || W0.burst || 1);
     return `<div class="iw${i === P.wi ? ' on' : ''}" style="border-color:${RARITY[W0.r]}"><b style="color:${RARITY[W0.r]}">${W0.name}${s > 1 ? ' ' + '★'.repeat(s) : ''}</b>
@@ -2193,7 +2193,24 @@ function updateBullets() {
 }
 
 // ---------- 진행 ----------
+// ---------- 중간 저장: 지금 역의 처음부터 이어 한다(이 브라우저에 저장) ----------
+const RUN_KEY = 'makcha.run.v1';
+function saveRun() {
+  const d = { job: P.job, stage: { order: stage.order, zi: stage.zi, zone: stage.zone, st: stage.st }, time,
+    P: { hp: P.hp, maxHp: P.maxHp, sh: P.sh, maxSh: P.maxSh, en: P.en, maxEn: P.maxEn, skillMax: P.skillMax, weapons: P.weapons, stars: P.stars, wi: P.wi, relics: P.relics,
+      perks: [...P.perks], usedQ: [...(P.usedQ || [])], usedOX: [...(P.usedOX || [])] }, at: new Date().toLocaleString('ko-KR') };
+  try { localStorage.setItem(RUN_KEY, JSON.stringify(d)); return d.at; } catch (e) { return null; }
+}
+function loadRunData() { try { return JSON.parse(localStorage.getItem(RUN_KEY)); } catch (e) { return null; } }
+function continueRun() {
+  const d = loadRunData(); if (!d || !JOBS[d.job]) return;
+  jobKey = d.job; start(); const Q = d.P;
+  Object.assign(P, { hp: Q.hp, maxHp: Q.maxHp, sh: Q.sh, maxSh: Q.maxSh, en: Q.en, maxEn: Q.maxEn, skillMax: Q.skillMax, weapons: Q.weapons, stars: Q.stars, wi: Q.wi, relics: Q.relics,
+    perks: new Set(Q.perks), usedQ: new Set(Q.usedQ), usedOX: new Set(Q.usedOX), loaded: true });
+  stage = { ...d.stage }; time = d.time; enterStation(); P.loaded = false; say(P.x, P.y - 50, '이어하기 · ' + stationName().split(' · ').slice(-1)[0], 'heal');
+}
 function finish(win) {
+  try { localStorage.removeItem(RUN_KEY); } catch (e) { } // 판이 끝나면 중간 저장은 지운다
   if (ended) return; ended = true; endT = win ? 1.6 : 1.0;
   ended = win ? 'win' : 'lose';
 }
@@ -2681,6 +2698,8 @@ function showResult() {
 }
 function toLobby() { running = false; document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
 document.getElementById('startBtn').onclick = start;
+document.getElementById('contBtn').onclick = continueRun;
+document.getElementById('saveBtn').onclick = () => { const at = saveRun(); document.getElementById('saveMsg').textContent = at ? '저장했다 · ' + at + ' · 대기실의 이어하기로 이 역 처음부터 이어 한다' : '저장하지 못했다'; };
 document.getElementById('againBtn').onclick = toLobby;
 document.getElementById('jobBtn').onclick = toLobby;
 
@@ -2690,6 +2709,7 @@ function applyLoadout() {
   for (const k of loadout.relics) if (save.relics.includes(k)) { P.relics.push(k); applyRelic(RELIC[k]); }
 }
 function renderLobby() {
+  const cb = document.getElementById('contBtn'), d = loadRunData(); if (cb) { cb.classList.toggle('hide', !d); if (d) cb.textContent = '이어하기 · ' + JOBS[d.job].name + ' · ' + d.at; }
   const rb = document.getElementById('lobbyRelics'); rb.innerHTML = '';
   if (!save.relics.length) rb.innerHTML = '<i>아직 없다 · 연구소 재화로 얻는다(연결 예정)</i>';
   for (const k of save.relics) { const b = document.createElement('button'); b.className = 'lob' + (loadout.relics.includes(k) ? ' on' : ''); b.textContent = RELIC[k].name; b.title = RELIC[k].desc;
