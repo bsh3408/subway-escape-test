@@ -14,10 +14,29 @@
   .cdnum { transform:translate(-50%,-50%); font-size:1.15em; font-weight:800; }
   .keylab { right:8.4%; transform:translateY(-50%); font-size:0.75em; color:#cfc6b3; }
   #mat { top:12.4%; left:1%; font-size:0.72em; color:#e6dcc6; }
+  #lore { top:9%; left:50%; transform:translateX(-50%); white-space:normal; max-width:70%; text-align:center; font-size:0.8em; color:#ffe08a; }
+  #lore:empty { display:none; }
   #status { top:16%; left:1%; font-size:0.78em; font-weight:700; }
   #status span { margin-right:0.6em; }
   #bag { bottom:2%; left:50%; transform:translateX(-50%); font-size:0.8em; color:#e6dcc6; }
-  #craftList { display:grid; grid-template-columns:repeat(4, 1fr); gap:0.5em; }
+  #craft { background:rgba(0,0,0,0.92); }
+  #craftList { max-width:min(46em, 94%); max-height:78vh; overflow:auto; }
+  .qz { text-align:left; font-size:0.92em; }
+  .qz .qt { font-size:0.8em; color:#9fe0ff; }
+  .qz .qq { color:#f3ead7; white-space:pre-line; margin:0.3em 0 0.6em; }
+  .qtab { border-collapse:collapse; margin:0.4em 0; font-size:0.85em; }
+  .qtab th, .qtab td { border:1px solid #6a604e; padding:0.2em 0.6em; }
+  .qtab th { background:#3a3326; }
+  .qbox { border:1px solid #6a604e; padding:0.4em 0.7em; margin:0.4em 0; font-size:0.88em; line-height:1.7; }
+  .qch { display:flex; flex-wrap:wrap; gap:0.4em; margin:0.5em 0; align-items:center; }
+  .qz button.qb { padding:0.45em 0.8em; background:#26221c; color:#f3ead7; border:2px solid #f0b429; font-size:0.95em; font-weight:400; text-align:left; }
+  .qz button.qb:disabled { opacity:0.35; border-color:#4a4234; }
+  .qz button.qr { border-color:#6a604e; }
+  .qz input { width:6em; font-size:1em; padding:0.3em; background:#1a1612; color:#f3ead7; border:2px solid #f0b429; }
+  .qseq { font-size:0.85em; color:#ffe08a; }
+  .qh p { margin:0.15em 0; font-size:0.85em; color:#9fe0ff; }
+  .qh p.lock { color:#6a6458; }
+  .qm { color:#ff8a6a !important; }
   .panel button.gear { display:flex; flex-direction:column; gap:0.2em; align-items:center; padding:0.6em 0.5em; background:#26221c; color:#f3ead7; border:2px solid #4a4234; font-size:0.85em; font-weight:400; min-width:9em; }
   .panel button.gear b { font-size:1.05em; }
   .panel button.gear i { font-style:normal; font-size:0.8em; color:#9a927f; }
@@ -90,14 +109,13 @@
   <div class="ui cdnum" id="dashCd" style="left:95.25%;top:80.89%"></div>
   <div class="ui keylab" id="skillLab" style="top:91.11%">스킬 · 우클릭</div>
   <div class="ui keylab" style="top:80.89%">구르기 · Shift</div>
-  <div class="ui" id="mat"></div>
   <div class="ui" id="status"></div>
+  <div class="ui" id="lore"></div>
   <div class="ui" id="bag"></div>
   <div class="panel hide" id="craft">
-    <h1 style="font-size:1.5em">조합대</h1>
-    <p id="craftMat"></p>
+    <h1 style="font-size:1.5em" id="craftTitle">문제</h1>
     <div id="craftList"></div>
-    <p class="note">E 또는 Esc 닫기 · 장비는 1개만 들고, G 키로 한 번 쓰면 사라진다</p>
+    <p class="note">Esc 닫기 · 닫아도 문제는 그대로 남는다</p>
   </div>
   <div class="panel hide" id="perk">
     <h1 style="font-size:1.5em">능력 고르기</h1>
@@ -124,8 +142,7 @@
     <p>대기실 · 구역 순서는 판마다 무작위로 바뀐다</p>
     <div id="jobs"></div>
     <div class="lobrow"><b>유물 <span id="lobbyRelicN"></span></b><div id="lobbyRelics"></div></div>
-    <div class="lobrow"><b>장비 1개 <span id="lobbyMat"></span></b><div id="lobbyGear"></div><div id="lobbyGearDesc" style="font-size:0.8em;color:#cfc6b3"></div></div>
-    <p style="font-size:0.75em">WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·조합대·내 상태 · Q 무기 바꾸기 · G 장비 쓰기 · Tab 스킬 트리 · R 다시 하기</p>
+    <p style="font-size:0.75em">WASD 이동 · 가까운 적 자동 조준 · 클릭 공격 · 우클릭 스킬 · Shift 구르기<br>E 줍기·장치·내 상태 · Q 무기 바꾸기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
     <button id="startBtn">시작</button>
   </div>
@@ -136,6 +153,7 @@
     <div style="display:flex;gap:0.8em"><button id="againBtn">대기실로</button><button id="jobBtn" class="sub hide">직업 고르기</button></div>
   </div>
 </div>
+<script src="quiz_bank.js"></script>
 <script src="game.js"></script>
 </body>
 </html>

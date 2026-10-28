@@ -13,7 +13,6 @@
     for (let y = y0; y < y0 + h; y++) for (let x = x0; x < x0 + w; x++) setT(x, y, 2);
     for (let y = y0 + 2; y < y0 + h - 1; y++) for (let x = x0 + 1; x < x0 + w - 1; x++) setT(x, y, 1);
     for (const [x, y] of [[9, 7], [w - 10, 7], [9, h - 5], [w - 10, h - 5]]) setT(x0 + x, y0 + y, 7);
-    setT(x0 + 3, y0 + 3, 9); setT(x0 + 4, y0 + 3, 9); // 조합대
     placeBlocks({ ...rooms[0], type: 'fight' }); // 부서지지 않는 장애물
     props = []; placeProps({ ...rooms[0], type: 'fight' }); placeProps({ ...rooms[0], type: 'fight' }); // 지형지물(구역마다 다름)
   };
@@ -81,16 +80,16 @@
   btn(r, '손에 든 무기 ★ 올리기', () => { const k = P.weapons[P.wi]; P.stars[k] = Math.min(3, (P.stars[k] || 1) + 1); say(P.x, P.y - 46, WEAP[k].name + ' ★' + P.stars[k], 'crit'); });
   btn(r, '바닥에 모두 깔기', () => { const ks = Object.keys(WEAP); ks.forEach((k, i) => { const a = i / ks.length * Math.PI * 2; pickups.push({ kind: k, x: P.x + Math.cos(a) * 80, y: P.y + Math.sin(a) * 55 }); }); });
 
-  // 장비
-  r = sec('장비', '한 번에 1개만 든다. G 키로 쓰면 사라진다.');
-  btn(r, '재료 99개', () => { P.mat = { cloth: 99, part: 99 }; });
-  btn(r, '조합대 열기', () => openCraft());
-  for (const k in GEAR) btn(r, GEAR[k].name + ' 들기', () => { P.gear = k; });
-  btn(r, '장비·막기 효과 지우기', () => { P.gear = null; P.guard = {}; P.solarT = 0; });
+  // 관문 문제·퍼즐 장치 (2026-10-28 장비 대신)
+  r = sec('관문 문제 · 퍼즐 장치', '관문 문제는 역 출구에서 E. 힌트는 몬스터를 잡으면 쪽지로 나온다. 장치는 상태 이상이 있을 때 E로 푼다.');
+  btn(r, '관문 문제 열기', () => openQuiz(() => say(P.x, P.y - 46, '관문 통과', 'heal')));
+  btn(r, '힌트 3개 받기', () => { if (stage.quiz) stage.quiz.hints = 3; });
+  btn(r, '다른 문제로 바꾸기', () => { stage.quiz = newQuiz(); });
+  for (const k in DEV) btn(r, DEV[k].name + ' 앞으로', () => { let d = devices.find(d => d.k === k); if (!d) { d = { k, x: P.x + 40, y: P.y }; devices.push(d); } P.x = d.x - 18; P.y = d.y + 4; });
   r = sec('상태 이상 걸기');
   for (const k in STATUS) btn(r, STATUS[k].name, () => applyStatus(k));
   btn(r, '감염(세균)', () => { delete P.st.infect; applyStatus('infect'); P.st.infect.type = '세균'; P.st.infect.life = 1e9; });
-  btn(r, '감염(바이러스)', () => { delete P.st.infect; applyStatus('infect'); P.st.infect.type = '바이러스'; P.st.infect.life = 14; });
+  btn(r, '감염(바이러스)', () => { delete P.st.infect; applyStatus('infect'); P.st.infect.type = '바이러스'; P.st.infect.life = 1e9; });
   btn(r, '모두 풀기', () => { P.st = {}; });
 
   // 스킬 트리
