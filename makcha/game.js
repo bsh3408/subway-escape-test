@@ -41,21 +41,30 @@ function ell(g, cx, cy, w, h, c) {
     if (half > 0) g.fillRect(Math.round(cx - half), Math.round(cy - b + j), half * 2, 1); }
 }
 function sprite(w, h, draw) {
-  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'));
-  const f = document.createElement('canvas'); f.width = w; f.height = h; const fg = f.getContext('2d');
-  fg.drawImage(c, 0, 0); fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = '#fff'; fg.fillRect(0, 0, w, h);
-  return { c, f, w, h };
+  const mk = (a, b) => { const k = document.createElement('canvas'); k.width = a; k.height = b; return k; };
+  const raw = mk(w, h); draw(raw.getContext('2d'));
+  const sil = mk(w, h), sg = sil.getContext('2d'); sg.drawImage(raw, 0, 0); sg.globalCompositeOperation = 'source-in'; sg.fillStyle = '#0b0a12'; sg.fillRect(0, 0, w, h);
+  const c = mk(w + 2, h + 2), g = c.getContext('2d');
+  for (const [dx, dy] of [[1, 0], [1, 2], [0, 1], [2, 1]]) g.drawImage(sil, dx, dy); // 바깥 외곽선 1칸 더
+  g.filter = 'saturate(1.35) contrast(1.06)'; g.drawImage(raw, 1, 1); g.filter = 'none'; // 선명한 색
+  g.globalCompositeOperation = 'source-atop'; // 위는 밝게, 아래는 어둡게
+  const gr = g.createLinearGradient(0, 0, 0, h + 2); gr.addColorStop(0, 'rgba(255,255,255,0.16)'); gr.addColorStop(0.35, 'rgba(255,255,255,0)'); gr.addColorStop(0.62, 'rgba(0,0,0,0)'); gr.addColorStop(1, 'rgba(0,0,0,0.24)');
+  g.fillStyle = gr; g.fillRect(0, 0, w + 2, h + 2);
+  const f = mk(w + 2, h + 2), fg = f.getContext('2d'); fg.drawImage(c, 0, 0); fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = '#fff'; fg.fillRect(0, 0, w + 2, h + 2);
+  return { c, f, w, h, pad: 1 };
 }
 const tintC = document.createElement('canvas'), tintG = tintC.getContext('2d');
+const heroSq = () => P.moving ? 1 + 0.05 * Math.sin(time * 18) : 1 + 0.035 * Math.sin(time * 4); // 주인공 출렁임(걸을 때 빠르게)
 function drawTinted(s, x, y, flip, col) { // 스프라이트의 그림 부분만 col 색으로 덮어 그린다(밝기가 조금씩 맥박친다)
-  tintC.width = s.w; tintC.height = s.h; tintG.globalCompositeOperation = 'source-over'; tintG.drawImage(s.c, 0, 0);
-  tintG.globalCompositeOperation = 'source-atop'; tintG.globalAlpha = 0.45 + 0.12 * Math.sin(time * 6); tintG.fillStyle = col; tintG.fillRect(0, 0, s.w, s.h); tintG.globalAlpha = 1;
-  drawSpr({ c: tintC, f: tintC, w: s.w, h: s.h }, x, y, flip, false);
+  tintC.width = s.c.width; tintC.height = s.c.height; tintG.globalCompositeOperation = 'source-over'; tintG.drawImage(s.c, 0, 0);
+  tintG.globalCompositeOperation = 'source-atop'; tintG.globalAlpha = 0.45 + 0.12 * Math.sin(time * 6); tintG.fillStyle = col; tintG.fillRect(0, 0, tintC.width, tintC.height); tintG.globalAlpha = 1;
+  drawSpr({ c: tintC, f: tintC, w: s.w, h: s.h, pad: s.pad }, x, y, flip, false, heroSq());
 }
-function drawSpr(s, x, y, flip, flash) {
-  const img = flash ? s.f : s.c; x = Math.round(x); y = Math.round(y);
-  if (!flip) { ctx.drawImage(img, x, y); return; }
-  ctx.save(); ctx.translate(x + s.w, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0); ctx.restore();
+function drawSpr(s, x, y, flip, flash, sq) {
+  const img = flash ? s.f : s.c, p = s.pad || 0, iw = img.width, ih = img.height, dh = sq ? Math.round(ih * sq) : ih;
+  x = Math.round(x) - p; y = Math.round(y) - p + (ih - dh);
+  if (!flip) { ctx.drawImage(img, x, y, iw, dh); return; }
+  ctx.save(); ctx.translate(x + iw, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, iw, dh); ctx.restore();
 }
 
 // 지질학자 30×38: 팔 없음 — 탐사모, 머리, 짧은 네모 몸통(조끼), 작은 장화
@@ -2482,7 +2491,7 @@ function render() {
     px(ctx, Math.round(e.x - e.bw / 2), Math.round(e.y) - 2, e.bw, 3, 'rgba(0,0,0,0.3)');
     const flash = e.flash > 0 || (isBoss(e) && isTell(e) && e.st !== 'chargeTell' && Math.floor(time * 16) % 2 === 0);
     if (e.battOut) ctx.globalAlpha = 0.5;
-    drawSpr(s, e.x - s.w / 2, e.y - s.h - alt, e.face < 0, flash); ctx.globalAlpha = 1;
+    drawSpr(s, e.x - s.w / 2, e.y - s.h - alt, e.face < 0, flash, e.stun > 0 || e.battOut ? 1 : 1 + (isBoss(e) ? 0.025 : 0.05) * Math.sin(time * 8 + e.x * 0.13)); ctx.globalAlpha = 1; // 몬스터 출렁임
     if (!isBoss(e) && Math.hypot(e.x - P.x, e.y - P.y) < 80) { const nm = ((ZONES[stage.zone].ov || {})[e.kind] || {}).name || EDEF[e.kind].name; // 2026-10-28 교사 요청: 가까이 가면 몬스터 이름
       if (nm) { const tx = Math.round(e.x), ty = Math.round(e.y - s.h - alt - 4); ctx.font = '10px DungGeunMo, sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(nm, tx + 1, ty + 1); ctx.fillStyle = '#ffe08a'; ctx.fillText(nm, tx, ty); } }
     if (e.batt !== undefined && !e.battOut) { const k = Math.max(0, e.batt / 10); px(ctx, Math.round(e.x - 8), Math.round(e.y - e.h - 5), 16, 3, '#0c0c0c'); px(ctx, Math.round(e.x - 7), Math.round(e.y - e.h - 4), Math.round(14 * k), 1, k > 0.3 ? '#7ee07e' : '#ff5a3c'); }
@@ -2552,7 +2561,7 @@ function drawPlayer() {
   const behind = Math.sin(a) < -0.35;
   if (behind) drawW();
   const stk = Object.keys(P.st)[0]; // 상태 이상에 걸리면 몸 색이 그 상태 이상 색으로 물든다(2026-10-28 교사 요청)
-  if (stk && STATUS[stk]) drawTinted(s, x - 17, y - 39, P.face < 0, STATUS[stk].col); else drawSpr(s, x - 17, y - 39, P.face < 0, false);
+  if (stk && STATUS[stk]) drawTinted(s, x - 17, y - 39, P.face < 0, STATUS[stk].col); else drawSpr(s, x - 17, y - 39, P.face < 0, false, heroSq());
   if (!behind) drawW();
 }
 function heart(x, y, full) { const c = full ? '#e04848' : '#3a2a2a';
@@ -2678,7 +2687,7 @@ function jobPicker() {
   const box = document.getElementById('jobs');
   for (const k in JOBS) {
     const b = document.createElement('button'); b.className = 'job'; b.dataset.k = k;
-    const cv = document.createElement('canvas'); cv.width = 34; cv.height = 40; cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0);
+    const cv = document.createElement('canvas'); cv.width = 36; cv.height = 42; cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0);
     const nm = document.createElement('span'); nm.textContent = JOBS[k].name;
     b.append(cv, nm); b.onclick = () => { jobKey = k; mark(); }; box.appendChild(b);
   }
