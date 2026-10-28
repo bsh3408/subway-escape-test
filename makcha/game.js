@@ -1202,6 +1202,8 @@ const DESC2 = {
   ai: '인공지능: 자료를 바탕으로 판단하지만, 학습한 자료에 따라 한계가 있다',
 };
 for (const k in DESC2) EDEF[k].desc = DESC2[k];
+const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안개', drone: '정전 드론', bias: '편향 AI', spore: '곰팡이 포자', rust: '녹 덩어리', fake2: '가짜 정보 봇' }; // 이름이 비어 있던 몬스터
+for (const k in NAME2) EDEF[k].name = NAME2[k];
 function spawnEnemy(kind, x, y, room) {
   const ov = (ZONES[stage.zone].ov || {})[kind] || {}, nm = ov.name || EDEF[kind].name, ds = ov.desc || EDEF[kind].desc;
   if (ds && !seenKinds.has(kind + '@' + stage.zone)) { seenKinds.add(kind + '@' + stage.zone); loreQ.push(nm + ' · ' + ds); } // 처음 만난 적: 과학 설명
@@ -2472,6 +2474,8 @@ function render() {
     const flash = e.flash > 0 || (isBoss(e) && isTell(e) && e.st !== 'chargeTell' && Math.floor(time * 16) % 2 === 0);
     if (e.battOut) ctx.globalAlpha = 0.5;
     drawSpr(s, e.x - s.w / 2, e.y - s.h - alt, e.face < 0, flash); ctx.globalAlpha = 1;
+    if (!isBoss(e) && Math.hypot(e.x - P.x, e.y - P.y) < 80) { const nm = ((ZONES[stage.zone].ov || {})[e.kind] || {}).name || EDEF[e.kind].name; // 2026-10-28 교사 요청: 가까이 가면 몬스터 이름
+      if (nm) { const tx = Math.round(e.x), ty = Math.round(e.y - s.h - alt - 4); ctx.font = '8px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#000'; ctx.fillText(nm, tx + 1, ty + 1); ctx.fillStyle = '#ffe08a'; ctx.fillText(nm, tx, ty); } }
     if (e.batt !== undefined && !e.battOut) { const k = Math.max(0, e.batt / 10); px(ctx, Math.round(e.x - 8), Math.round(e.y - e.h - 5), 16, 3, '#0c0c0c'); px(ctx, Math.round(e.x - 7), Math.round(e.y - e.h - 4), Math.round(14 * k), 1, k > 0.3 ? '#7ee07e' : '#ff5a3c'); }
   } });
   for (const d of devices) list.push({ y: d.y, f: () => drawDevice(d) });
