@@ -46,6 +46,12 @@ function sprite(w, h, draw) {
   fg.drawImage(c, 0, 0); fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = '#fff'; fg.fillRect(0, 0, w, h);
   return { c, f, w, h };
 }
+const tintC = document.createElement('canvas'), tintG = tintC.getContext('2d');
+function drawTinted(s, x, y, flip, col) { // 스프라이트의 그림 부분만 col 색으로 덮어 그린다(밝기가 조금씩 맥박친다)
+  tintC.width = s.w; tintC.height = s.h; tintG.globalCompositeOperation = 'source-over'; tintG.drawImage(s.c, 0, 0);
+  tintG.globalCompositeOperation = 'source-atop'; tintG.globalAlpha = 0.45 + 0.12 * Math.sin(time * 6); tintG.fillStyle = col; tintG.fillRect(0, 0, s.w, s.h); tintG.globalAlpha = 1;
+  drawSpr({ c: tintC, f: tintC, w: s.w, h: s.h }, x, y, flip, false);
+}
 function drawSpr(s, x, y, flip, flash) {
   const img = flash ? s.f : s.c; x = Math.round(x); y = Math.round(y);
   if (!flip) { ctx.drawImage(img, x, y); return; }
@@ -1749,24 +1755,12 @@ function openDevice(d) {
     const draw = () => show(`<p class="qq">${q}</p>${msg ? `<p class="qm">${msg}</p>` : ''}`, ord.map(i => opts[i]), c => { const i = ord[c];
       if (i === right) { closeCraft(); why(); } else { msg = wrong(i); if (crafting) draw(); } });
     draw(); };
-  if (d.k === 'wash') { // 화학 화상: BTB 용액으로 성질 확인 → 반대 성질 용액을 한 방울씩 → 초록색에서 멈춘다
-    const W = d.w || (d.w = { step: 0, drops: 0, need: 3 + Math.floor(rand() * 3) }); const chem = () => P.chem || 'acid';
-    const col = () => { const base = chem() === 'acid' ? '노란색' : '파란색', flip = chem() === 'acid' ? '파란색' : '노란색'; return W.drops < W.need ? base : W.drops === W.need ? '초록색' : flip; };
-    const draw = msg => {
-      if (W.step === 0) show('<p class="qq">몸에 묻은 용액의 성질을 먼저 확인한다.</p>' + (msg ? `<p class="qm">${msg}</p>` : ''), ['BTB 용액 떨어뜨리기'], () => { W.step = 1; draw(); });
-      else if (W.step === 1) { const opts = ['묽은 염기성 용액 넣기', '묽은 산성 용액 넣기', '증류수만 붓기'];
-        show(`<p class="qq">BTB 용액을 떨어뜨리자 ${chem() === 'acid' ? '노란색' : '파란색'}이 되었다. 무엇을 넣을까?</p>` + (msg ? `<p class="qm">${msg}</p>` : ''), opts, c => {
-          const right = chem() === 'acid' ? 0 : 1;
-          if (c === right) { W.step = 2; W.drops = 0; draw(); }
-          else if (c === 2) draw('색이 연해질 뿐 그대로다. 물만으로는 중화되지 않는다');
-          else draw(penal('색이 그대로다. 같은 성질의 용액을 넣으면 중화되지 않는다')); }); }
-      else show(`<p class="qq">한 방울씩 넣으며 색을 본다. 지금 색: <b>${col()}</b> (넣은 양 ${W.drops}방울)</p>` + (msg ? `<p class="qm">${msg}</p>` : ''), ['한 방울 넣기', '멈추고 씻어 내기'], c => {
-          if (c === 0) { W.drops++; draw(); return; }
-          if (W.drops === W.need) { d.w = null; closeCraft(); P.chem = null; cure('acid', '초록색(중성) · 중화되어 제독했다'); P.guard.acid = 8; return; }
-          if (W.drops < W.need) { draw('아직 ' + col() + '이다. 중성이 되려면 더 넣어야 한다'); return; }
-          P.chem = chem() === 'acid' ? 'base' : 'acid'; W.step = 1; W.need = 2 + Math.floor(rand() * 3); draw(penal('너무 많이 넣어 색이 ' + col() + '으로 바뀌었다. 중화열로 용액이 조금 따뜻해졌다. 다시 맞춘다')); });
-    };
-    draw(); return; }
+  if (d.k === 'wash') { // 화학 화상: 묻은 용액의 BTB 색을 보고, 반대 성질의 용액(산 또는 염기)을 골라 중화한다 (2026-10-28 교사 요청: 산·염기 고르기만)
+    const acid = (P.chem || 'acid') === 'acid';
+    pick3(`몸에 묻은 용액에 BTB 용액을 떨어뜨리니 <b>${acid ? '노란색' : '파란색'}</b>이 되었다. 어떤 용액을 부어 중화할까?`, ['산성 용액', '염기성 용액'], acid ? 1 : 0,
+      () => { P.chem = null; P.guard.acid = 8; cure('acid', '중화되어 제독했다(H⁺ + OH⁻ → H₂O)'); },
+      () => penal('같은 성질의 용액이라 중화되지 않는다'));
+    return; }
   if (d.k === 'tap') pick3('화상 부위를 어떻게 식힐까?', ['흐르는 찬물에 대기', '얼음 덩어리를 직접 대기', '불꽃 가까이에서 바람 쐬기'], 0,
     () => cure('burn', '흐르는 찬물이 열을 계속 빼앗아 화상이 가라앉았다'),
     i => i === 1 ? (P.coldX = Math.min(EXPOSE, P.coldX + 4), P.slowT = 2, penal('너무 차가워 몸이 얼어붙는다. 추위가 쌓였다')) : (P.st.burn += 2, penal('열을 더 받아 화상이 길어졌다')));
@@ -2554,7 +2548,8 @@ function drawPlayer() {
   const drawW = () => drawSpr(fr, pose.flip ? pv.x - (40 - WC) : pv.x - WC, pv.y - WC, pose.flip, false);
   const behind = Math.sin(a) < -0.35;
   if (behind) drawW();
-  drawSpr(s, x - 17, y - 39, P.face < 0, false);
+  const stk = Object.keys(P.st)[0]; // 상태 이상에 걸리면 몸 색이 그 상태 이상 색으로 물든다(2026-10-28 교사 요청)
+  if (stk && STATUS[stk]) drawTinted(s, x - 17, y - 39, P.face < 0, STATUS[stk].col); else drawSpr(s, x - 17, y - 39, P.face < 0, false);
   if (!behind) drawW();
 }
 function heart(x, y, full) { const c = full ? '#e04848' : '#3a2a2a';
