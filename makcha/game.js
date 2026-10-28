@@ -365,6 +365,15 @@ function buildSprites() {
   SPR.sling = sprite(20, 8, drawSling);
   SPR.wf = {};
   for (const k in WDRAW) SPR.wf[k] = weaponFrames(WDRAW[k]);
+  SPR.wi = {};
+  if (typeof WEAPON_ATLAS !== 'undefined') { const wimg = new Image();
+    wimg.onload = () => { const N = 100;
+      for (const k in WEAPON_ATLAS) { if (!WEAP[k]) continue; const [sx, sy, w, h] = WEAPON_ATLAS[k], melee = WEAP[k].type === 'melee';
+        const gx = Math.round(w * (melee ? 0.16 : 0.3)), gy = Math.round(h * (melee ? 0.5 : 0.4)); // 쥐는 곳
+        SPR.wi[k] = sprite(w, h, g => g.drawImage(wimg, sx, sy, w, h, 0, 0, w, h), true);
+        const fr = {}; for (let i = -4; i <= 4; i++) fr[i] = sprite(N, N, g => { g.imageSmoothingEnabled = false; g.translate(N / 2, N / 2); g.rotate(i * WSTEP); g.drawImage(wimg, sx, sy, w, h, -gx, -gy, w, h); }, true);
+        SPR.wf[k] = fr; WEAP[k].len = Math.max(8, w - gx - 2); } }; // 총구: 쥐는 곳에서 그림 끝까지
+    wimg.src = 'weapons.png'; }
 }
 // 무기 방향별 그림: 그림을 회전시키지 않고(도트가 깨짐) 22.5° 간격마다 도트로 따로 그린다.
 // 오른쪽 반(-90°~+90°) 9장만 그리고 왼쪽은 좌우 뒤집기로 쓴다. 손잡이(축)는 그림 가운데(20,20)
@@ -2503,7 +2512,7 @@ function render() {
     else if (p.kind === 'water') { const x = Math.round(p.x), y = Math.round(p.y - 12 + Math.sin(time * 4)); px(ctx, x - 4, y - 2, 8, 12, '#1a1512'); px(ctx, x - 3, y - 1, 6, 10, '#7fc8ff'); px(ctx, x - 3, y + 2, 6, 4, '#3f8fd0'); px(ctx, x - 2, y - 5, 4, 4, '#1a1512'); px(ctx, x - 1, y - 4, 2, 3, '#f4f4f0'); } // 물병
     else if (p.kind === 'heal') { const y = p.y - 10 + Math.round(Math.sin(time * 4)); px(ctx, p.x - 6, y, 12, 10, '#1a1512'); px(ctx, p.x - 5, y + 1, 10, 8, '#e04848'); px(ctx, p.x - 1, y + 2, 2, 6, '#fff'); px(ctx, p.x - 3, y + 4, 6, 2, '#fff'); }
     else { const y = Math.round(p.y - 12 + Math.sin(time * 4)); ell(ctx, Math.round(p.x), Math.round(p.y) - 1, 22, 7, 'rgba(0,0,0,0.3)'); // 바닥 무기: 등급 색 고리
-      ringPx(p.x, p.y - 1, 12, RARITY[WEAP[p.kind].r]); drawSpr(SPR.wf[p.kind][0], p.x - WC, y - WC, false, false); }
+      ringPx(p.x, p.y - 1, 12, RARITY[WEAP[p.kind].r]); if (SPR.wi[p.kind]) { const ic = SPR.wi[p.kind]; drawSpr(ic, p.x - (ic.w >> 1), y - (ic.h >> 1), false, false); } else drawSpr(SPR.wf[p.kind][0], p.x - WC, y - WC, false, false); }
   }
   drawHazards();
   for (const c of clouds) { const a = Math.min(1, c.t / 0.5) * 0.55; ctx.globalAlpha = a; ell(ctx, Math.round(c.x), Math.round(c.y), 64, 40, '#d8c840'); ell(ctx, Math.round(c.x - 14), Math.round(c.y - 8), 30, 22, '#e8d860'); ctx.globalAlpha = 1; }
@@ -2587,7 +2596,8 @@ function drawPlayer() {
   if ((WEAP[wk].type === 'melee' || P.swingW) && P.swing > 0) { // 휘두르기: 무기마다 휘두르는 폭이 다르다(쇠봉은 짧게 찌른다)
     const k = 1 - P.swing / 0.16, side = Math.cos(P.swingA) >= 0 ? 1 : -1, s = Math.min(1.2, (P.swingW || WEAP[wk]).arc); a = P.swingA + side * (-s + 2 * s * k); }
   const pose = weaponPose(a), pv = weaponPivot(a), fr = SPR.wf[wk][pose.k];
-  const drawW = () => drawSpr(fr, pose.flip ? pv.x - (40 - WC) : pv.x - WC, pv.y - WC, pose.flip, false);
+  const fc = fr.w === 40 ? WC : fr.w / 2; // 예전 그림은 40칸(WC), 새 그림은 가운데
+  const drawW = () => drawSpr(fr, pose.flip ? pv.x - (fr.w - fc) : pv.x - fc, pv.y - fc, pose.flip, false);
   const behind = Math.sin(a) < -0.35;
   if (behind) drawW();
   const stk = Object.keys(P.st)[0]; // 상태 이상에 걸리면 몸 색이 그 상태 이상 색으로 물든다(2026-10-28 교사 요청)
@@ -2654,10 +2664,11 @@ function drawHud() {
   setTxt('skillCd', sk < 1 ? Math.ceil(P.skillCd) : ''); setTxt('dashCd', '');
   { const k = P.weapons[P.wi], W0 = WEAP[k], bx = W - 214, by = H - 60; pframe(bx, by, 64, 50, '#1a1730');
     px(ctx, bx + 4, by + 4, 56, 2, RARITY[W0.r]); // 등급 색 띠
-    const fr = SPR.wf[k] && SPR.wf[k][0]; if (fr) ctx.drawImage(fr.c, bx + 4, by + 2, 56, 56 * fr.h / fr.w);
+    const ic = SPR.wi[k], fr = SPR.wf[k] && SPR.wf[k][0];
+    if (ic) ctx.drawImage(ic.c, bx + 32 - (ic.w >> 1), by + 22 - (ic.h >> 1)); else if (fr) ctx.drawImage(fr.c, bx + 4, by + 2, 56, 56 * fr.h / fr.w);
     ctx.font = '10px DungGeunMo, sans-serif'; ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.fillText('J', bx + 7, by + 45); ctx.fillStyle = '#ffe08a'; ctx.fillText('J', bx + 6, by + 44);
     if (W0.en) { ctx.textAlign = 'right'; px(ctx, bx + 40, by + 37, 5, 5, '#2fb6f0'); ctx.fillStyle = '#000'; ctx.fillText(String(enCost(W0.en)), bx + 59, by + 45); ctx.fillStyle = '#9fe8ff'; ctx.fillText(String(enCost(W0.en)), bx + 58, by + 44); }
-    if (P.weapons.length > 1) { const o = P.weapons[(P.wi + 1) % P.weapons.length], f2 = SPR.wf[o] && SPR.wf[o][0]; pframe(bx - 34, by + 18, 32, 32, '#1a1730'); if (f2) { ctx.globalAlpha = 0.7; ctx.drawImage(f2.c, bx - 32, by + 18, 28, 28); ctx.globalAlpha = 1; }
+    if (P.weapons.length > 1) { const o = P.weapons[(P.wi + 1) % P.weapons.length], f2 = SPR.wf[o] && SPR.wf[o][0], i2 = SPR.wi[o]; pframe(bx - 34, by + 18, 32, 32, '#1a1730'); if (i2) { const k2 = Math.min(1, 24 / i2.w, 24 / i2.h); ctx.globalAlpha = 0.7; ctx.drawImage(i2.c, bx - 18 - i2.w * k2 / 2, by + 34 - i2.h * k2 / 2, i2.w * k2, i2.h * k2); ctx.globalAlpha = 1; } else if (f2) { ctx.globalAlpha = 0.7; ctx.drawImage(f2.c, bx - 32, by + 18, 28, 28); ctx.globalAlpha = 1; }
       ctx.textAlign = 'left'; ctx.fillStyle = '#000'; ctx.fillText('Q', bx - 29, by + 47); ctx.fillStyle = '#ffe08a'; ctx.fillText('Q', bx - 30, by + 46); } } // 두 번째 무기(Q로 바꾼다)
   // 미니맵
   const mx = W - 10 - GW * 18, my = 12; pframe(mx - 8, my - 8, GW * 18 + 11, GH * 14 + 11, 'rgba(26,23,48,0.85)');
