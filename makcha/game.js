@@ -1221,7 +1221,7 @@ const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안�
 for (const k in NAME2) EDEF[k].name = NAME2[k];
 function spawnEnemy(kind, x, y, room) {
   const ov = (ZONES[stage.zone].ov || {})[kind] || {}, nm = ov.name || EDEF[kind].name, ds = ov.desc || EDEF[kind].desc;
-  if (ds && !seenKinds.has(kind + '@' + stage.zone)) { seenKinds.add(kind + '@' + stage.zone); loreQ.push(nm + ' · ' + ds); } // 처음 만난 적: 과학 설명
+  // 처음 만난 몬스터 설명 줄은 띄우지 않는다(2026-10-28 교사 요청) // 처음 만난 적: 과학 설명
   const d = EDEF[kind];
   const e = { kind, x, y, hp: d.hp, maxHp: d.hp, bw: d.bw, bh: d.bh, w: d.w, h: d.h, room, st: 'idle', t: 0.4 + rand() * 0.6, cd: 1 + rand(), flash: 0, face: -1, ph: 0, pt: 0, aim: 0 };
   if (kind === 'amm') e.shootT = 1.2 + rand() * 1.5;
@@ -1703,7 +1703,6 @@ function newOX() { const used = P.usedOX || (P.usedOX = new Set());
   if (!pool.length) return null; const q = pool[Math.floor(rand() * pool.length)]; used.add(q.id); return q; }
 function rightFx(explain) { // 정답 효과: 초록 번쩍임, 큰 글자, 별가루. 해설은 설명 줄에
   climFlash = { col: '#7ee07e', t: 0.5 }; say(P.x, P.y - 58, '정답!', 'heal', 'big'); burst(P.x, P.y - 16, '#7ee07e', 24); burst(P.x, P.y - 16, '#ffe08a', 14);
-  if (explain) { setTxt('lore', '정답 · ' + explain); loreT = time + 6; }
 }
 function openOX(onSolve) {
   let q = newOX(), msg = ''; if (!q) { onSolve(); return; }

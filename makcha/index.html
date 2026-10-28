@@ -10,10 +10,11 @@
   :root { --ink:#0b0a12; --pnl:#25213a; --pnl2:#332d4f; --rim:#6b6390; --rimhi:#8f86b8; --txt:#f4f0e6; --dim:#b8b0cc; --gold:#ffcf3f; --golddk:#c48a12; }
   html,body { margin:0; height:100%; background:#000; overflow:hidden; font-family:'DungGeunMo',"Malgun Gothic",sans-serif; }
   button, input { font-family:inherit; }
+  body *, .panel button, .ft, h1, h3, b { font-weight:400 !important; } /* 픽셀 글꼴은 굵게 하면 뭉개진다(2026-10-28 교사 요청: 글씨를 얇게) */
   body { display:flex; align-items:center; justify-content:center; }
   #wrap { position:relative; }
   #game { display:block; image-rendering:pixelated; cursor:crosshair; }
-  .ui { position:absolute; color:var(--txt); text-shadow:0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000; pointer-events:none; white-space:nowrap; }
+  .ui { position:absolute; color:var(--txt); text-shadow:0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; pointer-events:none; white-space:nowrap; }
   .pix, #craft .pop, .panel button.perk, .tnode, .iw, .panel button.job, .panel button.lob, #lore, #timer, #prompt:not(:empty), #bag:not(:empty), .qbox, #infoBody, .lobrow {
     background:var(--pnl); border:3px solid var(--ink) !important; border-radius:4px; box-shadow:inset 0 0 0 2px var(--rim), inset 0 3px 0 2px var(--rimhi), inset 0 -5px 0 rgba(0,0,0,0.35), 0 4px 0 rgba(0,0,0,0.55); }
   .bar { left:11.06%; transform:translate(-50%,-50%); font-size:0.72em; font-weight:700; font-variant-numeric:tabular-nums; }
@@ -34,7 +35,7 @@
   .qz .oxb button.qb { font-size:2em; min-width:2.6em; text-align:center; font-weight:800; }
   .qz { text-align:left; font-size:0.92em; }
   .qz .qt { font-size:0.8em; color:#9fe0ff; }
-  .panel h1, #craftTitle { color:var(--gold); text-shadow:0 3px 0 var(--ink), 2px 0 0 var(--ink), -2px 0 0 var(--ink), 0 -2px 0 var(--ink); }
+  .panel h1, #craftTitle { color:var(--gold); text-shadow:0 2px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink), 0 -1px 0 var(--ink); }
   .qz .qq { color:#f3ead7; white-space:pre-line; margin:0.3em 0 0.6em; }
   .qtab { border-collapse:collapse; margin:0.4em 0; font-size:0.85em; }
   .qtab th, .qtab td { border:2px solid var(--ink); padding:0.2em 0.6em; background:var(--pnl2); }
@@ -108,7 +109,7 @@
   .panel button.sub { background:var(--pnl2); color:var(--txt); box-shadow:inset 0 0 0 2px var(--rim), 0 4px 0 rgba(0,0,0,0.55); }
   #float { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
   .ft { position:absolute; transform:translate(-50%,-100%); font-weight:800; white-space:nowrap; font-size:1.05em;
-        text-shadow:0 2px 0 #000, 2px 0 0 #000, -2px 0 0 #000, 0 -2px 0 #000, 1px 1px 0 #000, -1px -1px 0 #000; }
+        text-shadow:0 1px 0 #000, 1px 0 0 #000, -1px 0 0 #000, 0 -1px 0 #000; }
   .ft.big { font-size:1.45em; }
   .ft.small { font-size:0.9em; }
 </style>
