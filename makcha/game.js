@@ -70,30 +70,34 @@ function drawSpr(s, x, y, flip, flash, sq) {
 // 지질학자 30×38: 팔 없음 — 탐사모, 머리, 짧은 네모 몸통(조끼), 작은 장화
 // 직업 6명 30×38: 모두 팔 없음 — 머리, 짧은 네모 몸통, 작은 발. 직업은 모자와 옷 색으로만 구분한다(그림은 설계가 끝난 뒤)
 function drawHero(g, ph, moving, L) {
-  const h = 38, w = 30, fh = 5, bh = 11, hh = 22, O = '#1a1512', x = 17, y = 39;
-  const bob = (ph % 2 === 1) ? 1 : 0;
-  const left = x - 15, top = y - h + bob;
-  const step = moving ? [0, -1, 0, 1][ph % 4] : 0, fw = 9;
-  px(g, left + 4, y - fh + Math.min(0, step), fw, fh, O); px(g, left + 5, y - fh + 1 + Math.min(0, step), fw - 2, fh - 2, L.shoe);
-  px(g, left + w - 4 - fw, y - fh + Math.min(0, -step), fw, fh, O); px(g, left + w - 3 - fw, y - fh + 1 + Math.min(0, -step), fw - 2, fh - 2, L.shoe);
-  const bw = 24, bl = x - 12, bt = top + hh - 1;
-  px(g, bl, bt, bw, bh + 1, O); px(g, bl + 1, bt + 1, bw - 2, bh - 1, L.shirt);
-  px(g, bl + 1, bt + 1, 6, bh - 1, L.vest); px(g, bl + bw - 7, bt + 1, 6, bh - 1, L.vest);
-  px(g, bl + 2, bt + 5, 4, 3, L.pocket); px(g, bl + bw - 6, bt + 5, 4, 3, L.pocket);
-  if (L.mark) L.mark(g, x, bt);
-  px(g, left + 1, top, w - 2, hh, O); px(g, left, top + 1, w, hh - 2, O); px(g, left + 1, top + 1, w - 2, hh - 2, '#f2d0a9');
-  HAT[L.hat](g, left, top, w, L);
-  px(g, x - 4, top + 12, 2, 3, O); px(g, x + 6, top + 12, 2, 3, O);
-  px(g, x - 7, top + 16, 3, 1, '#e8a68a'); px(g, x + 8, top + 16, 3, 1, '#e8a68a');
+  const O = '#1a1512', x = 17, y = 39, bob = (ph % 2 === 1) ? 1 : 0, top = 1 + bob;
+  const step = moving ? [0, -1, 0, 1][ph % 4] : 0;
+  // 작은 둥근 발
+  for (const [fx, st] of [[11, Math.min(0, step)], [23, Math.min(0, -step)]]) { ell(g, fx, y - 3 + st, 10, 7, O); ell(g, fx, y - 3 + st, 8, 5, L.shoe); }
+  // 달걀꼴 몸통(옷·조끼·주머니는 몸통 안에서만)
+  const by = 28 + bob, bt = by - 7;
+  ell(g, x, by, 24, 15, O); ell(g, x, by, 22, 13, L.shirt);
+  g.save(); g.beginPath(); g.ellipse(x, by, 11, 6.5, 0, 0, Math.PI * 2); g.clip();
+  px(g, x - 11, by - 7, 6, 14, L.vest); px(g, x + 5, by - 7, 6, 14, L.vest); px(g, x - 9, by - 1, 4, 3, L.pocket); px(g, x + 5, by - 1, 4, 3, L.pocket);
+  if (L.mark) L.mark(g, x, bt); g.restore();
+  // 큰 둥근 머리
+  const hy = top + 12;
+  ell(g, x, hy, 31, 25, O); ell(g, x, hy, 29, 23, '#f2d0a9'); ell(g, x - 5, hy - 6, 8, 4, '#f8dfc0'); // 이마 빛
+  HAT[L.hat](g, x, top, L);
+  // 동그란 눈(반짝임), 볼터치, 작은 입
+  for (const ex of [x - 5, x + 6]) { ell(g, ex, hy + 3, 4, 5, O); px(g, ex - 1, hy + 1, 1, 1, '#ffffff'); }
+  ell(g, x - 9, hy + 7, 5, 3, '#f0a090'); ell(g, x + 10, hy + 7, 5, 3, '#f0a090'); px(g, x, hy + 7, 2, 1, '#b0604a');
 }
+// 모자: 모두 둥근 돔 꼴. (g, 머리 가운데 x, 머리 위 t, 외형)
 const HAT = {
-  brim(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 3, t - 1, w - 6, 7, O); px(g, l + 4, t, w - 8, 5, L.hatC); px(g, l + 4, t + 4, w - 8, 1, L.hatD); px(g, l - 2, t + 6, w + 4, 3, O); px(g, l - 1, t + 7, w + 2, 1, L.hatD); },
-  cap(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 1, t - 1, w - 2, 8, O); px(g, l + 2, t, w - 4, 6, L.hatC); px(g, l + 2, t + 4, w - 4, 1, L.hatD); px(g, l + 12, t + 1, 6, 3, '#e3c25a'); px(g, l + w - 6, t + 6, 9, 3, O); px(g, l + w - 5, t + 7, 7, 1, L.hatD); },
-  helmet(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 2, t - 2, w - 4, 9, O); px(g, l, t + 1, w, 6, O); px(g, l + 3, t - 1, w - 6, 7, L.hatC); px(g, l + 1, t + 2, w - 2, 4, L.hatC); px(g, l + 13, t - 1, 4, 7, '#d9483b'); px(g, l + 11, t + 1, 8, 3, '#d9483b'); },
-  beanie(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 2, t - 2, w - 4, 9, O); px(g, l + 3, t - 1, w - 6, 5, L.hatC); px(g, l + 1, t + 3, w - 2, 4, O); px(g, l + 2, t + 4, w - 4, 2, L.hatD); px(g, l + 13, t - 4, 4, 3, O); px(g, l + 14, t - 3, 2, 1, '#f3ead7'); },
-  hair(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 1, t - 1, w - 2, 7, O); px(g, l + 2, t, w - 4, 5, L.hatC); px(g, l + 1, t + 5, 4, 4, L.hatC); px(g, l + 20, t + 4, 8, 2, L.hatC); },
-  goggles(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 1, t, w - 2, 5, '#3a2a20'); px(g, l, t + 5, w, 4, O); px(g, l + 3, t + 5, 9, 3, L.hatC); px(g, l + 18, t + 5, 9, 3, L.hatC); px(g, l + 4, t + 5, 3, 1, '#e6f6ff'); px(g, l + 19, t + 5, 3, 1, '#e6f6ff'); },
-  bucket(g, l, t, w, L) { const O = '#1a1512'; px(g, l + 4, t - 2, w - 8, 8, O); px(g, l + 5, t - 1, w - 10, 6, L.hatC); px(g, l - 1, t + 5, w + 2, 4, O); px(g, l, t + 6, w, 2, L.hatD); px(g, l + 6, t + 3, w - 12, 1, L.hatD); },
+  brim(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 9, 36, 7, O); ell(g, x, t + 9, 34, 5, L.hatD); ell(g, x, t + 4, 22, 12, O); ell(g, x, t + 4, 20, 10, L.hatC); px(g, x - 9, t + 6, 18, 2, L.hatD); },
+  cap(g, x, t, L) { const O = '#1a1512'; ell(g, x + 9, t + 9, 16, 6, O); ell(g, x + 9, t + 9, 14, 4, L.hatD); ell(g, x, t + 5, 30, 15, O); ell(g, x, t + 5, 28, 13, L.hatC); ell(g, x, t + 4, 7, 5, '#e3c25a'); },
+  helmet(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 6, 34, 17, O); ell(g, x, t + 6, 32, 15, L.hatC); px(g, x - 2, t, 4, 9, '#d9483b'); px(g, x - 4, t + 2, 8, 4, '#d9483b'); ell(g, x - 7, t + 3, 6, 3, '#ffffff'); },
+  beanie(g, x, t, L) { const O = '#1a1512'; ell(g, x, t - 2, 7, 7, O); ell(g, x, t - 2, 5, 5, '#f3ead7'); ell(g, x, t + 4, 30, 15, O); ell(g, x, t + 4, 28, 13, L.hatC); ell(g, x, t + 9, 31, 6, O); ell(g, x, t + 9, 29, 4, L.hatD); },
+  hair(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 4, 31, 15, O); ell(g, x, t + 4, 29, 13, L.hatC); ell(g, x - 11, t + 9, 7, 9, L.hatC); ell(g, x + 9, t + 8, 10, 6, L.hatC); },
+  goggles(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 4, 29, 13, '#3a2a20'); px(g, x - 15, t + 7, 30, 3, O);
+    for (const gx of [x - 6, x + 6]) { ell(g, gx, t + 8, 11, 9, O); ell(g, gx, t + 8, 9, 7, L.hatC); px(g, gx - 2, t + 6, 2, 2, '#e6f6ff'); } },
+  bucket(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 9, 36, 8, O); ell(g, x, t + 9, 34, 6, L.hatD); ell(g, x, t + 4, 24, 13, O); ell(g, x, t + 4, 22, 11, L.hatC); },
 };
 // 최종 소비자 임시 도형: 매 22×14, 호랑이 36×22(오른쪽을 봄), 사람(팔 없는 같은 꼴)
 function drawHawk(g, f) { const O = '#1a1512';
