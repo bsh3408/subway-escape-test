@@ -469,8 +469,7 @@ function weaponPose(a) {
 }
 function weaponPivot(a) {
   // 위를 겨누면 머리에 가려지지 않게 어깨 쪽으로 비켜 올린다
-  const up = Math.max(0, -Math.sin(a) - 0.35) / 0.65, side = Math.cos(a) >= 0 ? 1 : -1;
-  const x = Math.round(P.x + Math.cos(a) * 9 + side * up * 10), y = Math.round(P.y - 19 + Math.sin(a) * 5 - up * 8) + (P.moving && P.ph % 2 ? 1 : 0);
+  const x = Math.round(P.x + Math.cos(a) * 4), y = Math.round(P.y - 16 + Math.sin(a) * 3) + (P.moving && P.ph % 2 ? 1 : 0);
   return { x, y };
 }
 
@@ -2598,7 +2597,7 @@ function drawPlayer() {
   const pose = weaponPose(a), pv = weaponPivot(a), fr = SPR.wf[wk][pose.k];
   const fc = fr.w === 40 ? WC : fr.w / 2; // 예전 그림은 40칸(WC), 새 그림은 가운데
   const drawW = () => drawSpr(fr, pose.flip ? pv.x - (fr.w - fc) : pv.x - fc, pv.y - fc, pose.flip, false);
-  const behind = Math.sin(a) < -0.35;
+  const behind = false; // 위를 겨눠도 몸 뒤로 숨기지 않는다
   if (behind) drawW();
   const stk = Object.keys(P.st)[0]; // 상태 이상에 걸리면 몸 색이 그 상태 이상 색으로 물든다(2026-10-28 교사 요청)
   const hx = x - Math.floor(s.w / 2), hy = y - s.h + 1; // 발밑 기준
