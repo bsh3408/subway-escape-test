@@ -1701,10 +1701,14 @@ const OXB = typeof OX_BANK !== 'undefined' ? OX_BANK : [];
 function newOX() { const used = P.usedOX || (P.usedOX = new Set());
   let pool = OXB.filter(q => q.zone === stage.zone && !used.has(q.id)); if (!pool.length) { for (const q of OXB) if (q.zone === stage.zone) used.delete(q.id); pool = OXB.filter(q => q.zone === stage.zone); }
   if (!pool.length) return null; const q = pool[Math.floor(rand() * pool.length)]; used.add(q.id); return q; }
+function rightFx(explain) { // 정답 효과: 초록 번쩍임, 큰 글자, 별가루. 해설은 설명 줄에
+  climFlash = { col: '#7ee07e', t: 0.5 }; say(P.x, P.y - 58, '정답!', 'heal', 'big'); burst(P.x, P.y - 16, '#7ee07e', 24); burst(P.x, P.y - 16, '#ffe08a', 14);
+  if (explain) { setTxt('lore', '정답 · ' + explain); loreT = time + 6; }
+}
 function openOX(onSolve) {
   let q = newOX(), msg = ''; if (!q) { onSolve(); return; }
   const done = () => { closeCraft(); onSolve(); };
-  const pick = v => { if (v === q.answer) { openModal('정답', `<div class="qz"><p class="qq">${esc(q.explain || '')}</p><button class="qb" id="qgo">들어가기</button></div>`, b => { b.querySelector('#qgo').onclick = done; }, { e: done }); return; }
+  const pick = v => { if (v === q.answer) { done(); rightFx(q.explain); return; }
     time += 30; say(P.x, P.y - 44, '오답 · 기록 +30초', 'hurt'); msg = '틀렸다 · ' + esc(q.explain || '') + '<br>새 문제를 맞혀야 들어갈 수 있다'; q = newOX() || q; draw(); };
   const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div>${msg ? `<p class="qm">${msg}</p>` : ''}</div>`,
     b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false) });
@@ -1715,7 +1719,7 @@ function openQuiz(onSolve, kind) {
   if (!stage.quiz) stage.quiz = newQuiz(); const Q = stage.quiz; if (!Q) { onSolve(); return; }
   const label = kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록 +5분' : '다음 역으로 가는 문제 · 틀리면 기록 +1분';
   const go = () => { closeCraft(); stage.quiz = newQuiz(); onSolve(); }; // 다음 관문은 새 문제(힌트도 새로 모은다)
-  const check = ok => { if (ok) { Q.solved = true; openModal('정답', `<div class="qz"><p class="qq">${esc(Q.q.explain || '')}</p><button class="qb" id="qgo">계속</button></div>`, b => { b.querySelector('#qgo').onclick = go; }, { e: go }); burst(P.x, P.y - 16, '#9fe0ff', 16); return; }
+  const check = ok => { if (ok) { Q.solved = true; const ex = Q.q.explain; go(); rightFx(ex); return; }
     if (kind === 'zone') { time += 300; say(P.x, P.y - 44, '오답 · 기록 +5분', 'hurt', 'big'); } // 2026-10-28 교사 요청
     else { time += 60; say(P.x, P.y - 44, '오답 · 기록 +1분', 'hurt'); } // 역 관문: 틀리면 1분
     draw(); };
