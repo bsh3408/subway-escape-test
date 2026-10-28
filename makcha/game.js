@@ -921,9 +921,9 @@ function shootOnce(wk, W0, dm) {
   if (W0.type === 'quake') { quakes.push({ x: P.x, y: P.y - 4, t: 0, dmg: Math.round(W0.dmg * dm), hitP: new Set(), hitS: new Set() }); shake = Math.max(shake, 6); burst(P.x, P.y, '#8a6a3a', 12); return; }
   if (W0.type === 'focus') { const d = Math.min(Math.hypot(m.x - gx, m.y - gy), 14 * T); foci.push({ x: gx + Math.cos(a2) * d, y: gy + Math.sin(a2) * d, t: 0, dur: 0.5, dmg: Math.round(W0.dmg * dm) }); return; }
   if (W0.type === 'lob') { const d = Math.min(Math.hypot(m.x - gx, m.y - gy), 15 * T); lobs.push({ x0: gx, y0: gy, x1: gx + Math.cos(a2) * d, y1: gy + Math.sin(a2) * d + 12, t: 0, dur: 0.45 + d / 900, r: W0.boom.r, dmg: W0.boom.dmg * dm }); return; }
-  const n = W0.n || 1;
-  for (let i = 0; i < n; i++) {
-    const sa = a2 + (n > 1 ? (rand() - 0.5) * 2 * W0.spread : (W0.spread ? (rand() - 0.5) * 2 * W0.spread : 0)), sp = W0.sp * (n > 1 ? 0.8 + rand() * 0.4 : 1);
+  const n = W0.n || 1, ex = (has('extra1') ? 1 : 0) + (has('extra2') ? 1 : 0); // 두 갈래·세 갈래 탄: 같은 탄을 양옆으로 더 쏜다
+  for (let j = 0; j <= ex; j++) for (let i = 0; i < n; i++) {
+    const sa = a2 + (j - ex / 2) * 0.2 + (n > 1 ? (rand() - 0.5) * 2 * W0.spread : (W0.spread ? (rand() - 0.5) * 2 * W0.spread : 0)), sp = W0.sp * (n > 1 ? 0.8 + rand() * 0.4 : 1);
     const lr = has('range') ? 1.15 : 1; // 장거리탄: 더 빠르고 멀리
     shots.push({ x: gx, y: gy, vx: Math.cos(sa) * sp * lr, vy: Math.sin(sa) * sp * lr, life: (W0.life || 1.3) * (has('range') ? 1.4 : 1), dmg: W0.dmg * dm, r: W0.br, tag: W0.tag, mode: W0.tag === 'pack' ? P.packMode : undefined,
       boom: W0.boom ? { r: W0.boom.r, dmg: W0.boom.dmg * dm } : undefined, rocket: !!W0.boom, pierce: W0.pierce || 0, shape: W0.shape, col: W0.col, push: W0.push });
@@ -1483,6 +1483,7 @@ const TREES = [
   { id: 'life', name: '생존', perks: [['tough', '튼튼한 몸'], ['fastsh', '빠른 방어막'], ['regen', '재생']] },
   { id: 'move', name: '기동', perks: [['swift', '날렵함'], ['quickroll', '짧은 구르기'], ['rollhit', '구르기 돌진']] },
   { id: 'energy', name: '에너지', perks: [['save', '에너지 절약'], ['absorb', '에너지 흡수'], ['overflow', '넘치는 에너지']] },
+  { id: 'multi', name: '탄 수', perks: [['extra1', '두 갈래 탄'], ['extra2', '세 갈래 탄']] }, // 2026-10-28 교사 요청: 원거리 무기 탄 +1, +2
   { id: 'skill', name: '스킬', perks: [['sk1', '스킬 단련'], ['sk2', '스킬 숙련'], ['skshield', '스킬 방어막']] },
 ];
 const has = id => P.perks.has(id);
@@ -1601,7 +1602,8 @@ function loadSave() {
 }
 function writeSave() { try { localStorage.setItem(SAVE_KEY, JSON.stringify(save)); } catch (e) { } }
 let save = loadSave();
-function dropRelic(x, y) { const left = Object.keys(RELIC).filter(k => !P.relics.includes(k) && !pickups.some(p => p.kind === 'relic' && p.id === k)); if (!left.length) return;
+function dropRelic(x, y) { return; // 2026-10-28 교사 요청: 판 안에서는 유물이 떨어지지 않는다(대기실에서 들고 가는 유물만)
+   const left = Object.keys(RELIC).filter(k => !P.relics.includes(k) && !pickups.some(p => p.kind === 'relic' && p.id === k)); if (!left.length) return;
   pickups.push({ kind: 'relic', id: left[Math.floor(rand() * left.length)], x, y }); burst(x, y - 8, '#ffd23f', 12); }
 function relicMul(stat) { let m = 1; for (const k of P.relics || []) if (RELIC[k].stat === stat) m *= 1 + RELIC[k].v; return m; }
 function relicAdd(stat) { let s = 0; for (const k of P.relics || []) if (RELIC[k].stat === stat) s += RELIC[k].v; return s; }
