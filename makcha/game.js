@@ -443,7 +443,7 @@ function weaponPivot(a) {
 // ---------- 구역과 역 ----------
 // 한 판 = 구역 1부터 열린 구역까지, 구역마다 역 4개, 보스는 구역의 마지막 역에만 (컨셉_확정.md 2절)
 const ZONES = [
-  { name: '중화조 정거장', stations: ['산과 염기의 이온', '중화 반응과 물의 생성', '중화열과 온도 변화', '발열 반응과 흡열 반응'], pool: ['acid', 'lime', 'ember', 'icepack', 'hotiron'], boss: 'neutral', sts: ['acid', 'burn', 'frost'] },
+  { name: '중화조 정거장', stations: ['산과 염기의 이온', '중화 반응과 물의 생성', '중화열과 온도 변화', '발열 반응과 흡열 반응'], pool: ['acid', 'lime', 'ember', 'icepack', 'hotiron'], boss: 'neutral', sts: ['acid'] }, // 2026-10-28 교사 요청: 맵에 필요한 요소만(중화 → 화학 화상 하나)
   { name: '열돔 환승구역', stations: ['지구 복사 평형과 지구 열수지', '온실 효과', '온실 기체와 지구 온난화', '지구 온난화의 영향'], pool: ['fog', 'radiate', 'convect', 'methane', 'mirror'], boss: 'dome', clim: 'hot', sts: ['heat'] },
   { name: '해류 터널', stations: ['무역풍과 해수의 흐름', '엘니뇨', '엘니뇨의 영향', '사막화'], pool: ['wind', 'cactus', 'warmsea', 'dust'], boss: 'sandstorm', clim: 'cold', sts: ['frost'],
     ov: { wind: { name: '무역풍 풍차 로봇', desc: '무역풍: 적도 부근에서 동쪽에서 서쪽으로 부는 바람이다. 엘니뇨 때는 평상시보다 약해진다' } } },
