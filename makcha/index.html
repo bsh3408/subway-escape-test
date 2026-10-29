@@ -25,22 +25,22 @@
   #lore:empty { display:none; }
   #status { top:16%; left:1%; font-size:0.78em; font-weight:700; }
   #status span { margin-right:0.6em; }
-  #bag { bottom:2%; left:50%; transform:translateX(-50%); font-size:0.8em; color:#e6dcc6; padding:0.2em 0.8em; }
-  #craft { background:rgba(8,6,18,0.5); }
+  #bag { top:7.5%; left:50%; transform:translateX(-50%); font-size:0.8em; color:#e6dcc6; padding:0.2em 0.8em; }
+  #craft { background:rgba(8,6,18,0.88); }
   #craft .pop { background:var(--pnl); border-radius:4px; padding:0.9em 1.4em; box-shadow:0 8px 30px rgba(0,0,0,0.75); max-width:min(48em, 92%); display:flex; flex-direction:column; align-items:center; gap:0.5em; animation:popIn 0.18s ease-out; }
   @keyframes popIn { from { transform:scale(0.85); opacity:0; } to { transform:scale(1); opacity:1; } }
   #craftList { max-height:68vh; overflow:auto; }
   .qq.ox { font-size:1.15em; text-align:center; }
   .oxb { justify-content:center; gap:1.2em !important; }
   .qz .oxb button.qb { font-size:2em; min-width:2.6em; text-align:center; font-weight:800; }
-  .qz { text-align:left; font-size:0.92em; }
+  .qz { text-align:left; font-size:1.02em; }
   .qz .qt { font-size:0.8em; color:#9fe0ff; }
   .panel h1, #craftTitle { color:var(--gold); text-shadow:0 2px 0 var(--ink), 1px 0 0 var(--ink), -1px 0 0 var(--ink), 0 -1px 0 var(--ink); }
   .qz .qq { color:#f3ead7; white-space:pre-line; margin:0.3em 0 0.6em; }
-  .qtab { border-collapse:collapse; margin:0.4em 0; font-size:0.85em; }
+  .qtab { border-collapse:collapse; margin:0.4em 0; font-size:0.95em; }
   .qtab th, .qtab td { border:2px solid var(--ink); padding:0.2em 0.6em; background:var(--pnl2); }
   .qtab th { background:var(--rim); color:var(--txt); }
-  .qbox { border:1px solid #6a604e; padding:0.4em 0.7em; margin:0.4em 0; font-size:0.88em; line-height:1.7; }
+  .qbox { border:1px solid #6a604e; padding:0.4em 0.7em; margin:0.4em 0; font-size:0.98em; line-height:1.7; }
   .qch { display:flex; flex-wrap:wrap; gap:0.4em; margin:0.5em 0; align-items:center; }
   .qz button.qb { padding:0.45em 0.8em; background:var(--pnl2); color:var(--txt); border:3px solid var(--ink); border-radius:4px; box-shadow:inset 0 0 0 2px var(--gold), inset 0 -4px 0 rgba(0,0,0,0.35); font-size:0.95em; font-weight:400; text-align:left; cursor:pointer; }
   .qz button.qb:hover { background:var(--gold); color:#2a1a00; }
@@ -63,6 +63,7 @@
   .panel button.perk { display:flex; flex-direction:column; align-items:center; gap:0.35em; min-width:10em; padding:1em 0.8em; color:var(--txt); font-weight:400; }
   .panel button.perk:hover { background:var(--pnl2); }
   .panel button.perk b { font-size:1.2em; }
+  .panel button.perk .pk { font-style:normal; color:#2a1a00; background:var(--gold); border:2px solid var(--ink); border-radius:3px; padding:0 0.45em; }
   .panel button.perk small, .tnode small { display:block; font-size:0.78em; color:var(--dim); white-space:normal; max-width:12em; line-height:1.4; margin-top:0.2em; }
   .tnode.own small { color:#4a3600; }
   .panel button.perk span { color:#cfc6b3; font-size:0.9em; }

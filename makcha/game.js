@@ -503,7 +503,7 @@ const shuffle = a => { for (let i = a.length - 1; i > 0; i--) { const j = Math.f
 let stage = { order: [0], zi: 0, zone: 0, st: 0 };
 // 역의 전투방 웨이브: 뒤 역일수록 적이 많고 세다
 function wavesFor(zone, st) {
-  const k = ZONES[zone].pool, n = 6 + st, waves = []; // 2026-10-28 교사 요청: 몬스터는 방마다 한 번만(6~9마리)
+  const k = ZONES[zone].pool, n = stage.zi === 0 && st === 0 ? 4 : 6 + st, waves = []; // 판의 첫 역은 4마리(3인 테스트: 첫 방이 너무 어렵다) // 2026-10-28 교사 요청: 몬스터는 방마다 한 번만(6~9마리)
   const nw = 1;
   for (let w = 0; w < nw; w++) { const wave = [], off = Math.floor(rand() * k.length);
     for (let i = 0; i < n + w; i++) wave.push(k[(i + off) % k.length]);
@@ -771,6 +771,7 @@ function reset() {
     job: jobKey, skillCd: 0, skillMax: J.cd, stars: {}, packMode: 'cold', chg: 0,
     st: {}, gear: null, guard: {}, solarT: 0, heatX: 0, coldX: 0, wetT: 0, warmT: 0, frostTick: 0, mat: { cloth: 0, part: 0 }, perks: new Set(), rollHit: new Set(), relics: [], // 상태 이상, 장비(1개), 상태 이상 막는 시간, 재료(가죽·부품)
     ph: 0, pt: 0, moving: false, vx: 0, vy: 0, dash: 0, dashCd: 0, ddx: 0, ddy: 0, weapons: J.weapons.slice(), wi: 0, cd: 0, swing: 0, swingA: 0 };
+  if (WEAP[P.weapons[0]].type === 'melee') { P.maxSh += 1; P.sh += 1; } // 근접 무기로 시작하는 직업은 방어막 +1
   time = 0; ended = false; endT = 0;
   enterStation();
   const s = rooms[0];
@@ -827,7 +828,7 @@ addEventListener('keydown', e => {
   if (k === 'esc') { openInfo(); return; } // 내 상태: Esc
   if (k === 'e') tryPick();
   if (k === 'g') pickWeapon();
-  if (k === 'r') start();
+  if (k === 'r') { const nw = performance.now(); if (nw - (P.rT || 0) < 2000) start(); else { P.rT = nw; say(P.x, P.y - 60, 'R을 한 번 더 누르면 처음부터 다시 시작한다', 'block'); } }
   if (k === 'f' && P.weapons[P.wi] === 'pack') { P.packMode = P.packMode === 'cold' ? 'hot' : 'cold'; say(P.x, P.y - 46, P.packMode === 'cold' ? '흡열(파랑)' : '발열(빨강)', P.packMode === 'cold' ? 'stun' : 'hurt', 'small'); }
 });
 addEventListener('keyup', e => { const k = CODE[e.code]; if (k) keys[k] = false; });
@@ -849,7 +850,7 @@ function tryDash() {
 }
 const nearExit = () => tile(Math.floor(P.x / T), Math.floor((P.y - 3) / T)) === 8 || [[-12, 0], [12, 0], [0, -12], [0, 12]].some(([dx, dy]) => tile(Math.floor((P.x + dx) / T), Math.floor((P.y - 3 + dy) / T)) === 8);
 function tryPick() {
-  if (stage.gate) { openQuiz(goNextZone, 'zone'); return; } // 보스를 잡은 뒤 다음 구역으로 가는 관문
+  if (stage.gate) { openQuiz(zoneGateNext, 'zone'); return; } // 보스를 잡은 뒤 다음 구역으로 가는 관문
   if (nearExit()) { openQuiz(nextStation, 'station'); return; }
   const dv = nearDev(); if (dv) { openDevice(dv); return; }
   if (nearBench()) { openCraft(); return; }
@@ -1091,9 +1092,9 @@ function useSkill() {
   } else if (P.job === 'geo') { skillFx = { kind: 'geo', t: 8 }; say(P.x, P.y - 46, '지층 판독', 'stun'); }
   else if (P.job === 'eco') summonAlly();
   else if (P.job === 'chem') { const m = aimPoint(); flasks.push({ x0: c.x, y0: c.y, x1: m.x, y1: m.y, t: 0, dur: 0.45 }); }
-  else if (P.job === 'weather') { skillFx = { kind: 'storm', t: 7, tick: 0 }; say(P.x, P.y - 46, '대기 불안정', 'stun'); }
+  else if (P.job === 'weather') { skillFx = { kind: 'storm', t: 5, tick: 0 }; say(P.x, P.y - 46, '대기 불안정', 'stun'); }
   else if (P.job === 'medic') { const b = P.hp; P.hp = Math.min(P.maxHp, P.hp + 3); P.sh = Math.min(P.maxSh, P.sh + 2); P.inv = Math.max(P.inv, 1.5);
-    for (const k in P.st) if (k !== 'infect') delete P.st[k]; // 감염은 진단 키트로 병원체를 확인해야 풀린다(컨셉_확정 4절)
+    // 상태 이상은 구호실 장치로만 푼다(2026-10-29 밸런스) // 감염은 진단 키트로 병원체를 확인해야 풀린다(컨셉_확정 4절)
     say(P.x, P.y - 46, '응급 처치 · 체력 +' + (P.hp - b) + ' · 방어막 +2', 'heal'); burst(P.x, P.y - 16, '#7ee07e', 12); }
   P.skillCd = P.skillMax; // 스킬 단련·숙련이 쿨타임을 줄인다
   if (has('skshield')) { P.sh = Math.min(P.maxSh, P.sh + 1); say(P.x, P.y - 60, '방어막 +1', 'shield', 'small'); } // 스킬 방어막
@@ -1101,7 +1102,7 @@ function useSkill() {
 const skillDmg = e => skillFx.t > 0 && skillFx.kind === 'geo' ? 2 : 1;
 function splash(x, y) { // 중화제가 떨어진 자리: 주변 적에게 피해, 탄을 중화해 없애고, 웅덩이를 남긴다
   let n = 0;
-  for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < 64) damage(e, 14);
+  for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < 64) damage(e, 24);
   for (const b of ebul) if (!b.dead && Math.hypot(b.x - x, b.y - y) < 64) { b.dead = true; n++; }
   for (const h of hazards) if ((h.kind === 'acid' || h.kind === 'base') && Math.hypot(h.x - x, (h.y - y) * 1.4) < 56) h.t = h.life; // 산·염기 웅덩이를 중화
   puddles.push({ x, y, t: 0, life: 3 }); burst(x, y - 4, '#e8d040', 14); shake = Math.max(shake, 3);
@@ -1116,7 +1117,7 @@ function updateSkills() {
     if (skillFx.tick <= 0) { skillFx.tick = 0.35;
       for (const e of enemies) { if (e.dead) continue; const ex = e.x, ey = e.y - e.h / 2, d = Math.hypot(ex - c.x, ey - c.y);
         if (d > STORM_R + e.w * 0.4) continue;
-        damage(e, 4);
+        damage(e, 2);
         if (!isBoss(e)) { const ux = (ex - c.x) / (d || 1), uy = (ey - c.y) / (d || 1); e.kx = (-ux * 0.3 - uy * 0.95) * 260; e.ky = (-uy * 0.3 + ux * 0.95) * 260; } } } // 둘레를 돌며 안쪽으로 조금 끌려온다
   }
   for (const f of flasks) { f.t += DT; if (f.t >= f.dur) { f.dead = true; splash(f.x1, f.y1); } }
@@ -1466,9 +1467,10 @@ function applyStatus(k) {
   if (k === 'infect') { if (P.st.infect) return; const virus = rand() < 0.5; P.st.infect = { t: 0, type: virus ? '바이러스' : '세균', known: false, life: 1e9 }; say(P.x, P.y - 46, '감염', 'conf'); return; } // 바이러스·세균 모두 약을 먹기 전까지 낫지 않는다
   if (!(P.st[k] > 0)) { say(P.x, P.y - 46, STATUS[k].name, 'hurt', 'small'); if (k === 'frost') P.frostTick = 0; }
   if (k === 'acid' && P.sh > 0) { P.sh = 0; say(P.x, P.y - 60, '방어막 0', 'hurt', 'small'); } // 화학 화상: 닿는 순간 방어막이 0이 된다
-  P.st[k] = STATUS[k].keep ? 1e9 : STATUS[k].dur;
+  P.st[k] = STATUS[k].keep ? 1e9 : STATUS[k].dur; syncSaveSt();
 }
-function cure(k, msg) { delete P.st[k]; if (msg) say(P.x, P.y - 46, msg, 'heal', 'small'); }
+function syncSaveSt() { const d = loadRunData(); if (!d) return; d.P.st = P.st; d.P.chem = P.chem; try { localStorage.setItem(RUN_KEY, JSON.stringify(d)); } catch (e) { } }
+function cure(k, msg) { delete P.st[k]; syncSaveSt(); if (msg) say(P.x, P.y - 46, msg, 'heal', 'small'); }
 function updateStatus() {
   P.blockMsg = (P.blockMsg || 0) - DT;
   for (const k in P.st) {
@@ -1579,6 +1581,7 @@ function openPerk() {
   for (const o of offer) { const b = document.createElement('button'); b.className = 'perk';
     b.innerHTML = `<b>${o.name}</b><span>${o.tree.name}</span><small>${PERK_DESC[o.id] || ''}</small><em>${'●'.repeat(o.tier + 1)}${'○'.repeat(o.tree.perks.length - 1 - o.tier)}</em>`;
     b.onclick = () => { takePerk(o.id); closePerk(); say(P.x, P.y - 46, o.name, 'crit'); }; box.appendChild(b); }
+  box.querySelectorAll('.perk').forEach((b, n) => b.insertAdjacentHTML('afterbegin', '<i class="pk">' + (n + 1) + '</i>')); // 키보드 1·2·3
   document.getElementById('perk').classList.remove('hide');
 }
 function closePerk() { choosing = false; document.getElementById('perk').classList.add('hide'); }
@@ -1729,6 +1732,7 @@ function strongHints(q) { // 2026-10-29 교사 요청: 힌트는 거의 답을 �
 function newQuiz() {
   const used = P.usedQ || (P.usedQ = new Set());
   let pool = BANK.filter(q => q.zone === stage.zone && !used.has(q.id)); if (!pool.length) pool = BANK.filter(q => !used.has(q.id)); if (!pool.length) pool = BANK;
+  { const sp = pool.filter(q => q.st === stage.st); if (sp.length) pool = sp; } // 이 역의 소주제 문제를 먼저
   if (!pool.length) return null;
   const q0 = gichulOrder(pool[Math.floor(rand() * pool.length)]); used.add(q0.id); const q = { ...q0, hints: strongHints(q0) };
   return { q, hints: 0, paper: 0, dropped: 0, kills: 0, need: [1, 2, 3], wrong: new Set(), seq: [], order: q.type === 'order' ? shuffle(q.items.map((t, i) => i)) : null, solved: false, msg: '' };
@@ -1753,37 +1757,46 @@ function quizHtml(Q, gate, label) {
 const OXB = typeof OX_BANK !== 'undefined' ? OX_BANK : [];
 function newOX() { const used = P.usedOX || (P.usedOX = new Set());
   let pool = OXB.filter(q => q.zone === stage.zone && !used.has(q.id)); if (!pool.length) { for (const q of OXB) if (q.zone === stage.zone) used.delete(q.id); pool = OXB.filter(q => q.zone === stage.zone); }
+  { const sp = pool.filter(q => q.st === stage.st); if (sp.length) pool = sp; }
   if (!pool.length) return null; const q = pool[Math.floor(rand() * pool.length)]; used.add(q.id); return q; }
 function rightFx(explain) { // 정답 효과: 초록 번쩍임, 큰 글자, 별가루. 해설은 설명 줄에
   climFlash = { col: '#7ee07e', t: 0.5 }; say(P.x, P.y - 58, '정답!', 'heal', 'big'); burst(P.x, P.y - 16, '#7ee07e', 24); burst(P.x, P.y - 16, '#ffe08a', 14);
 }
-function openOX(onSolve) {
-  let q = newOX(), msg = ''; if (!q) { onSolve(); return; }
+let revealTok = null;
+function showReveal(title, html, next) { // 해설 창: Enter(또는 E)나 3초 뒤 다음으로
+  const tok = {}; revealTok = tok; let fired = false; const fire = () => { if (fired) return; fired = true; revealTok = null; next(); };
+  openModal(title, `<div class="qz">${html}<p class="note" style="text-align:center">Enter 계속 · 3초 뒤 자동으로 넘어간다</p></div>`, null, { e: fire });
+  setTimeout(() => { if (revealTok === tok && crafting) fire(); }, 3000);
+}
+function penalty(sec, msg) { time += sec; say(P.x, P.y - 44, msg, 'hurt', sec >= 300 ? 'big' : ''); // 오답 시간 벌칙은 중간 저장에도 바로 더한다(이어하기로 지우지 못하게)
+  const d = loadRunData(); if (d) { d.time += sec; try { localStorage.setItem(RUN_KEY, JSON.stringify(d)); } catch (e) { } } }
+const oxReveal = q => `<p class="qq ox">${esc(q.q)}</p><p class="qq" style="text-align:center">정답: <b>${q.answer ? 'O' : 'X'}</b></p><p class="qq">${esc(q.explain || '')}</p>`;
+const mcReveal = q => `<p class="qq">정답: <b>${'①②③④⑤'[q.answer]} ${esc(q.choices[q.answer])}</b></p><div class="qbox">${(q.hints || []).map(esc).join('<br>')}</div><p class="qq">${esc(q.explain || '')}</p>`;
+function openOX(onSolve, room) {
+  let q = (room && room.ox) || newOX(); if (!q) { onSolve(); return; } if (room) room.ox = q; // 닫았다 다시 와도 같은 문제
   const done = () => { closeCraft(); onSolve(); };
-  const pick = v => { if (v === q.answer) { done(); rightFx(q.explain); return; }
-    time += 30; say(P.x, P.y - 44, '오답 · 기록 +30초', 'hurt'); msg = '틀렸다 · ' + esc(q.explain || '') + '<br>새 문제를 맞혀야 들어갈 수 있다'; q = newOX() || q; draw(); };
-  const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div>${msg ? `<p class="qm">${msg}</p>` : ''}</div>`,
+  const pick = v => {
+    if (v === q.answer) { const first = !(room && room.oxTried); if (first) P.en = Math.min(P.maxEn, P.en + 15);
+      rightFx(); showReveal(first ? '정답 · 첫 시도 에너지 +15' : '정답', oxReveal(q), done); return; }
+    penalty(30, '오답 · 기록 +30초'); if (room) room.oxTried = true; const old = q; q = newOX() || q; if (room) room.ox = q;
+    showReveal('오답 · 새 문제를 맞혀야 들어간다', oxReveal(old), draw); };
+  const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초 · 처음에 맞히면 에너지 +15</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div></div>`,
     b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false) });
   draw();
 }
-function openQuiz(onSolve, kind) {
-  if (kind === 'room') { openOX(onSolve); return; } // kind: 'room' 방 입장 / 'station' 다음 역 / 'zone' 다음 구역(단원)
+function openQuiz(onSolve, kind, room) {
+  if (kind === 'room') { openOX(onSolve, room); return; } // kind: 'room' 방 입장 / 'station' 다음 역 / 'zone' 다음 구역(단원)
   if (!stage.quiz) stage.quiz = newQuiz(); const Q = stage.quiz; if (!Q) { onSolve(); return; }
-  const label = kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록 +5분' : '다음 역으로 가는 문제 · 틀리면 기록 +1분';
-  const go = () => { closeCraft(); stage.quiz = newQuiz(); onSolve(); }; // 다음 관문은 새 문제(힌트도 새로 모은다)
-  const check = ok => { if (ok) { Q.solved = true; const ex = Q.q.explain; go(); rightFx(ex); return; }
-    if (kind === 'zone') { time += 300; say(P.x, P.y - 44, '오답 · 기록 +5분', 'hurt', 'big'); } // 2026-10-28 교사 요청
-    else { time += 60; say(P.x, P.y - 44, '오답 · 기록 +1분', 'hurt'); } // 역 관문: 틀리면 1분
-    draw(); };
-  const draw = () => openModal(kind === 'zone' ? '단원 관문 문제' : '역 관문 문제', quizHtml(Q, true, label), b => {
-    b.querySelectorAll('[data-i]').forEach(x => x.onclick = () => { const i = +x.dataset.i; if (i === Q.q.answer) check(true); else { Q.wrong.add(i); Q.msg = '틀렸다. 힌트 쪽지를 더 모아 보자'; check(false); } });
-    const ok = b.querySelector('#qok'); if (ok) { const inp = b.querySelector('#qnum'); inp.focus(); const go = () => { if (inp.value === '') return; if (+inp.value === Q.q.answer) check(true); else { Q.msg = `입력한 값(${esc(inp.value)}${esc(Q.q.unit || '')})은 답이 아니다`; check(false); } };
-      ok.onclick = go; inp.onkeydown = ev => { ev.stopPropagation(); if (ev.key === 'Enter') go(); if (ev.key === 'Escape') closeCraft(); }; }
-    b.querySelectorAll('[data-o]').forEach(x => x.onclick = () => { Q.seq.push(+x.dataset.o); if (Q.seq.length < Q.q.items.length) { draw(); return; }
-      const right = Q.seq.filter((v, n) => v === n).length; if (right === Q.seq.length) check(true); else { Q.msg = `${Q.seq.length}개 중 ${right}개가 제자리다`; Q.seq = []; check(false); } });
-    const rs = b.querySelector('#qreset'); if (rs) rs.onclick = () => { Q.seq = []; draw(); };
-  }, Q.q.type === 'mc' ? Object.fromEntries(Q.q.choices.map((c, i) => [String(i + 1), () => { const x = document.querySelector(`#craftList [data-i="${i}"]`); if (x && !x.disabled) x.click(); }])) : null);
-  draw();
+  const pen = kind === 'zone' ? 300 : 60, label = (kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록 +5분' : '다음 역으로 가는 문제 · 틀리면 기록 +1분') + ' · 처음에 맞히면 에너지 +40';
+  const go = () => { closeCraft(); stage.quiz = newQuiz(); onSolve(); }; // 다음 관문은 새 문제
+  const check = ok => {
+    if (ok) { Q.solved = true; const first = !Q.tried; if (first) P.en = Math.min(P.maxEn, P.en + 40); rightFx(); showReveal(first ? '정답 · 첫 시도 에너지 +40' : '정답', mcReveal(Q.q), go); return; }
+    penalty(pen, kind === 'zone' ? '오답 · 기록 +5분' : '오답 · 기록 +1분');
+    const nq = newQuiz() || Q; nq.hints = Q.hints; nq.paper = Q.paper; nq.tried = true; stage.quiz = nq; // 틀리면 새 문제(번호를 차례로 눌러 넘어가지 못하게). 모은 힌트는 이어진다
+    showReveal('오답 · 새 문제를 맞혀야 넘어간다', mcReveal(Q.q), () => openQuiz(onSolve, kind)); };
+  openModal(kind === 'zone' ? '단원 관문 문제' : '역 관문 문제', quizHtml(Q, true, label), b => {
+    b.querySelectorAll('[data-i]').forEach(x => x.onclick = () => check(+x.dataset.i === Q.q.answer)); },
+    Object.fromEntries(Q.q.choices.map((c, i) => [String(i + 1), () => check(i === Q.q.answer)])));
 }
 // ---------- 퍼즐 장치: 역마다 방 곳곳에 놓인다. 가까이 가서 E. 상태 이상이 없을 때는 쓰임새만 보여 준다 ----------
 const DEV = {
@@ -2092,7 +2105,7 @@ function spawnWave(r) {
 function setDoors(r, v) { for (const [x, y] of r.doors) setT(x, y, v); }
 function updateRooms() {
   const cur = roomAt(P.x, P.y - 3, 0);
-  if (cur && !cur.passed && !crafting) { const r = cur; P.x = P.safe.x; P.y = P.safe.y; P.vx = P.vy = 0; P.dash = 0; P.rush = null; openQuiz(() => { r.passed = true; say(P.x, P.y - 46, '문이 열렸다', 'heal', 'small'); }, 'room'); return; }
+  if (cur && !cur.passed && !crafting) { const r = cur; P.x = P.safe.x; P.y = P.safe.y; P.vx = P.vy = 0; P.dash = 0; P.rush = null; openQuiz(() => { r.passed = true; say(P.x, P.y - 46, '문이 열렸다', 'heal', 'small'); }, 'room', r); return; }
   P.safe = { x: P.x, y: P.y }; // 마지막으로 서 있던 들어갈 수 있는 자리
   const inside = roomAt(P.x, P.y - 3, 1);
   for (const r of rooms) if (roomAt(P.x, P.y - 3, 0) === r) r.seen = true;
@@ -2190,7 +2203,7 @@ function updateBullets() {
   for (const b of ebul) { if (b.ret !== undefined && !b.back) { b.ret -= DT; if (b.ret <= 0) { b.back = true; b.vx = -b.vx; b.vy = -b.vy; b.st = 'heat'; } } // 온실 기체: 퍼졌던 탄이 되돌아온다(다시 방출되는 복사 에너지)
     if (b.g) { b.vy += b.g * DT; if (b.convect && b.vy > 0) { b.st = null; b.cool = true; } } b.x += b.vx * DT; b.y += b.vy * DT; b.life -= DT;
     if (bulletWall(b) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
-    if (!b.dead && Math.hypot(b.x - pc.x, b.y - pc.y) < 7 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
+    if (!b.dead && Math.hypot(b.x - P.x, Math.max(P.y - 46, Math.min(P.y - 8, b.y)) - b.y) < 8 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
       const s = b.st || (b.hz === 'fire' ? 'burn' : null);
       if (s === 'heat') { if (!inHaz('water') && stOk('heat')) P.heatX = Math.min(EXPOSE, P.heatX + 2.5); } else if (s === 'frost') { if (stOk('frost')) P.coldX = Math.min(EXPOSE, P.coldX + 2.5); } else if (s) applyStatus(s); } } // 열기·냉기 탄은 몸에 더위·추위를 쌓는다
   ebul = ebul.filter(b => !b.dead && b.life > 0);
@@ -2229,7 +2242,7 @@ const RUN_KEY = 'makcha.run.v1';
 function saveRun() {
   const d = { job: P.job, stage: { order: stage.order, zi: stage.zi, zone: stage.zone, st: stage.st }, time,
     P: { hp: P.hp, maxHp: P.maxHp, sh: P.sh, maxSh: P.maxSh, en: P.en, maxEn: P.maxEn, skillMax: P.skillMax, weapons: P.weapons, stars: P.stars, wi: P.wi, relics: P.relics,
-      perks: [...P.perks], usedQ: [...(P.usedQ || [])], usedOX: [...(P.usedOX || [])] }, at: new Date().toLocaleString('ko-KR') };
+      perks: [...P.perks], usedQ: [...(P.usedQ || [])], usedOX: [...(P.usedOX || [])], st: P.st, chem: P.chem, revived: !!P.revived }, at: new Date().toLocaleString('ko-KR') };
   try { localStorage.setItem(RUN_KEY, JSON.stringify(d)); return d.at; } catch (e) { return null; }
 }
 function loadRunData() { try { return JSON.parse(localStorage.getItem(RUN_KEY)); } catch (e) { return null; } }
@@ -2237,8 +2250,9 @@ function continueRun() {
   const d = loadRunData(); if (!d || !JOBS[d.job]) return;
   jobKey = d.job; start(); const Q = d.P;
   Object.assign(P, { hp: Q.hp, maxHp: Q.maxHp, sh: Q.sh, maxSh: Q.maxSh, en: Q.en, maxEn: Q.maxEn, skillMax: Q.skillMax, weapons: Q.weapons, stars: Q.stars, wi: Q.wi, relics: Q.relics,
-    perks: new Set(Q.perks), usedQ: new Set(Q.usedQ), usedOX: new Set(Q.usedOX), loaded: true });
-  stage = { ...d.stage }; time = d.time; enterStation(); P.loaded = false; say(P.x, P.y - 50, '이어하기 · ' + stationName().split(' · ').slice(-1)[0], 'heal');
+    perks: new Set(Q.perks), usedQ: new Set(Q.usedQ), usedOX: new Set(Q.usedOX), loaded: true, revived: !!Q.revived });
+  const keepSt = Q.st || {}, keepChem = Q.chem;
+  stage = { ...d.stage }; time = d.time; enterStation(); P.loaded = false; P.st = keepSt; P.chem = keepChem; // 저장한 상태 이상도 그대로 say(P.x, P.y - 50, '이어하기 · ' + stationName().split(' · ').slice(-1)[0], 'heal');
 }
 function finish(win) {
   try { localStorage.removeItem(RUN_KEY); } catch (e) { } // 판이 끝나면 중간 저장은 지운다
@@ -2247,18 +2261,18 @@ function finish(win) {
 }
 // 보스를 잡으면 구역 통과: 열린 구역이 더 있으면 다음 구역 역 1로, 없으면 막차에 타고 끝난다
 function zoneClear() {
-  if (stage.zi + 1 < stage.order.length) { say(P.x, P.y - 50, `구역 ${stage.zone + 1} 통과`, 'heal', 'big'); zoneNext = 1.8; }
-  else finish(true);
+  say(P.x, P.y - 50, stage.zi + 1 < stage.order.length ? `구역 ${stage.zone + 1} 통과` : '마지막 보스 처치 · 단원 문제를 풀면 막차에 탄다', 'heal', 'big'); zoneNext = 1.8;
 }
 let zoneNext = 0;
-function goNextZone() { stage = { order: stage.order, zi: stage.zi + 1, zone: stage.order[stage.zi + 1], st: 0 }; enterStation(); }
+const zoneGateNext = () => stage.zi + 1 < stage.order.length ? goNextZone() : finish(true);
+function goNextZone() { P.st = {}; P.heatX = P.coldX = 0; P.chem = null; P.test = null; stage = { order: stage.order, zi: stage.zi + 1, zone: stage.order[stage.zi + 1], st: 0 }; enterStation(); }
 function step() {
   if (!running) return;
   if (crafting || choosing || viewingTree || infoOpen) return; // 조합대·능력 고르기·스킬 트리·상태 창이 열려 있으면 기록 시계도 함께 멈춘다
   if (!ended) time += DT;
   if (trans > 0) { trans -= DT; if (trans <= 0) { stage.st++; enterStation(); } return; }
   updateStatus();
-  if (zoneNext > 0) { zoneNext -= DT; if (zoneNext <= 0) { stage.gate = true; openQuiz(goNextZone, 'zone'); return; } }
+  if (zoneNext > 0) { zoneNext -= DT; if (zoneNext <= 0) { stage.gate = true; openQuiz(zoneGateNext, 'zone'); return; } }
   updatePlayer();
   for (const e of enemies) updateEnemy(e);
   updateBullets(); updateSkills(); updateFx(); updateRooms(); updateTexts(); updateTimers(); updateHazards(); updateBossExtras();
