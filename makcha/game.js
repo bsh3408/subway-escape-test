@@ -7,7 +7,7 @@ const ACCEL = 9, FRICTION = 6; // 클수록 빨리 붙고 빨리 선다(작을�
 const DASH_CD = 0.8; // 구르기 쿨타임(초)
 const RUSH = 34; // 회생 제동 급발진 속도(초당 타일)
 const HIT_INV = 0.5; // 맞은 뒤 무적 시간(초) (2026-10-26 교사 요청: 1.0 → 0.5)
-const STORM_R = 58; // 대기 불안정 회오리 반지름(도트)
+const STORM_R = 72; // 대기 불안정 회오리 반지름(도트)
 
 // ---------- 화면 ----------
 const view = document.getElementById('game'), vctx = view.getContext('2d');
@@ -115,18 +115,18 @@ const HUMAN_LOOK = { hat: 'hair', hatC: '#2a1d14', hatD: '#1a120c', shirt: '#6a8
 // 직업: 체력·방어막·에너지, 스킬(쿨타임 초), 겉모습. 스킬 내용은 컨셉_확정.md 4절(통박사 점검 반영)
 // 시작 무기: 직업에 어울리는 약한 무기, pick은 시작 방 바닥에 놓이는 두 번째 무기 (2026-10-27 교사 요청)
 const JOBS = {
-  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 10, weapons: ['flashlight'], pick: 'bb',
+  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 8, weapons: ['flashlight'], pick: 'bb',
     look: { hat: 'cap', hatC: '#24365c', hatD: '#16223d', shirt: '#dfe6ee', vest: '#2e4470', pocket: '#22355a', shoe: '#2a2a30' } },
-  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 12, weapons: ['shovel'], pick: 'sling',
+  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 10, weapons: ['shovel'], pick: 'sling',
     look: { hat: 'brim', hatC: '#9a7b45', hatD: '#6e552b', shirt: '#c9b27a', vest: '#6f7d3c', pocket: '#55612c', shoe: '#5a3b22' } },
-  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 12, weapons: ['straw'], pick: 'broom',
+  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 10, weapons: ['straw'], pick: 'broom',
     look: { hat: 'bucket', hatC: '#5f8a3a', hatD: '#3f6024', shirt: '#e8e0c8', vest: '#7a9a4a', pocket: '#5a7a34', shoe: '#4a3a28' } },
-  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 7, weapons: ['watergun'], pick: 'ruler',
+  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 6, weapons: ['watergun'], pick: 'ruler',
     look: { hat: 'goggles', hatC: '#7fd0c8', hatD: '#3a8a84', shirt: '#f4f4f0', vest: '#f4f4f0', pocket: '#c9d2d6', shoe: '#3a3a40',
       mark: (g, x, bt) => { px(g, x - 1, bt + 1, 2, 10, '#c9d2d6'); } } },
-  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 11, weapons: ['umbrella'], pick: 'rubber',
+  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 9, weapons: ['umbrella'], pick: 'rubber',
     look: { hat: 'beanie', hatC: '#3f7fb8', hatD: '#2a5a86', shirt: '#d8e4ee', vest: '#e08a2e', pocket: '#b86a1e', shoe: '#2f3640' } },
-  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 14, weapons: ['dart'], pick: 'mop',
+  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 11, weapons: ['dart'], pick: 'mop',
     look: { hat: 'helmet', hatC: '#f3f3f3', hatD: '#c9c9c9', shirt: '#e05a3a', vest: '#f0c419', pocket: '#c99f10', shoe: '#2a2a30' } },
 };
 let jobKey = 'geo';
@@ -1011,7 +1011,7 @@ let flasks = [], puddles = [], skillFx = { kind: '', t: 0 }, allies = [], bombs 
 const ALLY = { hawk: '매', tiger: '호랑이', human: '사람' };
 function summonAlly() {
   const kinds = Object.keys(ALLY), kind = kinds[Math.floor(rand() * kinds.length)];
-  const a = { kind, x: P.x - P.face * 20, y: P.y + 4, t: 6, st: 'go', cd: 0.2, face: P.face, ph: 0, pt: 0, hit: new Set(), bw: 24, bh: 8 };
+  const a = { kind, x: P.x - P.face * 20, y: P.y + 4, t: 9, st: 'go', cd: 0.2, face: P.face, ph: 0, pt: 0, hit: new Set(), bw: 24, bh: 8 };
   allies.push(a); burst(a.x, a.y - 10, '#cfe8b0', 14);
   say(P.x, P.y - 46, '최종 소비자 · ' + ALLY[kind], 'heal');
 }
@@ -1035,7 +1035,7 @@ function updateAllies() {
       const e = nearestEnemy(a.x, a.y);
       if (e && a.cd <= 0) { const dx = e.x - a.x, dy = e.y - e.h / 2 - a.y + 18, d = Math.hypot(dx, dy) || 1; a.face = dx >= 0 ? 1 : -1;
         a.x += dx / d * 300 * DT; a.y += dy / d * 300 * DT;
-        if (d < 16) { damage(e, 3); confuse(e, 2.5); a.cd = 0.55; a.y -= 10; } }
+        if (d < 16) { damage(e, 5); confuse(e, 2.5); a.cd = 0.55; a.y -= 10; } }
       else if (!e) { a.x += (P.x - a.x) * 2 * DT; a.y += (P.y - 30 - a.y) * 2 * DT; }
     } else if (a.kind === 'tiger') { // 가장 강한 적에게 직선으로 달려가 큰 피해
       if (a.st === 'go' && a.cd <= 0) { const e = strongestEnemy(); if (e) { const dx = e.x - a.x, dy = e.y - a.y, d = Math.hypot(dx, dy) || 1;
@@ -1045,7 +1045,7 @@ function updateAllies() {
         const wall = move(a, a.dx * 430 * DT, a.dy * 430 * DT);
         if (rand() < 0.7) fx.push({ t: 'dust', x: a.x + (rand() - 0.5) * 20, y: a.y - 2, life: 0.3, max: 0.3 });
         for (const e of enemies) if (!e.dead && !a.hit.has(e) && Math.hypot(e.x - a.x, (e.y - a.y) * 1.3) < e.bw / 2 + 18) {
-          a.hit.add(e); damage(e, 12); shake = Math.max(shake, 4);
+          a.hit.add(e); damage(e, 18); shake = Math.max(shake, 4);
           if (!isBoss(e)) { e.kx = a.dx * 520; e.ky = a.dy * 520; e.stun = Math.max(e.stun || 0, 0.4); } }
         if (wall || a.cd <= 0) { a.st = 'go'; a.cd = 0.5; }
       }
@@ -1075,23 +1075,23 @@ function useSkill() {
   if (P.job === 'driver') { // 회생 제동: 이동 방향(없으면 조준 방향)으로 급발진, 멈출 때 방어막 충전
     let dx = (keys.d ? 1 : 0) - (keys.a ? 1 : 0), dy = (keys.s ? 1 : 0) - (keys.w ? 1 : 0);
     if (!dx && !dy) { const m = aimPoint(); dx = m.x - c.x; dy = m.y - c.y; }
-    const l = Math.hypot(dx, dy) || 1; P.rush = { t: 0.35, dx: dx / l, dy: dy / l, hit: new Set() }; P.dash = 0;
+    const l = Math.hypot(dx, dy) || 1; P.rush = { t: 0.45, dx: dx / l, dy: dy / l, hit: new Set() }; P.dash = 0;
     say(P.x, P.y - 46, '회생 제동', 'shield');
-  } else if (P.job === 'geo') { skillFx = { kind: 'geo', t: 6 }; say(P.x, P.y - 46, '지층 판독', 'stun'); }
+  } else if (P.job === 'geo') { skillFx = { kind: 'geo', t: 8 }; say(P.x, P.y - 46, '지층 판독', 'stun'); }
   else if (P.job === 'eco') summonAlly();
   else if (P.job === 'chem') { const m = aimPoint(); flasks.push({ x0: c.x, y0: c.y, x1: m.x, y1: m.y, t: 0, dur: 0.45 }); }
-  else if (P.job === 'weather') { skillFx = { kind: 'storm', t: 5, tick: 0 }; say(P.x, P.y - 46, '대기 불안정', 'stun'); }
-  else if (P.job === 'medic') { const b = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2); P.inv = Math.max(P.inv, 0.6);
+  else if (P.job === 'weather') { skillFx = { kind: 'storm', t: 7, tick: 0 }; say(P.x, P.y - 46, '대기 불안정', 'stun'); }
+  else if (P.job === 'medic') { const b = P.hp; P.hp = Math.min(P.maxHp, P.hp + 3); P.sh = Math.min(P.maxSh, P.sh + 2); P.inv = Math.max(P.inv, 1.5);
     for (const k in P.st) if (k !== 'infect') delete P.st[k]; // 감염은 진단 키트로 병원체를 확인해야 풀린다(컨셉_확정 4절)
-    say(P.x, P.y - 46, '응급 처치 · 체력 +' + (P.hp - b), 'heal'); burst(P.x, P.y - 16, '#7ee07e', 12); }
+    say(P.x, P.y - 46, '응급 처치 · 체력 +' + (P.hp - b) + ' · 방어막 +2', 'heal'); burst(P.x, P.y - 16, '#7ee07e', 12); }
   P.skillCd = P.skillMax; // 스킬 단련·숙련이 쿨타임을 줄인다
   if (has('skshield')) { P.sh = Math.min(P.maxSh, P.sh + 1); say(P.x, P.y - 60, '방어막 +1', 'shield', 'small'); } // 스킬 방어막
 }
-const skillDmg = e => skillFx.t > 0 && skillFx.kind === 'geo' ? 1.5 : 1;
+const skillDmg = e => skillFx.t > 0 && skillFx.kind === 'geo' ? 2 : 1;
 function splash(x, y) { // 중화제가 떨어진 자리: 주변 적에게 피해, 탄을 중화해 없애고, 웅덩이를 남긴다
   let n = 0;
-  for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < 46) damage(e, 6);
-  for (const b of ebul) if (!b.dead && Math.hypot(b.x - x, b.y - y) < 46) { b.dead = true; n++; }
+  for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < 64) damage(e, 14);
+  for (const b of ebul) if (!b.dead && Math.hypot(b.x - x, b.y - y) < 64) { b.dead = true; n++; }
   for (const h of hazards) if ((h.kind === 'acid' || h.kind === 'base') && Math.hypot(h.x - x, (h.y - y) * 1.4) < 56) h.t = h.life; // 산·염기 웅덩이를 중화
   puddles.push({ x, y, t: 0, life: 3 }); burst(x, y - 4, '#e8d040', 14); shake = Math.max(shake, 3);
   say(x, y - 20, n ? '중화 ×' + n : '중화', 'heal');
@@ -1105,7 +1105,7 @@ function updateSkills() {
     if (skillFx.tick <= 0) { skillFx.tick = 0.35;
       for (const e of enemies) { if (e.dead) continue; const ex = e.x, ey = e.y - e.h / 2, d = Math.hypot(ex - c.x, ey - c.y);
         if (d > STORM_R + e.w * 0.4) continue;
-        damage(e, 2);
+        damage(e, 4);
         if (!isBoss(e)) { const ux = (ex - c.x) / (d || 1), uy = (ey - c.y) / (d || 1); e.kx = (-ux * 0.3 - uy * 0.95) * 260; e.ky = (-uy * 0.3 + ux * 0.95) * 260; } } } // 둘레를 돌며 안쪽으로 조금 끌려온다
   }
   for (const f of flasks) { f.t += DT; if (f.t >= f.dur) { f.dead = true; splash(f.x1, f.y1); } }
@@ -1175,13 +1175,13 @@ function updatePlayer() {
     if (rand() < 0.8) fx.push({ t: 'dust', x: P.x + (rand() - 0.5) * 16, y: P.y - 2, life: 0.4, max: 0.4 });
     for (const e of enemies) { // 지나가는 길의 적: 피해, 넉백, 기절 (한 번씩)
       if (e.dead || P.rush.hit.has(e) || Math.hypot(e.x - P.x, (e.y - P.y) * 1.3) > e.bw / 2 + 22) continue;
-      P.rush.hit.add(e); damage(e, 5); shake = Math.max(shake, 5);
+      P.rush.hit.add(e); damage(e, 12); if (!isBoss(e)) e.stun = Math.max(e.stun || 0, 0.6); shake = Math.max(shake, 5);
       if (!isBoss(e)) { const sx = Math.sign((e.x - P.x) * -P.rush.dy + (e.y - P.y) * P.rush.dx) || 1;
         e.kx = (P.rush.dx * 0.7 - P.rush.dy * sx * 0.7) * 620; e.ky = (P.rush.dy * 0.7 + P.rush.dx * sx * 0.7) * 620; }
       if (!e.dead) { e.stun = Math.max(e.stun || 0, isBoss(e) ? 0.5 : 1.0); say(e.x, e.y - e.h - 16, '기절', 'stun', 'small'); }
     }
     if (P.rush.t <= 0) { // 감속: 운동 에너지 일부를 전기 에너지로 전환해 방어막에 저장 (최댓값을 넘지 않음)
-      const before = P.sh; P.sh = Math.min(P.maxSh, P.sh + 2); P.shT = 0; P.rush = null; P.vx *= 0.25; P.vy *= 0.25;
+      const before = P.sh; P.sh = Math.min(P.maxSh, P.sh + 3); P.shT = 0; P.rush = null; P.vx *= 0.25; P.vy *= 0.25;
       say(P.x, P.y - 46, P.sh > before ? '방어막 +' + (P.sh - before) + ' (전환 효율 65%)' : '방어막 가득', 'shield'); burst(P.x, P.y - 6, '#9fd8ff', 12);
     }
   } else if (P.dash > 0) {
@@ -1209,7 +1209,7 @@ function updatePlayer() {
     if (p.t > 0.3 && d < 90 * (1 + relicAdd('magnet'))) { const s = 340 * (1 - d / 120); p.vx += dx / d * s * DT * 8; p.vy += dy / d * s * DT * 8; }
     if (d < 14) { p.dead = true; P.en = Math.min(P.maxEn, P.en + (has('absorb') ? 6 : 4)); } // 에너지 흡수
   }
-  for (const p of pickups) if (p.kind === 'hint' && Math.hypot(p.x - P.x, p.y - P.y) < 24 * (1 + relicAdd('magnet'))) { p.dead = true; const Q = stage.quiz; if (Q && Q.hints < 3) { Q.paper = (Q.paper || 0) + 1; if (Q.paper >= 10) { Q.paper = 0; Q.hints++; say(P.x, P.y - 52, `힌트 ${Q.hints} 완성`, 'stun', 'big'); } else say(P.x, P.y - 46, `쪽지 ${Q.paper}/10`, 'stun', 'small'); } }
+  for (const p of pickups) if (p.kind === 'hint' && Math.hypot(p.x - P.x, p.y - P.y) < 24 * (1 + relicAdd('magnet'))) { p.dead = true; const Q = stage.quiz; if (Q && Q.hints < HINT_MAX) { Q.paper = (Q.paper || 0) + 1; if (Q.paper >= 10) { Q.paper = 0; Q.hints++; say(P.x, P.y - 52, `힌트 ${Q.hints} 완성`, 'stun', 'big'); } else say(P.x, P.y - 46, `쪽지 ${Q.paper}/10`, 'stun', 'small'); } }
   for (const p of pickups) if (p.kind === 'relic' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; takeRelic(p.id); } // 유물은 닿으면 줍는다
   for (const p of pickups) if ((p.kind === 'cloth' || p.kind === 'part') && Math.hypot(p.x - P.x, p.y - P.y) < 22 * (1 + relicAdd('magnet'))) { // 재료는 닿으면 줍는다(자석: 더 멀리서)
     p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
@@ -1676,7 +1676,7 @@ function openInfo() { document.getElementById('saveMsg').textContent = '';
       <span>피해 ${Math.round(dmg * starMul(k) * dmgMul(W0.type === 'melee'))} · 간격 ${W0.cd}초 · 에너지 ${enCost(W0.en)}</span>${W0.desc ? `<span>${W0.desc}</span>` : ''}</div>`; }).join('');
   const list = (arr, empty) => arr.length ? arr.join(', ') : `<i>${empty}</i>`;
   const Q = stage.quiz;
-  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 ${Q.hints} / 3개 · 쪽지 ${Q.paper || 0} / 10장(10장마다 힌트 1개)</p>` : '') + `
+  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 ${Q.hints} / ${HINT_MAX}개 · 쪽지 ${Q.paper || 0} / 10장(지형지물을 부수면 나온다)</p>` : '') + `
     <div class="icol">
       <h3>${J.name}</h3>
       ${g('스킬', `${J.skill} · ${Math.round(P.skillMax * 10) / 10}초`)}
@@ -1722,10 +1722,10 @@ function newQuiz() {
   const q0 = gichulOrder(pool[Math.floor(rand() * pool.length)]); used.add(q0.id); const q = { ...q0, hints: strongHints(q0) };
   return { q, hints: 0, paper: 0, dropped: 0, kills: 0, need: [1, 2, 3], wrong: new Set(), seq: [], order: q.type === 'order' ? shuffle(q.items.map((t, i) => i)) : null, solved: false, msg: '' };
 }
-function dropHint(x, y, p) { const Q = stage.quiz; if (!Q || Q.hints >= 3 || rand() >= p) return; pickups.push({ kind: 'hint', x, y }); burst(x, y - 8, '#9fe0ff', 6); } // 2026-10-29: 쪽지 10장 = 힌트 1개
+const HINT_MAX = 1; // 문제 하나에 열 수 있는 힌트 수
+function dropHint(x, y, p) { const Q = stage.quiz; if (!Q || Q.hints >= HINT_MAX || rand() >= p) return; pickups.push({ kind: 'hint', x, y }); burst(x, y - 8, '#9fe0ff', 6); } // 2026-10-29: 쪽지 10장 = 힌트 1개
 function quizKill(e) { const Q = stage.quiz; if (!Q) return;
-  if (isBoss(e)) { if (Q.hints < 3) { Q.hints = 3; Q.paper = 0; say(P.x, P.y - 50, '보스 처치 · 힌트 3개가 모두 열렸다', 'stun'); } return; } // 보스: 남은 힌트를 모두 연다
-  dropHint(e.x, e.y, 1); } // 몬스터를 잡으면 쪽지 1장
+} // 몬스터·보스는 쪽지를 떨어뜨리지 않는다(지형지물에서만)
 function quizHtml(Q, gate, label) {
   const q = Q.q; let h = `<div class="qz"><p class="qt">${esc(q.topic)} · ${label || '이 문제를 풀어야 지나갈 수 있다'}</p><p class="qq">${esc(q.q)}</p>`;
   if (q.table) h += '<table class="qtab">' + q.table.map((r, i) => '<tr>' + r.map(c => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join('') + '</tr>').join('') + '</table>';
@@ -1735,7 +1735,7 @@ function quizHtml(Q, gate, label) {
     if (q.type === 'num') h += `<div class="qch"><input id="qnum" type="number" inputmode="numeric"> <span>${esc(q.unit || '')}</span> <button class="qb" id="qok">확인</button></div>`;
     if (q.type === 'order') h += '<div class="qseq">고른 순서: ' + (Q.seq.length ? Q.seq.map((i, n) => `${n + 1}) ${esc(q.items[i])}`).join(' → ') : '<i>아래에서 차례로 누른다</i>') + '</div><div class="qch">' + Q.order.map(i => `<button class="qb" data-o="${i}"${Q.seq.includes(i) ? ' disabled' : ''}>${esc(q.items[i])}</button>`).join('') + '<button class="qb qr" id="qreset">다시 고르기</button></div>';
   }
-  h += '<div class="qh">' + [0, 1, 2].map(i => i < Q.hints ? `<p>힌트 ${i + 1} · ${esc(q.hints[i])}</p>` : `<p class="lock">힌트 ${i + 1} · ${i === Q.hints ? `쪽지 10장을 모으면 열린다(지금 ${Q.paper || 0}/10)` : '잠김'}</p>`).join('') + '</div>';
+  h += '<div class="qh">' + [0, 1, 2].slice(0, HINT_MAX).map(i => i < Q.hints ? `<p>힌트 ${i + 1} · ${esc(q.hints[i])}</p>` : `<p class="lock">힌트 ${i + 1} · ${i === Q.hints ? `쪽지 10장을 모으면 열린다(지금 ${Q.paper || 0}/10)` : '잠김'}</p>`).join('') + '</div>';
   if (Q.msg) h += `<p class="qm">${Q.msg}</p>`;
   return h + '</div>';
 }
@@ -2705,7 +2705,7 @@ function drawHud() {
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   if (loreT <= time && loreQ.length) { setTxt('lore', loreQ.shift()); loreT = time + 4; } else if (loreT <= time) setTxt('lore', '');
-  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? '역 관문 문제 힌트 ' + stage.quiz.hints + '/3 · 쪽지 ' + (stage.quiz.paper || 0) + '/10' : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
+  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? (stage.quiz.hints >= HINT_MAX ? '역 관문 문제 힌트를 열었다' : '힌트 쪽지 ' + (stage.quiz.paper || 0) + '/10 · 지형지물을 부수면 나온다') : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
 }
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
