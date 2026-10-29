@@ -369,6 +369,13 @@ function buildSprites() {
   SPR.sling = sprite(20, 8, drawSling);
   SPR.wf = {};
   for (const k in WDRAW) SPR.wf[k] = weaponFrames(WDRAW[k]);
+  if (typeof MONSTER_ATLAS !== 'undefined') { const mimg = new Image();
+    mimg.onload = () => { for (const k in MONSTER_ATLAS) { const D = EDEF[k]; if (!D) continue; const [sx, sy, w, h] = MONSTER_ATLAS[k], m = D.boss ? 2 : 1, W2 = w * m, H2 = h * m;
+        const sp = sprite(W2, H2, g => { g.imageSmoothingEnabled = false; g.drawImage(mimg, sx, sy, w, h, 0, 0, W2, H2); }, true);
+        SPR[k] = [sp, sp]; // 움직임은 출렁임으로
+        D.w = W2; D.h = H2; D.bw = Math.max(14, Math.round(W2 * 0.7)); } // 그림 크기에 맞춘 몸 판정
+      for (const e of enemies || []) { const D = EDEF[e.kind]; e.w = D.w; e.h = D.h; e.bw = D.bw; } };
+    mimg.src = 'monsters.png'; }
   SPR.wi = {};
   if (typeof WEAPON_ATLAS !== 'undefined') { const wimg = new Image();
     wimg.onload = () => { const N = 100;
