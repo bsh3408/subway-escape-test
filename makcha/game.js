@@ -902,6 +902,35 @@ function findTarget() {
 }
 const aimPoint = () => target ? { x: target.x, y: target.y - target.h / 2 } : performance.now() - mouseT < 1500 ? mWorld() : { x: P.x + (P.ldx ?? P.face) * 80, y: P.y - 16 + (P.ldy || 0) * 80 };
 // 에너지가 모자라면 든 무기를 그냥 휘두른다(2026-10-27 교사 요청). 약하지만 탄 1개는 막거나 튕긴다
+const SWING_FX = {
+  umbrella: { st: 'arc', col: ['#9fd8ff', '#3f6fb0'], p: '#7fc8ff' }, ladle: { st: 'arc', col: ['#ffe08a', '#c8a050'], p: '#ffcf6a' },
+  hammer: { st: 'heavy', col: ['#e8e8e8', '#7a7a80'], p: '#a89a84' }, rod: { st: 'thrust', col: ['#e6eef4', '#8d96a3'] },
+  mop: { st: 'arc', col: ['#bfe6ff', '#7fb0d0'], p: '#7fc8ff' }, broom: { st: 'arc', col: ['#e8d090', '#a8884a'], p: '#c8a870' },
+  ruler: { st: 'thrust', col: ['#ffffff', '#c3cad3'] }, flashlight: { st: 'cone', col: ['#fff3a0', '#ffd23f'] },
+  shovel: { st: 'heavy', col: ['#c8a070', '#6a4a2a'], p: '#8a6a3a' }, pan: { st: 'heavy', col: ['#ffd23f', '#5a5a62'], p: '#ffe08a' },
+  wrench: { st: 'arc', col: ['#d8dde3', '#8d96a3'], p: '#ffd23f' }, steelpipe: { st: 'heavy', col: ['#b8c0c8', '#5a6470'], p: '#c26a3a' },
+  bat: { st: 'heavy', col: ['#f0c890', '#8a5a2e'], p: '#ffffff' }, baton: { st: 'zap', col: ['#9fe0ff', '#3f7fd0'], p: '#e6f6ff' },
+  saw: { st: 'arc', col: ['#e8e8e8', '#ff9a3a'], p: '#ffd23f' }, plasma: { st: 'flame', col: ['#ffe08a', '#ff6a2a'], p: '#ff9a3a' },
+  meteor: { st: 'heavy', col: ['#c08aff', '#5a2a8a'], p: '#a86ad8' }, magnet: { st: 'dual', col: ['#ff5a5a', '#5a8aff'] },
+  sonic: { st: 'wave', col: ['#d8a8ff', '#8a4ad0'] }, saber: { st: 'glow', col: ['#fff3c0', '#ff8a2a'] },
+};
+function drawSwingFx(c, k, W0, wk) { // k: 1(막 휘두름) → 0(끝)
+  const F0 = SWING_FX[wk] || { st: 'arc', col: ['#fff7c2', '#c8b070'] }, R = W0.range || 38, A = W0.arc || 1.2, a0 = P.swingA, ad = Math.round(A * 180 / Math.PI * 0.85);
+  const dot = (a, r, w, col) => { ctx.fillStyle = col; ctx.fillRect(Math.round(c.x + Math.cos(a) * r), Math.round(c.y + Math.sin(a) * r), w, w); };
+  ctx.globalAlpha = 0.35 + 0.65 * k;
+  if (F0.st === 'thrust') { for (let r = 8; r < R * 1.25; r += 2) { dot(a0, r, 3, F0.col[1]); dot(a0, r, 2, F0.col[0]); } dot(a0, R * 1.25, 5, '#ffffff'); } // 곧게 찌르는 선
+  else if (F0.st === 'cone') { ctx.fillStyle = F0.col[0]; ctx.globalAlpha = 0.35 * k + 0.1; ctx.beginPath(); ctx.moveTo(c.x, c.y); ctx.arc(c.x, c.y, R * 1.3, a0 - A * 0.6, a0 + A * 0.6); ctx.closePath(); ctx.fill(); } // 손전등 빛 부채꼴
+  else if (F0.st === 'wave') { for (const r of [R * 0.6, R * 0.85, R * 1.1, R * 1.35]) for (let d = -ad; d <= ad; d += 3) dot(a0 + d * Math.PI / 180, r * (1.15 - k * 0.3), 2, Math.round(r) % 2 ? F0.col[0] : F0.col[1]); } // 퍼져 나가는 음파
+  else if (F0.st === 'zap') { let pr = null; for (let d = -ad; d <= ad; d += 6) { const a = a0 + d * Math.PI / 180, r = R * (0.85 + (Math.random() - 0.5) * 0.3), p = { x: c.x + Math.cos(a) * r, y: c.y + Math.sin(a) * r }; if (pr) { line(pr.x, pr.y, p.x, p.y, F0.col[1], 3); line(pr.x, pr.y, p.x, p.y, F0.col[0], 1); } pr = p; } } // 지글거리는 전기
+  else if (F0.st === 'dual') { for (let d = -ad; d <= ad; d += 3) { const a = a0 + d * Math.PI / 180; dot(a, R * 0.8, 3, F0.col[0]); dot(a, R * 1.05, 3, F0.col[1]); } } // 자석의 N·S 두 줄
+  else { const heavy = F0.st === 'heavy', glow = F0.st === 'glow', flame = F0.st === 'flame', rs = heavy ? [0.65, 0.8, 0.95, 1.1, 1.25] : glow ? [0.7, 0.85, 1.0, 1.15] : [0.75, 0.95, 1.15];
+    for (let d = -ad; d <= ad; d += heavy || glow ? 2 : 4) { const a = a0 + d * Math.PI / 180;
+      rs.forEach((f, i) => dot(a, R * f, heavy || glow ? 3 : 2, i === 0 || i === rs.length - 1 ? F0.col[1] : F0.col[0]));
+      if (glow) dot(a, R * 0.92, 2, '#ffffff'); if (flame && Math.random() < 0.3) dot(a, R * (0.8 + Math.random() * 0.5), 2, Math.random() < 0.5 ? '#ffd23f' : '#ff5a1e'); } }
+  ctx.globalAlpha = 1;
+}
+function swingBits(c, a, W0, wk) { const F0 = SWING_FX[wk]; if (!F0 || !F0.p) return; const R = (W0.range || 38) * 1.05; // 휘두를 때 끝에서 튀는 알갱이
+  burst(c.x + Math.cos(a) * R, c.y + Math.sin(a) * R, F0.p, F0.st === 'heavy' ? 10 : 6); if (F0.st === 'heavy') shake = Math.max(shake, 3); }
 const BASH = { type: 'melee', cd: 0.4, dmg: 2, range: 30, arc: 1.0, kb: 0.7, deflect: 0.8, deflN: 1 };
 function attack() {
   const wk = P.weapons[P.wi], c = pCenter(), m = aimPoint(), a = Math.atan2(m.y - c.y, m.x - c.x);
@@ -912,7 +941,7 @@ function attack() {
   P.cd = W0.cd; P.swingW = W0 === BASH ? BASH : null;
   const dm = starMul(wk) * (P.st.corrode ? 0.7 : 1) * dmgMul(W0.type === 'melee'); // 부식: 무기 피해 30% 감소
   if (W0.type === 'melee') {
-    P.swing = 0.16; P.swingA = a;
+    P.swing = 0.16; P.swingA = a; swingBits(c, a, W0, W0 === BASH ? '' : wk);
     if (W0.magnet) { // 전자석: 철로 된 기계형 적만 끌어당긴다(통박사: 전자석은 철 같은 물체만 끌어당김)
       let np = 0; for (const e of enemies) { if (e.dead || isBoss(e) || !MECH.has(e.kind)) continue; const dx = c.x - e.x, dy = c.y - (e.y - e.h / 2), d = Math.hypot(dx, dy); if (d < 160 && d > 20) { e.kx = dx / d * 460; e.ky = dy / d * 460; np++; } }
       if (np) say(P.x, P.y - 60, '끌어당김 ×' + np, 'stun', 'small'); fx.push({ t: 'boom', x: c.x, y: c.y + 4, r: 60, life: 0.2, max: 0.2 }); }
@@ -2650,9 +2679,7 @@ function render() {
     drawShot(s, x, y, d); }
   drawSkillsOver(cx, cy);
   // 망치 휘두름
-  if (P.swing > 0) { const c = pCenter(), k = P.swing / 0.16, W0 = P.swingW || WEAP[P.weapons[P.wi]], R = W0.range || 38, ad = Math.round((W0.arc || 1.2) * 180 / Math.PI * 0.85);
-    ctx.fillStyle = `rgba(255,247,194,${0.4 + 0.6 * k})`;
-    for (let d = -ad; d <= ad; d += 4) for (const r of [R * 0.75, R * 0.95, R * 1.15]) { const a = P.swingA + d * Math.PI / 180; ctx.fillRect(Math.round(c.x + Math.cos(a) * r), Math.round(c.y + Math.sin(a) * r), 2, 2); } }
+  if (P.swing > 0) { const W0 = P.swingW || WEAP[P.weapons[P.wi]]; drawSwingFx(pCenter(), P.swing / 0.16, W0, P.swingW ? '' : P.weapons[P.wi]); } // 무기마다 다른 휘두르기 효과
   if (P.chg > 0) { const c = pCenter(), w = 24; px(ctx, Math.round(c.x - w / 2), Math.round(P.y + 4), w, 4, '#0c0c0c'); px(ctx, Math.round(c.x - w / 2) + 1, Math.round(P.y + 5), Math.round((w - 2) * P.chg), 2, P.chg >= 1 ? '#ffd23f' : '#c8783a'); }
   for (const f of fx) {
     if (f.t === 'bit') px(ctx, Math.round(f.x), Math.round(f.y), 2, 2, f.col);
