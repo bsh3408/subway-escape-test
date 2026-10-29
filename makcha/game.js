@@ -1209,7 +1209,7 @@ function updatePlayer() {
     if (p.t > 0.3 && d < 90 * (1 + relicAdd('magnet'))) { const s = 340 * (1 - d / 120); p.vx += dx / d * s * DT * 8; p.vy += dy / d * s * DT * 8; }
     if (d < 14) { p.dead = true; P.en = Math.min(P.maxEn, P.en + (has('absorb') ? 6 : 4)); } // 에너지 흡수
   }
-  for (const p of pickups) if (p.kind === 'hint' && Math.hypot(p.x - P.x, p.y - P.y) < 24 * (1 + relicAdd('magnet'))) { p.dead = true; const Q = stage.quiz; if (Q && Q.hints < 3) { Q.hints++; say(P.x, P.y - 46, `힌트 쪽지 ${Q.hints}/3`, 'stun'); } }
+  for (const p of pickups) if (p.kind === 'hint' && Math.hypot(p.x - P.x, p.y - P.y) < 24 * (1 + relicAdd('magnet'))) { p.dead = true; const Q = stage.quiz; if (Q && Q.hints < 3) { Q.paper = (Q.paper || 0) + 1; if (Q.paper >= 10) { Q.paper = 0; Q.hints++; say(P.x, P.y - 52, `힌트 ${Q.hints} 완성`, 'stun', 'big'); } else say(P.x, P.y - 46, `쪽지 ${Q.paper}/10`, 'stun', 'small'); } }
   for (const p of pickups) if (p.kind === 'relic' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; takeRelic(p.id); } // 유물은 닿으면 줍는다
   for (const p of pickups) if ((p.kind === 'cloth' || p.kind === 'part') && Math.hypot(p.x - P.x, p.y - P.y) < 22 * (1 + relicAdd('magnet'))) { // 재료는 닿으면 줍는다(자석: 더 멀리서)
     p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
@@ -1552,12 +1552,21 @@ function takePerk(id) {
   if (id === 'sk1') { P.skillMax = Math.round(P.skillMax * 0.8 * 10) / 10; }
   if (id === 'sk2') { P.skillMax = Math.round(P.skillMax * 0.85 * 10) / 10; }
 }
+const PERK_DESC = {
+  range: '탄이 15% 빨라지고 40% 더 멀리 날아간다', power: '원거리 피해 +25%', bounce: '탄이 벽에 맞으면 한 번 튕긴다', chain: '탄이 맞힌 적 옆의 다른 적에게 한 번 더 튄다',
+  wide: '근접 공격 거리 +15%, 휘두르는 폭 +30%', stunhit: '근접 공격으로 적을 0.5초 더 기절시킨다', counter: '튕겨 낸 적 탄이 더 빠르고 피해가 2배', shock: '휘두를 때 둘레로 충격파가 퍼진다',
+  tough: '최대 체력 +2', fastsh: '방어막이 더 빨리 찬다(3초 → 1.8초)', regen: '전투방을 정리하면 체력 +1',
+  swift: '이동 속도 +12%', quickroll: '구르기 대기 시간 -40%', rollhit: '구르며 부딪힌 적에게 피해 3',
+  save: '30% 확률로 에너지를 쓰지 않는다', absorb: '에너지 구슬 하나에 에너지 +6(원래 +4)', overflow: '최대 에너지 +40, 적을 쓰러뜨리면 에너지 +1',
+  extra1: '원거리 무기가 탄을 1발 더 쏜다', extra2: '원거리 무기가 탄을 1발 더 쏜다(모두 3발)',
+  sk1: '스킬 대기 시간 -20%', sk2: '스킬 대기 시간 -15%', skshield: '스킬을 쓰면 방어막 +1',
+};
 let choosing = false;
 function openPerk() {
   const offer = perkOffer(); if (!offer.length) return;
   choosing = true; const box = document.getElementById('perkList'); box.innerHTML = '';
   for (const o of offer) { const b = document.createElement('button'); b.className = 'perk';
-    b.innerHTML = `<b>${o.name}</b><span>${o.tree.name}</span><em>${'●'.repeat(o.tier + 1)}${'○'.repeat(o.tree.perks.length - 1 - o.tier)}</em>`;
+    b.innerHTML = `<b>${o.name}</b><span>${o.tree.name}</span><small>${PERK_DESC[o.id] || ''}</small><em>${'●'.repeat(o.tier + 1)}${'○'.repeat(o.tree.perks.length - 1 - o.tier)}</em>`;
     b.onclick = () => { takePerk(o.id); closePerk(); say(P.x, P.y - 46, o.name, 'crit'); }; box.appendChild(b); }
   document.getElementById('perk').classList.remove('hide');
 }
@@ -1569,7 +1578,7 @@ function toggleTree() {
   const box = document.getElementById('treeGrid'); box.innerHTML = '';
   for (const t of TREES) { const col = document.createElement('div'); col.className = 'tcol'; col.innerHTML = `<h3>${t.name}</h3>`;
     t.perks.forEach(([id, name], i) => { const own = has(id), open = !own && (i === 0 || has(t.perks[i - 1][0]));
-      const d = document.createElement('div'); d.className = 'tnode' + (own ? ' own' : open ? ' open' : ''); d.textContent = name; col.appendChild(d); });
+      const d = document.createElement('div'); d.className = 'tnode' + (own ? ' own' : open ? ' open' : ''); d.innerHTML = name + `<small>${PERK_DESC[id] || ''}</small>`; col.appendChild(d); });
     box.appendChild(col); }
   el.classList.remove('hide');
 }
@@ -1667,7 +1676,7 @@ function openInfo() { document.getElementById('saveMsg').textContent = '';
       <span>피해 ${Math.round(dmg * starMul(k) * dmgMul(W0.type === 'melee'))} · 간격 ${W0.cd}초 · 에너지 ${enCost(W0.en)}</span>${W0.desc ? `<span>${W0.desc}</span>` : ''}</div>`; }).join('');
   const list = (arr, empty) => arr.length ? arr.join(', ') : `<i>${empty}</i>`;
   const Q = stage.quiz;
-  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 쪽지 ${Q.hints} / 3장을 모았다</p>` : '') + `
+  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 ${Q.hints} / 3개 · 쪽지 ${Q.paper || 0} / 10장(10장마다 힌트 1개)</p>` : '') + `
     <div class="icol">
       <h3>${J.name}</h3>
       ${g('스킬', `${J.skill} · ${Math.round(P.skillMax * 10) / 10}초`)}
@@ -1703,17 +1712,20 @@ function gichulOrder(q) { if (q.type !== 'mc' || !q.box) return q;
   const key = c => { const p = c.split(',').map(t => t.trim()); return p.length * 10 + ('ㄱㄴㄷ'.indexOf(p[0]) + 1) + ('ㄱㄴㄷ'.indexOf(p[p.length - 1]) + 1) / 10; };
   const idx = q.choices.map((c, i) => i).sort((a, b) => key(q.choices[a]) - key(q.choices[b]));
   return { ...q, choices: idx.map(i => q.choices[i]), answer: idx.indexOf(q.answer) }; }
+function strongHints(q) { // 2026-10-29 교사 요청: 힌트는 거의 답을 알려 주는 수준(ㄱ·ㄴ·ㄷ가 옳은지 하나씩)
+  if (q.type !== 'mc' || !q.box) return q.hints; const ans = q.choices[q.answer].split(',').map(t => t.trim());
+  return q.box.map(b => { const L = b.trim()[0]; return `${L}은 ${ans.includes(L) ? '옳은' : '옳지 않은'} 설명이다 · ${b.replace(/^\s*[ㄱㄴㄷ]\.\s*/, '')}`; }); }
 function newQuiz() {
   const used = P.usedQ || (P.usedQ = new Set());
   let pool = BANK.filter(q => q.zone === stage.zone && !used.has(q.id)); if (!pool.length) pool = BANK.filter(q => !used.has(q.id)); if (!pool.length) pool = BANK;
   if (!pool.length) return null;
-  const q = gichulOrder(pool[Math.floor(rand() * pool.length)]); used.add(q.id);
-  return { q, hints: 0, dropped: 0, kills: 0, need: [1, 2, 3], wrong: new Set(), seq: [], order: q.type === 'order' ? shuffle(q.items.map((t, i) => i)) : null, solved: false, msg: '' };
+  const q0 = gichulOrder(pool[Math.floor(rand() * pool.length)]); used.add(q0.id); const q = { ...q0, hints: strongHints(q0) };
+  return { q, hints: 0, paper: 0, dropped: 0, kills: 0, need: [1, 2, 3], wrong: new Set(), seq: [], order: q.type === 'order' ? shuffle(q.items.map((t, i) => i)) : null, solved: false, msg: '' };
 }
-function dropHint(x, y, p) { const Q = stage.quiz; if (!Q || Q.dropped >= 3 || rand() >= p) return; Q.dropped++; pickups.push({ kind: 'hint', x, y }); burst(x, y - 8, '#9fe0ff', 10); }
+function dropHint(x, y, p) { const Q = stage.quiz; if (!Q || Q.hints >= 3 || rand() >= p) return; pickups.push({ kind: 'hint', x, y }); burst(x, y - 8, '#9fe0ff', 6); } // 2026-10-29: 쪽지 10장 = 힌트 1개
 function quizKill(e) { const Q = stage.quiz; if (!Q) return;
-  if (isBoss(e)) { while (Q.dropped < 3) { Q.dropped++; pickups.push({ kind: 'hint', x: e.x - 30 + Q.dropped * 20, y: e.y + 10 }); } return; } // 보스: 남은 힌트를 모두 떨어뜨린다
-  dropHint(e.x, e.y, 0.3); }
+  if (isBoss(e)) { if (Q.hints < 3) { Q.hints = 3; Q.paper = 0; say(P.x, P.y - 50, '보스 처치 · 힌트 3개가 모두 열렸다', 'stun'); } return; } // 보스: 남은 힌트를 모두 연다
+  dropHint(e.x, e.y, 1); } // 몬스터를 잡으면 쪽지 1장
 function quizHtml(Q, gate, label) {
   const q = Q.q; let h = `<div class="qz"><p class="qt">${esc(q.topic)} · ${label || '이 문제를 풀어야 지나갈 수 있다'}</p><p class="qq">${esc(q.q)}</p>`;
   if (q.table) h += '<table class="qtab">' + q.table.map((r, i) => '<tr>' + r.map(c => i ? `<td>${esc(c)}</td>` : `<th>${esc(c)}</th>`).join('') + '</tr>').join('') + '</table>';
@@ -1723,7 +1735,7 @@ function quizHtml(Q, gate, label) {
     if (q.type === 'num') h += `<div class="qch"><input id="qnum" type="number" inputmode="numeric"> <span>${esc(q.unit || '')}</span> <button class="qb" id="qok">확인</button></div>`;
     if (q.type === 'order') h += '<div class="qseq">고른 순서: ' + (Q.seq.length ? Q.seq.map((i, n) => `${n + 1}) ${esc(q.items[i])}`).join(' → ') : '<i>아래에서 차례로 누른다</i>') + '</div><div class="qch">' + Q.order.map(i => `<button class="qb" data-o="${i}"${Q.seq.includes(i) ? ' disabled' : ''}>${esc(q.items[i])}</button>`).join('') + '<button class="qb qr" id="qreset">다시 고르기</button></div>';
   }
-  h += '<div class="qh">' + [0, 1, 2].map(i => i < Q.hints ? `<p>힌트 ${i + 1} · ${esc(q.hints[i])}</p>` : `<p class="lock">힌트 ${i + 1} · 몬스터를 잡거나 지형지물을 부수면 쪽지가 나온다</p>`).join('') + '</div>';
+  h += '<div class="qh">' + [0, 1, 2].map(i => i < Q.hints ? `<p>힌트 ${i + 1} · ${esc(q.hints[i])}</p>` : `<p class="lock">힌트 ${i + 1} · ${i === Q.hints ? `쪽지 10장을 모으면 열린다(지금 ${Q.paper || 0}/10)` : '잠김'}</p>`).join('') + '</div>';
   if (Q.msg) h += `<p class="qm">${Q.msg}</p>`;
   return h + '</div>';
 }
@@ -2379,7 +2391,7 @@ function hitProp(p, n) {
   if (!p || p.dead) return; p.hp -= n; p.flash = 0.08; burst(p.x, p.y - 8, '#cfc6b3', 2);
   if (p.hp > 0) return;
   p.dead = true; setT(p.tx, p.ty, 1); burst(p.x, p.y - 8, '#a89a84', 12); shake = Math.max(shake, 2);
-  dropHint(p.x, p.y - 4, 0.35); // 지형지물을 부숴도 힌트 쪽지
+  dropHint(p.x, p.y - 4, 0.6); // 지형지물을 부숴도 힌트 쪽지(60%)
   const X = PROP[p.kind].extra, x = p.x, y = p.y - 4;
   if (X === 'boom') explode(x, y, 44, 6); // 녹슨 드럼통: 터지며 둘레 적에게 피해
   if (X === 'nutri') addHazard(x, y, 'nutri');
@@ -2693,7 +2705,7 @@ function drawHud() {
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   if (loreT <= time && loreQ.length) { setTxt('lore', loreQ.shift()); loreT = time + 4; } else if (loreT <= time) setTxt('lore', '');
-  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? '역 관문 문제 힌트 ' + stage.quiz.hints + '/3' : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
+  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? '역 관문 문제 힌트 ' + stage.quiz.hints + '/3 · 쪽지 ' + (stage.quiz.paper || 0) + '/10' : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
 }
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
