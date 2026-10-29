@@ -517,7 +517,7 @@ function wavesFor(zone, st) {
 const CW = 44, CH = 32, GW = 4, GH = 3, MW = CW * GW, MH = CH * GH;
 const SOLID = new Set([0, 2, 3, 7, 10, 11]); // 10: 부서지는 지형지물(props), 11: 부서지지 않는 장애물
 let map, rooms, links;
-const ROOMSIZE = { start: [20, 16], fight: [30, 20], supply: [18, 14], exit: [20, 16], boss: [38, 26], aid: [22, 16], crate: [26, 18] };
+const ROOMSIZE = { start: [20, 16], fight: [30, 20], supply: [18, 14], exit: [20, 16], boss: [38, 26], aid: [22, 16], crate: [26, 18], treasure: [22, 16] };
 const tile = (x, y) => (x < 0 || y < 0 || x >= MW || y >= MH) ? 0 : map[y * MW + x];
 const setT = (x, y, v) => { map[y * MW + x] = v; };
 // 칸 무작위 걸음: 시작 → 전투 → 전투 → 출구(또는 보스), 가끔 전투방 옆에 보급방이 붙는다
@@ -538,7 +538,7 @@ function layoutStation(isBossSt) {
       for (const f of shuffle(defs.slice(0, len - 1))) { const cand = [[f.gx + 1, f.gy], [f.gx - 1, f.gy], [f.gx, f.gy - 1], [f.gx, f.gy + 1]].filter(([a, b]) => a >= 0 && a < GW && b >= 0 && b < GH && !used.has(a + ',' + b));
         if (cand.length) { const [gx, gy] = cand[Math.floor(rand() * cand.length)]; used.add(gx + ',' + gy); defs.push({ id, gx, gy, type }); L.push([f.id, id]); return true; } } return false; };
     if (!side('aid', 'aid')) continue; // 구호실은 반드시
-    if (rand() < 0.75) side('crate', 'crt'); if (rand() < 0.5) side('supply', 'sup'); if (rand() < 0.35) side('fight', 'sf');
+    if (rand() < 0.75) side('treasure', 'trs'); if (rand() < 0.5) side('supply', 'sup'); if (rand() < 0.35) side('fight', 'sf');
     return { defs, L };
   }
 }
@@ -548,7 +548,7 @@ function buildMap() {
   links = L;
   rooms = defs.map(d => { const [w0, h0] = ROOMSIZE[d.type], v = d.type === 'fight' || d.type === 'crate'; // 전투방·지형지물 방은 크기가 조금씩 다르다
     const w = w0 + (v ? Math.floor(rand() * 5) * 2 - 4 : 0), h = h0 + (v ? Math.floor(rand() * 3) * 2 - 2 : 0);
-    return { ...d, w, h, x0: d.gx * CW + ((CW - w) >> 1), y0: d.gy * CH + ((CH - h) >> 1), doors: [], state: d.type === 'crate' || d.type === 'aid' ? 'clear' : 'idle', wi: 0, seen: false, passed: d.type === 'start' || d.type === 'exit',
+    return { ...d, w, h, x0: d.gx * CW + ((CW - w) >> 1), y0: d.gy * CH + ((CH - h) >> 1), doors: [], state: d.type === 'treasure' || d.type === 'aid' ? 'clear' : 'idle', wi: 0, seen: false, passed: d.type === 'start' || d.type === 'exit',
       waves: d.type === 'fight' ? wavesFor(stage.zone, stage.st) : d.type === 'boss' ? [[pickBoss()]] : null }; });
   for (const r of rooms) {
     for (let y = r.y0; y < r.y0 + r.h; y++) for (let x = r.x0; x < r.x0 + r.w; x++) setT(x, y, 2);
@@ -786,7 +786,7 @@ function enterStation() {
   cam = { x: P.x - W / 2, y: P.y - H / 2 }; shake = 0; bossRef = null; trans = 0;
   hazards = []; corpses = []; timers = []; clouds = []; dark = 0; P.slowT = 0;
   P.safe = { x: P.x, y: P.y }; P.climIn = null; furnishRooms(); // 더운 방·추운 방, 쏟아진 산·염기
-  placeDevices(); P.test = null;
+  placeDevices(); placeChests(); P.test = null;
   stage.gate = false; stage.quiz = newQuiz(); // 다음에 풀 문제(방·역·구역을 넘어갈 때마다 새 문제)
   showBanner();
   if ((stage.zi > 0 || stage.st > 0) && !P.loaded) openPerk(); // 역을 넘어올 때마다 능력 고르기(이어하기로 불러온 역은 빼고)
@@ -853,6 +853,7 @@ const nearExit = () => tile(Math.floor(P.x / T), Math.floor((P.y - 3) / T)) === 
 function tryPick() {
   if (stage.gate) { openQuiz(zoneGateNext, 'zone'); return; } // 보스를 잡은 뒤 다음 구역으로 가는 관문
   if (nearExit()) { openQuiz(nextStation, 'station'); return; }
+  const ch = nearChest(); if (ch) { openChest(ch); return; }
   const dv = nearDev(); if (dv) { openDevice(dv); return; }
   if (nearBench()) { openCraft(); return; }
 }
@@ -1691,7 +1692,7 @@ function openInfo() { document.getElementById('saveMsg').textContent = '';
       <span>피해 ${Math.round(dmg * starMul(k) * dmgMul(W0.type === 'melee'))} · 간격 ${W0.cd}초 · 에너지 ${enCost(W0.en)}</span>${W0.desc ? `<span>${W0.desc}</span>` : ''}</div>`; }).join('');
   const list = (arr, empty) => arr.length ? arr.join(', ') : `<i>${empty}</i>`;
   const Q = stage.quiz;
-  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 ${Q.hints} / ${HINT_MAX}개 · 쪽지 ${Q.paper || 0} / 10장(지형지물을 부수면 나온다)</p>` : '') + `
+  document.getElementById('infoBody').innerHTML = (Q ? `<p class="qt" style="color:#9fe0ff">역 관문 문제 힌트 ${Q.hints} / ${HINT_MAX}개 · 쪽지 ${Q.paper || 0} / 10장</p>` : '') + `
     <div class="icol">
       <h3>${J.name}</h3>
       ${g('스킬', `${J.skill} · ${Math.round(P.skillMax * 10) / 10}초`)}
@@ -1779,11 +1780,11 @@ function openOX(onSolve, room) {
   let q = (room && room.ox) || newOX(); if (!q) { onSolve(); return; } if (room) room.ox = q; // 닫았다 다시 와도 같은 문제
   const done = () => { closeCraft(); onSolve(); };
   const pick = v => {
-    if (v === q.answer) { const first = !(room && room.oxTried); if (first) P.en = Math.min(P.maxEn, P.en + 15);
-      rightFx(); showReveal(first ? '정답! · 첫 시도 에너지 +15' : '정답!', oxReveal(q), done, true); return; }
-    penalty(30, '오답 · 기록 +30초'); if (room) room.oxTried = true; const old = q; q = newOX() || q; if (room) room.ox = q;
-    showReveal('오답 · 새 문제를 맞혀야 들어간다', oxReveal(old), draw, false); };
-  const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초 · 처음에 맞히면 에너지 +15</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div></div>`,
+    if (v === q.answer) { const first = !(room && room.oxTried); if (first) { P.en = Math.min(P.maxEn, P.en + 15); say(P.x, P.y - 72, '에너지 +15', 'energy'); }
+      done(); rightFx(); return; } // 해설 없이 바로 들어간다
+    penalty(30, '✕ 오답 · 기록 +30초'); climFlash = { col: '#ff3b3b', t: 0.5 }; shake = Math.max(shake, 8); if (room) room.oxTried = true; q = newOX() || q; if (room) room.ox = q; wrongMsg = true; draw(); };
+  let wrongMsg = false;
+  const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초 · 처음에 맞히면 에너지 +15</p>${wrongMsg ? '<p class="qm" style="text-align:center;font-size:1.3em">✕ 오답 · 새 문제</p>' : ''}<p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div></div>`,
     b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false), space: () => showAns(`#craftList [data-x="${q.answer ? 1 : 0}"]`) });
   draw();
 }
@@ -1810,6 +1811,23 @@ const DEV = {
   booth: { name: '진단 부스', st: 'infect', use: '감염됐을 때 병원체를 진단하고 맞는 약을 고른다' },
 };
 let devices = [];
+let chests = [];
+function placeChests() { chests = []; for (const r of rooms) if (r.type === 'treasure') chests.push({ x: (r.x0 + r.w / 2) * T, y: (r.y0 + r.h / 2 + 1) * T, open: false }); }
+const nearChest = () => chests.find(c => !c.open && Math.hypot(c.x - P.x, (c.y - P.y) * 1.3) < 32);
+function openChest(c) { // 보물상자: 체력·에너지·힌트 쪽지, 절반은 무기도
+  c.open = true; const x = c.x, y = c.y; burst(x, y - 10, '#ffd23f', 24); shake = Math.max(shake, 4); say(x, y - 30, '보물상자', 'crit');
+  pickups.push({ kind: 'heal', x: x - 26, y: y + 14 }, { kind: 'heal', x: x + 26, y: y + 14 });
+  for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; pickups.push({ kind: 'energy', x, y, vx: Math.cos(a) * 80, vy: Math.sin(a) * 60, t: 0 }); }
+  for (let i = 0; i < 4; i++) dropHint(x - 30 + i * 20, y + 26, 1);
+  if (rand() < 0.5) dropWeapon(x, y + 34);
+}
+function drawChest(c) { const x = Math.round(c.x), y = Math.round(c.y), O = '#1a1512';
+  px(ctx, x - 13, y - 2, 26, 3, 'rgba(0,0,0,0.35)');
+  if (!c.open) { ringPx(c.x, c.y - 1, 18, Math.floor(time * 3) % 2 ? '#ffd23f' : '#f0b429');
+    px(ctx, x - 12, y - 18, 24, 18, O); px(ctx, x - 11, y - 17, 22, 16, '#8a5a2e'); px(ctx, x - 11, y - 17, 22, 6, '#a8703a'); px(ctx, x - 11, y - 11, 22, 2, O);
+    px(ctx, x - 11, y - 17, 2, 16, '#f0c419'); px(ctx, x + 9, y - 17, 2, 16, '#f0c419'); px(ctx, x - 2, y - 13, 4, 5, '#f0c419'); px(ctx, x - 1, y - 11, 2, 2, O); }
+  else { px(ctx, x - 12, y - 12, 24, 12, O); px(ctx, x - 11, y - 11, 22, 10, '#8a5a2e'); px(ctx, x - 9, y - 11, 18, 3, '#2a1a10'); px(ctx, x - 12, y - 22, 24, 8, O); px(ctx, x - 11, y - 21, 22, 6, '#a8703a'); }
+}
 function placeDevices() { // 구호실: 이 구역에서 걸릴 수 있는 상태 이상을 푸는 장치만 한 줄로 놓는다
   devices = []; const r = rooms.find(r => r.type === 'aid'); if (!r) return;
   const ks = Object.keys(DEV).filter(k => stOk(DEV[k].st)), cy = (r.y0 + (r.h >> 1)) * T + 10;
@@ -2300,8 +2318,8 @@ function drawTiles(cx, cy) {
         if (!SOLID.has(below) && below !== 0) { px(ctx, X, Y + T - 2, T, 2, TH.edge); TH.decor(X, Y, h); }
       } else { px(ctx, X, Y, T, T, THEME[VIS[stage.zone]].top); if (h % 5 === 0) px(ctx, X + (h % 11), Y + (h % 13), 2, 1, '#2e2722'); }
     } else if (v === 1 || v === 6) {
-      const TH = THEME[VIS[stage.zone]];
-      px(ctx, X, Y, T, T, (tx + ty) % 2 ? TH.floor[0] : TH.floor[1]);
+      const TH = THEME[VIS[stage.zone]], ZF = ZFLOOR[stage.zone];
+      px(ctx, X, Y, T, T, (tx + ty) % 2 ? ZF.floor[0] : ZF.floor[1]); ZF.deco(X, Y, h, tx, ty);
       if (h % 7 === 0) px(ctx, X + (h % 12) + 1, Y + ((h >> 4) % 12) + 1, 2, 2, TH.speck[0]);
       if (h % 11 === 0) px(ctx, X + ((h >> 3) % 12) + 1, Y + ((h >> 6) % 12) + 1, TH.speck[2] || 1, 1, TH.speck[1]);
     } else if (v === 4 || v === 5) {
@@ -2336,6 +2354,8 @@ function roomConnected(r) { // 방 안 바닥이 모두 이어져 있는지(바�
 // 규칙적인 방 배치 틀 (2026-10-27 교사 요청: 미로나 던전 같은 느낌). 좌우·상하 대칭으로 세운다
 // b(x, y): 방 안쪽 좌표(0..iw-1, 0..ih-1)에 장애물 한 칸. iw·ih: 안쪽 폭·높이
 const LAYOUTS = {
+  sparse(b, iw, ih) { for (let y = 4; y < ih - 3; y += 7) for (let x = 5; x < iw - 4; x += 8) { b(x, y); b(x + 1, y); } }, // 띄엄띄엄 낮은 기둥
+  islands(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; for (const [x, y] of [[cx - 7, cy - 4], [cx + 6, cy - 4], [cx - 7, cy + 3], [cx + 6, cy + 3]]) { b(x, y); b(x + 1, y); b(x, y + 1); b(x + 1, y + 1); } }, // 네 개의 작은 섬
   pillars(b, iw, ih) { for (let y = 3; y < ih - 2; y += 4) for (let x = 3; x < iw - 2; x += 4) b(x, y); }, // 기둥 회랑
   maze(b, iw, ih) { const k = Math.max(3, Math.floor(iw / 6)); let i = 0; // 칸막이 미로: 세로벽, 틈이 위·아래로 엇갈린다
     for (let x = k; x < iw - 2; x += k, i++) { const top = i % 2 === 0; for (let y = 0; y < ih; y++) if (top ? y > 2 : y < ih - 3) b(x, y); } },
@@ -2357,8 +2377,8 @@ const LAYOUTS = {
   cross(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; // 십자 회랑: 네 귀퉁이 큰 덩어리
     for (let y = 2; y < ih - 2; y++) for (let x = 2; x < iw - 2; x++) if (Math.abs(x - cx) > 2 && Math.abs(y - cy) > 2 && Math.abs(x - cx) < cx - 3 && Math.abs(y - cy) < cy - 2) b(x, y); },
 };
-const LAYOUT_FIGHT = ['pillars', 'roomInRoom', 'corners', 'checker', 'cross'], // 미로 느낌이 강한 maze·stagger·rings는 뺐다
- LAYOUT_BOSS = ['pillars', 'corners', 'checker', 'cross'];
+const LAYOUT_FIGHT = ['sparse', 'islands', 'corners'], // 2026-10-29 교사 요청: 맵 때문에 짜증 나지 않게 성긴 모양만 // 미로 느낌이 강한 maze·stagger·rings는 뺐다
+ LAYOUT_BOSS = ['sparse', 'corners'];
 function placeBlocks(r) {
   if (r.type !== 'fight' && r.type !== 'boss') return; // 보급방·곁방에는 덩어리 장애물을 두지 않는다
   const ix0 = r.x0 + 1, iy0 = r.y0 + 2, iw = r.w - 2, ih = r.h - 3, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
@@ -2402,7 +2422,7 @@ const PROP = {
 };
 let props = [];
 function placeProps(r) {
-  const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 4 + Math.floor(rand() * 2) : r.type === 'boss' ? 3 : r.type === 'start' ? 2 : r.type === 'aid' ? 0 : 1; // 지형지물 방: 부서지는 지형지물만 가득
+  const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 2 + Math.floor(rand() * 2) : r.type === 'boss' ? 2 : r.type === 'start' ? 2 : r.type === 'aid' || r.type === 'treasure' ? 0 : 1;
   const kinds = Object.keys(PROP).filter(k => PROP[k].z === VIS[stage.zone]), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
   for (let i = 0, tries = 0; i < n && tries < 80; tries++) {
     const tx = r.x0 + 2 + Math.floor(rand() * (r.w - 4)), ty = r.y0 + 3 + Math.floor(rand() * (r.h - 5));
@@ -2419,7 +2439,7 @@ function hitProp(p, n) {
   if (!p || p.dead) return; p.hp -= n; p.flash = 0.08; burst(p.x, p.y - 8, '#cfc6b3', 2);
   if (p.hp > 0) return;
   p.dead = true; setT(p.tx, p.ty, 1); burst(p.x, p.y - 8, '#a89a84', 12); shake = Math.max(shake, 2);
-  dropHint(p.x, p.y - 4, 0.6); // 지형지물을 부숴도 힌트 쪽지(60%)
+  dropHint(p.x, p.y - 4, 0.8); // 지형지물을 부숴도 힌트 쪽지(80%)
   const X = PROP[p.kind].extra, x = p.x, y = p.y - 4;
   if (X === 'boom') explode(x, y, 44, 6); // 녹슨 드럼통: 터지며 둘레 적에게 피해
   if (X === 'nutri') addHazard(x, y, 'nutri');
@@ -2481,6 +2501,33 @@ const THEME_HOT = { face: ['#a8845a', '#9a7450', '#b8946a', '#8a6444', '#c8a070'
   THEME_COLD = { face: ['#6a7a8a', '#5a6a7a', '#7a8a9a', '#4a5a6a', '#8a9aa8', '#5e6e7e'], edge: '#1a2430', top: '#141a22', floor: ['#424c58', '#46505c'], speck: ['#3a4450', '#e6f6ff'], pillar: ['#8a9aaa', '#b8c8d8', '#6a7a8a', '#e6f6ff'],
     decor: (X, Y, h) => { if (h % 5 === 0) for (let i = 0; i < 3; i++) { px(ctx, X + 2 + i * 5, Y + T - 2, 3, 2, '#e6f6ff'); px(ctx, X + 3 + i * 5, Y + T, 1, 3, '#e6f6ff'); } // 고드름
       else if (h % 5 === 1) { px(ctx, X + 3, Y + 6, 10, 3, '#d8c7a4'); px(ctx, X + 2, Y + 5, 3, 5, '#d8c7a4'); px(ctx, X + 11, Y + 5, 3, 5, '#d8c7a4'); } } }; // 언 땅 속 뼈
+// 구역마다 바닥 개성(2026-10-29 교사 요청: 맵의 개성이 부족하다). 장식은 밟고 지나갈 수 있다
+const ZFLOOR = [
+  { floor: ['#2e3e3e', '#324444'], deco: (X, Y, h) => { // 중화조 정거장: 약품 얼룩·배수구·pH 타일
+    if (h % 23 === 0) { ell(ctx, X + 8, Y + 8, 12, 7, 'rgba(232,208,64,0.35)'); } else if (h % 23 === 1) ell(ctx, X + 8, Y + 8, 12, 7, 'rgba(63,127,208,0.35)');
+    else if (h % 23 === 2) { px(ctx, X + 3, Y + 4, 10, 8, '#1a2424'); for (let i = 0; i < 4; i++) px(ctx, X + 4 + i * 2, Y + 5, 1, 6, '#4a5a5a'); }
+    else if (h % 31 === 3) { const c = ['#e8d040', '#7ee07e', '#3f7fd0'][h % 3]; px(ctx, X + 1, Y + 1, T - 2, 2, c); } } },
+  { floor: ['#4a3028', '#503429'], deco: (X, Y, h) => { // 열돔 환승구역: 달궈진 아스팔트 균열·아지랑이
+    if (h % 13 === 0) { px(ctx, X + 2, Y + 7, 6, 1, '#2a1a14'); px(ctx, X + 7, Y + 8, 5, 1, '#2a1a14'); px(ctx, X + 11, Y + 6, 3, 1, '#2a1a14'); }
+    else if (h % 13 === 1) { const k = Math.floor(time * 3 + h) % 3; px(ctx, X + 4, Y + 4 + k, 1, 2, 'rgba(255,140,60,0.5)'); px(ctx, X + 10, Y + 6 - k, 1, 2, 'rgba(255,140,60,0.5)'); }
+    else if (h % 29 === 2) px(ctx, X + 3, Y + 3, T - 6, T - 6, 'rgba(255,90,40,0.12)'); } },
+  { floor: ['#5a5040', '#605545'], deco: (X, Y, h) => { // 해류 터널: 모래·물웅덩이·해초·조개
+    if (h % 17 === 0) ell(ctx, X + 8, Y + 8, 14, 8, 'rgba(63,143,208,0.45)');
+    else if (h % 17 === 1) { px(ctx, X + 5, Y + 4, 1, 8, '#3f7a3a'); px(ctx, X + 7, Y + 6, 1, 6, '#4f9a3a'); px(ctx, X + 9, Y + 5, 1, 7, '#3f7a3a'); }
+    else if (h % 17 === 2) { px(ctx, X + 6, Y + 7, 4, 3, '#e8d8c0'); px(ctx, X + 7, Y + 6, 2, 1, '#e8d8c0'); }
+    else if (h % 7 === 3) px(ctx, X + (h % 11), Y + (h % 13), 2, 1, '#7a6a50'); } },
+  { floor: ['#2a2c32', '#2e3036'], deco: (X, Y, h, tx, ty) => { // 발전소 구역: 철망 바닥·경고 줄무늬·전선
+    if ((tx + ty) % 2 === 0) { px(ctx, X, Y + 7, T, 1, '#3a3c44'); px(ctx, X + 7, Y, 1, T, '#3a3c44'); }
+    if (h % 19 === 0) for (let i = 0; i < 4; i++) px(ctx, X + i * 4, Y + 12, 2, 3, i % 2 ? '#1a1512' : '#f0b429');
+    else if (h % 19 === 1) { px(ctx, X, Y + 9, T, 2, '#1a1a1a'); px(ctx, X + 3, Y + 9, 2, 2, '#d9483b'); } } },
+  { floor: ['#5a5e64', '#60646a'], deco: (X, Y, h) => { // 효율 변전소: 태양광 패널 타일·LED·계량 눈금
+    if (h % 15 === 0) { px(ctx, X + 1, Y + 1, T - 2, T - 2, '#1f3a6a'); for (let i = 1; i < 3; i++) { px(ctx, X + 1 + i * 5, Y + 1, 1, T - 2, '#7fb0e0'); px(ctx, X + 1, Y + 1 + i * 5, T - 2, 1, '#7fb0e0'); } }
+    else if (h % 15 === 1) px(ctx, X + 7, Y + 7, 2, 2, Math.floor(time * 2 + h) % 2 ? '#7ee07e' : '#2a5a2a');
+    else if (h % 23 === 2) for (let i = 0; i < 5; i++) px(ctx, X + 2 + i * 3, Y + 12, 1, i % 2 ? 2 : 3, '#2a2c30'); } },
+  { floor: ['#16202e', '#192434'], deco: (X, Y, h, tx, ty) => { // 관제 센터: 빛나는 회로선·데이터 점
+    if (h % 5 === 0) px(ctx, X, Y + 8, T, 1, 'rgba(79,208,224,0.35)'); else if (h % 5 === 1) px(ctx, X + 8, Y, 1, T, 'rgba(79,208,224,0.35)');
+    if (h % 11 === 2) px(ctx, X + 7, Y + 7, 2, 2, Math.floor(time * 4 + tx + ty) % 3 ? '#4fd0e0' : '#e0fbff'); } },
+];
 const THEME = [
   { face: STRATA, edge: '#2b2117', top: '#221d19', floor: ['#3f3a34', '#433d37'], speck: ['#35302b', '#5a534b'], pillar: ['#7a746a', '#9a9387', '#666056', '#5c574f'],
     decor: (X, Y, h) => { if (h % 9 === 0) { px(ctx, X + 4, Y + 4, 8, 5, '#d8c7a4'); px(ctx, X + 5, Y + 5, 6, 1, '#a8916a'); px(ctx, X + 5, Y + 7, 6, 1, '#a8916a'); }
@@ -2575,6 +2622,7 @@ function render() {
     if (e.batt !== undefined && !e.battOut) { const k = Math.max(0, e.batt / 10); px(ctx, Math.round(e.x - 8), Math.round(e.y - e.h - 5), 16, 3, '#0c0c0c'); px(ctx, Math.round(e.x - 7), Math.round(e.y - e.h - 4), Math.round(14 * k), 1, k > 0.3 ? '#7ee07e' : '#ff5a3c'); }
   } });
   for (const d of devices) list.push({ y: d.y, f: () => drawDevice(d) });
+  for (const c of chests) list.push({ y: c.y, f: () => drawChest(c) });
   list.push({ y: P.y, f: drawPlayer });
   for (const a of allies) if (a.kind !== 'hawk') list.push({ y: a.y, f: () => drawAlly(a) });
   list.sort((a, b) => a.y - b.y).forEach(o => o.f());
@@ -2715,7 +2763,7 @@ function drawHud() {
     line(mx + A.gx * 18 + 6, my + A.gy * 14 + 4, mx + B.gx * 18 + 6, my + B.gy * 14 + 4, '#6b6458', 1); }
   const cur = roomAt(P.x, P.y - 3, 0);
   for (const r of rooms) { if (!r.seen) continue; const x = mx + r.gx * 18, y = my + r.gy * 14;
-    px(ctx, x, y, 13, 9, '#0d0d0d'); px(ctx, x + 1, y + 1, 11, 7, r === cur ? '#f0b429' : r.type === 'boss' ? '#7a2e2e' : r.type === 'exit' ? '#3f7fb8' : r.type === 'supply' ? '#4f8f4a' : r.type === 'aid' ? '#d9483b' : r.type === 'crate' ? '#a07a4a' : r.state === 'clear' || r.type === 'start' ? '#6b6458' : '#4a443c'); }
+    px(ctx, x, y, 13, 9, '#0d0d0d'); px(ctx, x + 1, y + 1, 11, 7, r === cur ? '#f0b429' : r.type === 'boss' ? '#7a2e2e' : r.type === 'exit' ? '#3f7fb8' : r.type === 'supply' ? '#4f8f4a' : r.type === 'aid' ? '#d9483b' : r.type === 'treasure' ? '#f0c419' : r.state === 'clear' || r.type === 'start' ? '#6b6458' : '#4a443c'); }
   // 보스 체력
   const bn = document.getElementById('bossname');
   if (bossRef && !bossRef.dead) { const bw = 300, x = (W - bw) / 2, y = H - 18;
@@ -2727,13 +2775,14 @@ function drawHud() {
     el.style.color = RARITY[W0.r]; }
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   const dv = nearDev();
-  setTxt('prompt', nearExit() ? 'E 다음 역으로' : dv ? 'E ' + DEV[dv.k].name : near ? 'G ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
+  const chN = nearChest();
+  setTxt('prompt', nearExit() ? 'E 다음 역으로' : chN ? 'E 보물상자 열기' : dv ? 'E ' + DEV[dv.k].name : near ? 'G ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
   const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name}${STATUS[k].keep ? '' : ' ' + Math.ceil(P.st[k])}</span>`).join(' ')
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
   if (txtCache.st !== sts) { txtCache.st = sts; document.getElementById('status').innerHTML = sts; }
   if (loreT <= time && loreQ.length) { setTxt('lore', loreQ.shift()); loreT = time + 4; } else if (loreT <= time) setTxt('lore', '');
-  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? (stage.quiz.hints >= HINT_MAX ? '역 관문 문제 힌트를 열었다' : '힌트 쪽지 ' + (stage.quiz.paper || 0) + '/10 · 지형지물을 부수면 나온다') : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
+  setTxt('bag', (P.test ? P.test.name + ' ' + Math.ceil(P.test.t) + '초   ' : '') + (stage.quiz && !stage.quiz.solved ? (stage.quiz.hints >= HINT_MAX ? '역 관문 문제 힌트를 열었다' : '힌트 쪽지 ' + (stage.quiz.paper || 0) + '/10') : '') + (stage.gate ? 'E 관문 문제 풀기' : '') + (P.solarT > 0 ? '   태양광 충전 ' + Math.ceil(P.solarT) + '초' : '') + Object.keys(P.guard).filter(g => P.guard[g] > 0).map(g => '   ' + STATUS[g].name + ' 막음 ' + Math.ceil(P.guard[g]) + '초').join(''));
   document.getElementById('prompt').style.color = near ? RARITY[WEAP[near.kind].r] : '#ffe08a';
 }
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
