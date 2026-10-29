@@ -2711,7 +2711,13 @@ function cdCircle(cx, cy, r, k, fill, dim) {
 }
 function dashIcon(cx, cy, on) { const c = on ? '#e9f5d0' : '#6c7a62';
   for (const o of [-4, 2]) for (let i = 0; i < 4; i++) { px(ctx, cx + o + i, cy - 4 + i, 2, 1, c); px(ctx, cx + o + i, cy + 3 - i, 2, 1, c); } }
-function skillIcon(cx, cy, on) { (SKILL_ICON[P.job] || SKILL_ICON.geo)(cx, cy, on ? 1 : 0.45); }
+const SKILL_ATLAS = { driver: [0, 0, 46, 42], geo: [47, 0, 53, 43], eco: [101, 0, 49, 47], chem: [151, 0, 39, 47], weather: [191, 0, 49, 47], medic: [241, 0, 48, 41] }, skillImg = new Image();
+skillImg.src = 'skills.png';
+function skillIcon(cx, cy, on) {
+  const A = SKILL_ATLAS[P.job];
+  if (A && skillImg.complete && skillImg.naturalWidth) { const [sx, sy, w, h] = A, k = 34 / Math.max(w, h); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = on ? 1 : 0.4; // 대기 중에는 흐리게
+    ctx.drawImage(skillImg, sx, sy, w, h, Math.round(cx - w * k / 2), Math.round(cy - h * k / 2), Math.round(w * k), Math.round(h * k)); ctx.globalAlpha = 1; return; }
+  (SKILL_ICON[P.job] || SKILL_ICON.geo)(cx, cy, on ? 1 : 0.45); }
 const SKILL_ICON = {
   geo: (cx, cy, a) => { ctx.globalAlpha = a; for (let i = 0; i < 5; i++) px(ctx, cx - 10, cy - 9 + i * 4, 20, 3, ['#a88a5e', '#6b4f36', '#94754e', '#5c4a3a', '#7a6447'][i]); px(ctx, cx - 3, cy - 2, 7, 4, '#e8dcc0'); ctx.globalAlpha = 1; },
   driver: (cx, cy, a) => { ctx.globalAlpha = a; px(ctx, cx - 9, cy - 6, 18, 12, '#1a1512'); px(ctx, cx - 8, cy - 5, 16, 10, '#2e4470'); px(ctx, cx - 2, cy - 8, 5, 8, '#f0d040'); px(ctx, cx - 3, cy - 1, 4, 3, '#f0d040'); px(ctx, cx, cy + 1, 3, 6, '#f0d040'); ctx.globalAlpha = 1; },
