@@ -504,9 +504,9 @@ let stage = { order: [0], zi: 0, zone: 0, st: 0 };
 // 역의 전투방 웨이브: 뒤 역일수록 적이 많고 세다
 function wavesFor(zone, st) {
   const k = ZONES[zone].pool, n = stage.zi === 0 && st === 0 ? 4 : 6 + st, waves = []; // 판의 첫 역은 4마리(3인 테스트: 첫 방이 너무 어렵다) // 2026-10-28 교사 요청: 몬스터는 방마다 한 번만(6~9마리)
-  const nw = 1;
-  for (let w = 0; w < nw; w++) { const wave = [], off = Math.floor(rand() * k.length);
-    for (let i = 0; i < n + w; i++) wave.push(k[(i + off) % k.length]);
+  const n1 = Math.floor(n / 2), sizes = [n1, n - n1]; // 첫 웨이브 절반, 두 번째 웨이브 나머지
+  for (let w = 0; w < 2; w++) { const wave = [], off = Math.floor(rand() * k.length);
+    for (let i = 0; i < sizes[w]; i++) wave.push(k[(i + off) % k.length]);
     if (k.includes('rat')) { const r = wave.filter(x => x === 'rat'); wave.splice(0, wave.length, ...wave.filter(x => x !== 'rat'), ...r.slice(0, Math.max(1, Math.round(r.length / 3)))); } // 무리 짓는 쥐는 한 번에 3마리라 적게 넣는다
     waves.push(wave); }
   return waves;
@@ -2344,7 +2344,9 @@ function drawTiles(cx, cy) {
       if (below !== 0 && !SOLID.has(below) || (tile(tx, ty + 2) !== 0 && !SOLID.has(tile(tx, ty + 2)) && below === 2)) {
         const TH = THEME[VIS[stage.zone]];
         for (let j = 0; j < T; j += 4) px(ctx, X, Y + j, T, 4, TH.face[((Y + j) / 4 + (tx >> 3)) % TH.face.length]);
-        if (!SOLID.has(below) && below !== 0) { px(ctx, X, Y + T - 2, T, 2, TH.edge); TH.decor(X, Y, h); }
+        if (!SOLID.has(below) && below !== 0) { px(ctx, X, Y + T - 2, T, 2, TH.edge);
+          const ws = SPR.mp && SPR.mp['Z' + stage.zone + (h % 2 ? '_w1' : '_w2')];
+          if (!ws) TH.decor(X, Y, h); } // 벽 장식 그림은 깊이 정렬 목록에서 그린다
       } else { px(ctx, X, Y, T, T, THEME[VIS[stage.zone]].top); if (h % 5 === 0) px(ctx, X + (h % 11), Y + (h % 13), 2, 1, '#2e2722'); }
     } else if (v === 1 || v === 6) {
       const TH = THEME[VIS[stage.zone]], ZF = ZFLOOR[stage.zone];
@@ -2383,7 +2385,8 @@ function roomConnected(r) { // 방 안 바닥이 모두 이어져 있는지(바�
 // 규칙적인 방 배치 틀 (2026-10-27 교사 요청: 미로나 던전 같은 느낌). 좌우·상하 대칭으로 세운다
 // b(x, y): 방 안쪽 좌표(0..iw-1, 0..ih-1)에 장애물 한 칸. iw·ih: 안쪽 폭·높이
 const LAYOUTS = {
-  sparse(b, iw, ih) { for (let y = 4; y < ih - 3; y += 7) for (let x = 5; x < iw - 4; x += 8) { b(x, y); b(x + 1, y); } }, // 띄엄띄엄 낮은 기둥
+  sparse(b, iw, ih) { for (let y = 4; y < ih - 4; y += 8) for (let x = 5; x < iw - 5; x += 9) { b(x, y); b(x + 1, y); b(x, y + 1); b(x + 1, y + 1); } }, // 띄엄띄엄 2×2 장애물
+  quad(b, iw, ih) { for (const [x, y] of [[4, 3], [iw - 6, 3], [4, ih - 5], [iw - 6, ih - 5]]) { b(x, y); b(x + 1, y); b(x, y + 1); b(x + 1, y + 1); } }, // 네 귀퉁이 2×2
   islands(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; for (const [x, y] of [[cx - 7, cy - 4], [cx + 6, cy - 4], [cx - 7, cy + 3], [cx + 6, cy + 3]]) { b(x, y); b(x + 1, y); b(x, y + 1); b(x + 1, y + 1); } }, // 네 개의 작은 섬
   pillars(b, iw, ih) { for (let y = 3; y < ih - 2; y += 4) for (let x = 3; x < iw - 2; x += 4) b(x, y); }, // 기둥 회랑
   maze(b, iw, ih) { const k = Math.max(3, Math.floor(iw / 6)); let i = 0; // 칸막이 미로: 세로벽, 틈이 위·아래로 엇갈린다
@@ -2406,8 +2409,8 @@ const LAYOUTS = {
   cross(b, iw, ih) { const cx = iw >> 1, cy = ih >> 1; // 십자 회랑: 네 귀퉁이 큰 덩어리
     for (let y = 2; y < ih - 2; y++) for (let x = 2; x < iw - 2; x++) if (Math.abs(x - cx) > 2 && Math.abs(y - cy) > 2 && Math.abs(x - cx) < cx - 3 && Math.abs(y - cy) < cy - 2) b(x, y); },
 };
-const LAYOUT_FIGHT = ['sparse', 'islands', 'corners'], // 2026-10-29 교사 요청: 맵 때문에 짜증 나지 않게 성긴 모양만 // 미로 느낌이 강한 maze·stagger·rings는 뺐다
- LAYOUT_BOSS = ['sparse', 'corners'];
+const LAYOUT_FIGHT = ['sparse', 'islands', 'quad'], // 2026-10-29 교사 요청: 맵 때문에 짜증 나지 않게 성긴 모양만 // 미로 느낌이 강한 maze·stagger·rings는 뺐다
+ LAYOUT_BOSS = ['sparse', 'quad'];
 function placeBlocks(r) {
   if (r.type !== 'fight' && r.type !== 'boss') return; // 보급방·곁방에는 덩어리 장애물을 두지 않는다
   const ix0 = r.x0 + 1, iy0 = r.y0 + 2, iw = r.w - 2, ih = r.h - 3, cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
@@ -2424,6 +2427,11 @@ function placeBlocks(r) {
   }
 }
 // 구역마다 다른 장애물 모양(키 24도트: 바닥 1칸 + 위로 8도트)
+function drawWallSign(tx, ty) { const ws = SPR.mp['Z' + stage.zone + (hash(tx, ty) % 2 ? '_w1' : '_w2')], X = tx * T, Y = ty * T, sc = Math.min(1, 26 / ws.w, 26 / ws.h), w = Math.round(ws.w * sc), hh = Math.round(ws.h * sc); ctx.imageSmoothingEnabled = false; ctx.drawImage(ws.c, Math.round(X + T / 2 - w / 2), Math.round(Y + T - 3 - hh), w, hh); }
+function drawObstacle(tx, ty) { // 2×2 덩어리의 왼쪽 위 칸에서 구역 장애물 그림 하나를 그린다
+  const s = SPR.mp['Z' + stage.zone + (hash(tx, ty) % 2 ? '_o1' : '_o2')], X = tx * T, Y = ty * T, sc = Math.min(1, 36 / s.w, 48 / s.h), w = Math.round(s.w * sc), h = Math.round(s.h * sc);
+  px(ctx, X, Y + 2 * T - 4, 2 * T, 4, 'rgba(0,0,0,0.35)'); ctx.imageSmoothingEnabled = false; ctx.drawImage(s.c, Math.round(X + T - w / 2), Math.round(Y + 2 * T - h), w, h);
+}
 function drawBlock(tx, ty) {
   const X = tx * T, Y = ty * T, O = '#1a1512', z = VIS[stage.zone], up = tile(tx, ty - 1) === 11, dn = tile(tx, ty + 1) === 11, lf = tile(tx - 1, ty) === 11, rt = tile(tx + 1, ty) === 11, h = hash(tx, ty);
   const top = up ? Y : Y - 8, H = Y + T - top;
@@ -2449,10 +2457,21 @@ const PROP = {
   iceblock: { z: 5, name: '얼음 덩어리', hp: 6 }, snowpile: { z: 5, name: '눈 더미', hp: 2 }, sled: { z: 5, name: '썰매', hp: 4 },
   server: { z: 3, name: '서버 상자', hp: 7, extra: 'energy' }, battery: { z: 3, name: '배터리 묶음', hp: 5 }, cone: { z: 3, name: '공사용 원뿔', hp: 2 },
 };
+const MP_NAME = {
+  Z0_p1: ['약품 드럼통', 'boom'], Z0_p2: ['시약병 상자'], Z0_p3: ['산·염기 탱크'], Z0_p4: ['비커 선반'],
+  Z1_p1: ['실외기'], Z1_p2: ['생수 상자', 'water'], Z1_p3: ['선풍기'], Z1_p4: ['녹은 원뿔'],
+  Z2_p1: ['부표'], Z2_p2: ['어망 더미'], Z2_p3: ['산호 바위'], Z2_p4: ['모래주머니'],
+  Z3_p1: ['배터리 묶음', 'energy'], Z3_p2: ['전선 릴'], Z3_p3: ['변압기'], Z3_p4: ['공사용 원뿔'],
+  Z4_p1: ['태양광 패널 조각'], Z4_p2: ['풍력 날개'], Z4_p3: ['계량기 상자', 'energy'], Z4_p4: ['수소 연료 전지통'],
+  Z5_p1: ['서버 상자', 'energy'], Z5_p2: ['모니터 더미'], Z5_p3: ['케이블 묶음'], Z5_p4: ['저장 장치'],
+};
+for (const k in MP_NAME) PROP[k] = { z: -1, name: MP_NAME[k][0], hp: 5, extra: MP_NAME[k][1] }; // z -1: 구역 번호로 고른다
+SPR.mp = {}; const MP_OK = typeof MAPPROP_ATLAS !== 'undefined';
+if (MP_OK) { const mpi = new Image(); mpi.onload = () => { for (const k in MAPPROP_ATLAS) { const [sx, sy, w, h] = MAPPROP_ATLAS[k]; SPR.mp[k] = sprite(w, h, g => g.drawImage(mpi, sx, sy, w, h, 0, 0, w, h), true); } }; mpi.src = 'mapprops.png'; }
 let props = [];
 function placeProps(r) {
   const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 2 + Math.floor(rand() * 2) : r.type === 'boss' ? 2 : r.type === 'start' ? 2 : r.type === 'aid' || r.type === 'treasure' ? 0 : 1;
-  const kinds = Object.keys(PROP).filter(k => PROP[k].z === VIS[stage.zone]), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
+  const kinds = MP_OK ? ['p1', 'p2', 'p3', 'p4'].map(s => 'Z' + stage.zone + '_' + s) : Object.keys(PROP).filter(k => PROP[k].z === VIS[stage.zone]), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
   for (let i = 0, tries = 0; i < n && tries < 80; tries++) {
     const tx = r.x0 + 2 + Math.floor(rand() * (r.w - 4)), ty = r.y0 + 3 + Math.floor(rand() * (r.h - 5));
     if ((r.type === 'crate' ? Math.abs(tx - cx) <= 1 && Math.abs(ty - cy) <= 1 : Math.abs(tx - cx) <= 2 || Math.abs(ty - cy) <= 2) || tile(tx, ty) !== 1) continue; // 통로 줄과 가운데는 비운다
@@ -2481,6 +2500,10 @@ function hitProp(p, n) {
 }
 function drawProp(p) {
   const X = p.tx * T, Y = p.ty * T, O = '#1a1512', k = p.kind, dmg = 1 - p.hp / PROP[k].hp;
+  if (SPR.mp && SPR.mp[k]) { const s = SPR.mp[k], sc = Math.min(1, 30 / s.w, 34 / s.h), w = Math.round(s.w * sc), h = Math.round(s.h * sc), jx = dmg > 0 && p.flash > 0 ? 1 : 0; // 몸 판정은 바닥 한 칸, 그림은 크게
+    px(ctx, X - 4, Y + T - 3, T + 8, 3, 'rgba(0,0,0,0.3)'); ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(p.flash > 0 ? s.f : s.c, Math.round(p.x - w / 2) + jx, Math.round(p.y - h + 1), w, h);
+    if (dmg > 0.5) { px(ctx, Math.round(p.x) - 3, Math.round(p.y - h * 0.6), 1, 5, O); px(ctx, Math.round(p.x) - 2, Math.round(p.y - h * 0.6) + 4, 3, 1, O); } return; }
   const D = {
     fossilRock: () => { ell(ctx, X + 8, Y + 9, 18, 16, O); ell(ctx, X + 8, Y + 9, 16, 14, '#7a746a'); ell(ctx, X + 6, Y + 6, 8, 6, '#9a9387'); px(ctx, X + 7, Y + 9, 6, 4, '#d8c7a4'); px(ctx, X + 8, Y + 10, 4, 1, '#a8916a'); },
     cart: () => { px(ctx, X, Y + 2, 16, 11, O); px(ctx, X + 1, Y + 3, 14, 8, '#6a5a4a'); px(ctx, X + 1, Y + 3, 14, 2, '#8a7a6a'); ell(ctx, X + 4, Y + 14, 5, 5, O); ell(ctx, X + 12, Y + 14, 5, 5, O); px(ctx, X + 3, Y + 1, 10, 2, '#5a4a3a'); },
@@ -2637,7 +2660,7 @@ function render() {
   // 깊이 정렬
   const list = [];
   const tx0 = Math.floor(cx / T) - 1, ty0 = Math.floor(cy / T) - 1;
-  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
+  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 2 && SPR.mp && SPR.mp['Z' + stage.zone + '_w1'] && hash(tx, ty) % 11 === 0 && tile(tx, ty - 1) === 2 && !SOLID.has(tile(tx, ty + 1)) && tile(tx, ty + 1) !== 0) list.push({ y: (ty + 1) * T - 1, f: () => drawWallSign(tx, ty) }); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11 && SPR.mp && SPR.mp['Z' + stage.zone + '_o1']) { if (tile(tx - 1, ty) !== 11 && tile(tx, ty - 1) !== 11) list.push({ y: (ty + 2) * T, f: () => drawObstacle(tx, ty) }); } else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
   for (const p of props) if (!p.dead && p.tx >= tx0 - 1 && p.tx < tx0 + 54 && p.ty >= ty0 - 1 && p.ty < ty0 + 33) list.push({ y: p.y, f: () => drawProp(p) });
   for (const e of enemies) list.push({ y: e.y, f: () => {
     if (e.under) { ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 22, 9, O_); ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 20, 7, '#6a4a2a'); ell(ctx, Math.round(e.x), Math.round(e.y) - 4, 12, 4, '#8a6a3a'); return; } // 땅속 두더지: 흙 둔덕
