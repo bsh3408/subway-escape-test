@@ -351,6 +351,10 @@ function buildSprites() {
   SPR.hawk = [0, 1].map(f => sprite(22, 14, g => drawHawk(g, f)));
   SPR.tiger = [0, 1].map(f => sprite(36, 22, g => drawTiger(g, f)));
   SPR.human = { idle: [0, 1].map(p => sprite(34, 40, g => drawHero(g, p, false, HUMAN_LOOK))) };
+  { const AL = { hawk0: [0, 0, 32, 32], hawk1: [33, 0, 32, 14], tiger0: [66, 0, 49, 26], tiger1: [116, 0, 48, 26], human0: [165, 0, 29, 37], human1: [195, 0, 29, 33] }, aimg = new Image();
+    aimg.onload = () => { const f = k => { const [sx, sy, w, h] = AL[k]; return sprite(w, h, g => g.drawImage(aimg, sx, sy, w, h, 0, 0, w, h), true); };
+      SPR.hawk = [f('hawk0'), f('hawk1')]; SPR.tiger = [f('tiger0'), f('tiger1')]; SPR.human = { idle: [f('human0'), f('human1')] }; };
+    aimg.src = 'allies.png'; }
   SPR.hero = {};
   const HCW = 47, HCH = 57, HORDER = ['driver', 'geo', 'eco', 'chem', 'weather', 'medic'], heroImg = new Image();
   heroImg.onload = () => { HORDER.forEach((k, i) => { if (!JOBS[k]) return; const fr = r => sprite(HCW, HCH, g => g.drawImage(heroImg, i * HCW, r * HCH, HCW, HCH, 0, 0, HCW, HCH), true);
@@ -1065,9 +1069,9 @@ function updateAllies() {
 function drawAlly(a) {
   const blink = a.t < 1 && Math.floor(a.t * 10) % 2 === 0; if (blink) return;
   const x = Math.round(a.x), y = Math.round(a.y);
-  if (a.kind === 'hawk') { px(ctx, x - 6, y + 14, 12, 3, 'rgba(0,0,0,0.3)'); drawSpr(SPR.hawk[a.ph % 2], x - 11, y - 7, a.face < 0, false); }
-  else if (a.kind === 'tiger') { px(ctx, x - 16, y - 2, 32, 3, 'rgba(0,0,0,0.3)'); drawSpr(SPR.tiger[a.st === 'run' ? a.ph % 2 : 0], x - 18, y - 22, a.face < 0, false); }
-  else { px(ctx, x - 13, y - 2, 26, 3, 'rgba(0,0,0,0.3)'); const s = SPR.human; drawSpr(s.idle[a.ph % 2], x - 17, y - 39, a.face < 0, false); }
+  if (a.kind === 'hawk') { px(ctx, x - 6, y + 14, 12, 3, 'rgba(0,0,0,0.3)'); const s = SPR.hawk[a.ph % 2]; drawSpr(s, x - (s.w >> 1), y - (s.h >> 1), a.face < 0, false); }
+  else if (a.kind === 'tiger') { px(ctx, x - 16, y - 2, 32, 3, 'rgba(0,0,0,0.3)'); const s = SPR.tiger[a.st === 'run' ? a.ph % 2 : 0]; drawSpr(s, x - (s.w >> 1), y - s.h, a.face < 0, false); }
+  else { px(ctx, x - 13, y - 2, 26, 3, 'rgba(0,0,0,0.3)'); const s = SPR.human.idle[a.ph % 2]; drawSpr(s, x - (s.w >> 1), y - s.h + 1, a.face < 0, false); }
 }
 function useSkill() {
   if (!running || ended || P.skillCd > 0) return;
