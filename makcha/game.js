@@ -803,7 +803,8 @@ function showBanner() { const b = document.getElementById('banner'); if (!b) ret
 // ---------- 입력 ----------
 const keys = {}; const mouse = { sx: 0, sy: 0, down: false };
 // 글자 대신 키 위치(e.code)로 읽는다: 한글 입력 상태나 Shift를 누른 채여도 똑같이 동작
-const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', KeyG: 'g', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Digit6: '6', Escape: 'esc', KeyJ: 'j', KeyK: 'k', KeyL: 'l', KeyO: 'o', KeyX: 'x', Enter: 'enter', NumpadEnter: 'enter' };
+const CODE = { KeyW: 'w', KeyA: 'a', KeyS: 's', KeyD: 'd', ArrowUp: 'w', ArrowLeft: 'a', ArrowDown: 's', ArrowRight: 'd', KeyQ: 'q', KeyE: 'e', KeyR: 'r', KeyF: 'f', KeyG: 'g', Digit1: '1', Digit2: '2', Digit3: '3', Digit4: '4', Digit5: '5', Digit6: '6', Escape: 'esc', KeyJ: 'j', KeyK: 'k', KeyL: 'l', KeyO: 'o', KeyX: 'x', Enter: 'enter', NumpadEnter: 'enter', Space: 'space' };
+const showAns = sel => { if (!window.TEST_MODE) return; const b = document.querySelector(sel); if (b) b.classList.add('ans'); }; // 시험장 전용: Space로 정답 표시
 const atkHeld = () => mouse.down || keys.j; // 공격: J를 누르고 있거나 왼쪽 클릭
 let mouseT = -1e9; // 마우스를 마지막으로 움직인 때: 최근에 움직였을 때만 마우스 쪽을 조준한다
 addEventListener('keydown', e => {
@@ -1713,7 +1714,7 @@ function closeInfo() { infoOpen = false; document.getElementById('info').classLi
 // 창이 열려 있으면 게임이 멈춘다. bind(box): 창 안의 단추에 동작을 붙인다
 let crafting = false, modalKeys = null;
 function openModal(title, html, bind, keys) {
-  crafting = true; modalKeys = keys || null;
+  crafting = true; modalKeys = keys || null; document.querySelector('#craft .pop').classList.remove('ok', 'ng');
   document.getElementById('craftTitle').textContent = title; const box = document.getElementById('craftList'); box.innerHTML = html;
   if (bind) bind(box); document.getElementById('craft').classList.remove('hide');
 }
@@ -1763,9 +1764,11 @@ function rightFx(explain) { // 정답 효과: 초록 번쩍임, 큰 글자, 별�
   climFlash = { col: '#7ee07e', t: 0.5 }; say(P.x, P.y - 58, '정답!', 'heal', 'big'); burst(P.x, P.y - 16, '#7ee07e', 24); burst(P.x, P.y - 16, '#ffe08a', 14);
 }
 let revealTok = null;
-function showReveal(title, html, next) { // 해설 창: Enter(또는 E)나 3초 뒤 다음으로
+function showReveal(title, html, next, ok) { // 해설 창: Enter(또는 E)나 3초 뒤 다음으로. ok: 정답이면 초록, 오답이면 빨강
   const tok = {}; revealTok = tok; let fired = false; const fire = () => { if (fired) return; fired = true; revealTok = null; next(); };
-  openModal(title, `<div class="qz">${html}<p class="note" style="text-align:center">Enter 계속 · 3초 뒤 자동으로 넘어간다</p></div>`, null, { e: fire });
+  openModal((ok ? '○ ' : '✕ ') + title, `<div class="qz">${html}<p class="note" style="text-align:center">Enter 계속 · 3초 뒤 자동으로 넘어간다</p></div>`, null, { e: fire });
+  document.querySelector('#craft .pop').classList.add(ok ? 'ok' : 'ng');
+  if (!ok) { climFlash = { col: '#ff3b3b', t: 0.6 }; shake = Math.max(shake, 10); }
   setTimeout(() => { if (revealTok === tok && crafting) fire(); }, 3000);
 }
 function penalty(sec, msg) { time += sec; say(P.x, P.y - 44, msg, 'hurt', sec >= 300 ? 'big' : ''); // 오답 시간 벌칙은 중간 저장에도 바로 더한다(이어하기로 지우지 못하게)
@@ -1777,11 +1780,11 @@ function openOX(onSolve, room) {
   const done = () => { closeCraft(); onSolve(); };
   const pick = v => {
     if (v === q.answer) { const first = !(room && room.oxTried); if (first) P.en = Math.min(P.maxEn, P.en + 15);
-      rightFx(); showReveal(first ? '정답 · 첫 시도 에너지 +15' : '정답', oxReveal(q), done); return; }
+      rightFx(); showReveal(first ? '정답! · 첫 시도 에너지 +15' : '정답!', oxReveal(q), done, true); return; }
     penalty(30, '오답 · 기록 +30초'); if (room) room.oxTried = true; const old = q; q = newOX() || q; if (room) room.ox = q;
-    showReveal('오답 · 새 문제를 맞혀야 들어간다', oxReveal(old), draw); };
+    showReveal('오답 · 새 문제를 맞혀야 들어간다', oxReveal(old), draw, false); };
   const draw = () => openModal('방 관문 OX', `<div class="qz"><p class="qt">${esc(q.topic || '')} · OX 문제 · 틀리면 기록 +30초 · 처음에 맞히면 에너지 +15</p><p class="qq ox">${esc(q.q)}</p><div class="qch oxb"><button class="qb" data-x="1">O</button><button class="qb" data-x="0">X</button></div></div>`,
-    b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false) });
+    b => b.querySelectorAll('[data-x]').forEach(x => x.onclick = () => pick(x.dataset.x === '1')), { 1: () => pick(true), 2: () => pick(false), o: () => pick(true), x: () => pick(false), space: () => showAns(`#craftList [data-x="${q.answer ? 1 : 0}"]`) });
   draw();
 }
 function openQuiz(onSolve, kind, room) {
@@ -1790,13 +1793,13 @@ function openQuiz(onSolve, kind, room) {
   const pen = kind === 'zone' ? 300 : 60, label = (kind === 'zone' ? '단원을 넘어가는 문제 · 틀리면 기록 +5분' : '다음 역으로 가는 문제 · 틀리면 기록 +1분') + ' · 처음에 맞히면 에너지 +40';
   const go = () => { closeCraft(); stage.quiz = newQuiz(); onSolve(); }; // 다음 관문은 새 문제
   const check = ok => {
-    if (ok) { Q.solved = true; const first = !Q.tried; if (first) P.en = Math.min(P.maxEn, P.en + 40); rightFx(); showReveal(first ? '정답 · 첫 시도 에너지 +40' : '정답', mcReveal(Q.q), go); return; }
+    if (ok) { Q.solved = true; const first = !Q.tried; if (first) P.en = Math.min(P.maxEn, P.en + 40); rightFx(); showReveal(first ? '정답! · 첫 시도 에너지 +40' : '정답!', mcReveal(Q.q), go, true); return; }
     penalty(pen, kind === 'zone' ? '오답 · 기록 +5분' : '오답 · 기록 +1분');
     const nq = newQuiz() || Q; nq.hints = Q.hints; nq.paper = Q.paper; nq.tried = true; stage.quiz = nq; // 틀리면 새 문제(번호를 차례로 눌러 넘어가지 못하게). 모은 힌트는 이어진다
-    showReveal('오답 · 새 문제를 맞혀야 넘어간다', mcReveal(Q.q), () => openQuiz(onSolve, kind)); };
+    showReveal('오답 · 새 문제를 맞혀야 넘어간다', mcReveal(Q.q), () => openQuiz(onSolve, kind), false); };
   openModal(kind === 'zone' ? '단원 관문 문제' : '역 관문 문제', quizHtml(Q, true, label), b => {
     b.querySelectorAll('[data-i]').forEach(x => x.onclick = () => check(+x.dataset.i === Q.q.answer)); },
-    Object.fromEntries(Q.q.choices.map((c, i) => [String(i + 1), () => check(i === Q.q.answer)])));
+    { ...Object.fromEntries(Q.q.choices.map((c, i) => [String(i + 1), () => check(i === Q.q.answer)])), space: () => showAns(`#craftList [data-i="${Q.q.answer}"]`) });
 }
 // ---------- 퍼즐 장치: 역마다 방 곳곳에 놓인다. 가까이 가서 E. 상태 이상이 없을 때는 쓰임새만 보여 준다 ----------
 const DEV = {

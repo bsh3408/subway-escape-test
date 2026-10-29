@@ -1,4 +1,5 @@
 'use strict';
+window.TEST_MODE = true; // 패치 시험장: 문제 창에서 Space로 정답 표시
 // 막차 시험장: 패치로 추가된 기능만 골라 바로 시험한다.
 // 본 게임(game.js)은 그대로 두고 그 위에 단추판만 얹는다. test.html = index.html + 이 파일
 (function () {
