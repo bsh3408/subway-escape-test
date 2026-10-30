@@ -880,8 +880,8 @@ function updatePlayer() {
   for (const p of pickups) if (p.kind === 'relic' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; takeRelic(p.id); } // 유물은 닿으면 줍는다
   for (const p of pickups) if ((p.kind === 'cloth' || p.kind === 'part') && Math.hypot(p.x - P.x, p.y - P.y) < 22 * (1 + relicAdd('magnet'))) { // 재료는 닿으면 줍는다(자석: 더 멀리서)
     p.dead = true; P.mat[p.kind]++; say(P.x, P.y - 44, (p.kind === 'cloth' ? '가죽' : '부품') + ' +1', 'block', 'small'); }
-  for (const p of pickups) if (p.kind === 'water' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; P.heatX = 0; // 물을 마신다
-    if (P.st.heat) cure('heat', '물을 마셔 열사병이 풀렸다'); else say(P.x, P.y - 44, '물 · 더위가 가셨다', 'heal', 'small'); burst(p.x, p.y - 6, '#7fc8ff', 8); }
+  for (const p of pickups) if (p.kind === 'water' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { p.dead = true; P.heatX = 0; P.guard.heat = Math.max(P.guard.heat || 0, WATER_COOL); // 물을 마신다: 30초 동안 더위가 쌓이지 않는다
+    if (P.st.heat) cure('heat', '물을 마셔 열사병이 풀렸다'); else say(P.x, P.y - 44, '물 · 30초 동안 더위가 쌓이지 않는다', 'heal', 'small'); burst(p.x, p.y - 6, '#7fc8ff', 8); }
   for (const p of pickups) if (p.kind === 'heal' && Math.hypot(p.x - P.x, p.y - P.y) < 22) { const before = P.hp; P.hp = Math.min(P.maxHp, P.hp + 2 + relicAdd('healUp')); p.dead = true; say(P.x, P.y - 44, '체력 +' + (P.hp - before), 'heal'); burst(p.x, p.y - 6, '#ff6b6b', 8); }
   pickups = pickups.filter(p => !p.dead);
 }
@@ -916,15 +916,16 @@ const DESC2 = {
 for (const k in DESC2) if (EDEF[k]) EDEF[k].desc = DESC2[k];
 const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안개', drone: '정전 드론', bias: '편향 AI', spore: '곰팡이 포자', fake2: '가짜 정보 봇' }; // 이름이 비어 있던 몬스터
 for (const k in NAME2) if (EDEF[k]) EDEF[k].name = NAME2[k];
+const MOB_HP = 0.7; // 몬스터·보스 체력 배율 (2026-10-30 교사 요청: 전체적으로 낮춤)
 function spawnEnemy(kind, x, y, room) {
   const ov = (ZONES[stage.zone].ov || {})[kind] || {}, nm = ov.name || EDEF[kind].name, ds = ov.desc || EDEF[kind].desc;
   // 처음 만난 몬스터 설명 줄은 띄우지 않는다(2026-10-28 교사 요청) // 처음 만난 적: 과학 설명
-  const d = EDEF[kind];
-  const e = { kind, x, y, hp: d.hp, maxHp: d.hp, bw: d.bw, bh: d.bh, w: d.w, h: d.h, room, st: 'idle', t: 0.4 + rand() * 0.6, cd: 1 + rand(), flash: 0, face: -1, ph: 0, pt: 0, aim: 0 };
+  const d = EDEF[kind], hp0 = Math.max(1, Math.round(d.hp * MOB_HP));
+  const e = { kind, x, y, hp: hp0, maxHp: hp0, bw: d.bw, bh: d.bh, w: d.w, h: d.h, room, st: 'idle', t: 0.4 + rand() * 0.6, cd: 1 + rand(), flash: 0, face: -1, ph: 0, pt: 0, aim: 0 };
   if (kind === 'amm') e.shootT = 1.2 + rand() * 1.5;
   if (d.boss) { e.st = BOSS_IDLE[kind]; e.t = 1.4; e.seq = 0; bossRef = e; }
   if (kind === 'drone') e.batt = 10; // 정전 드론: 배터리가 0이 되면 멈춘다
-  const zk = 1 + stage.zi * 0.35; e.hp = e.maxHp = Math.round(d.hp * (d.boss ? 1 + stage.zi * 0.25 : zk)); // 몇 번째로 들어간 구역일수록 튼튼하다
+  const zk = 1 + stage.zi * 0.35; e.hp = e.maxHp = Math.max(1, Math.round(d.hp * MOB_HP * (d.boss ? 1 + stage.zi * 0.25 : zk))); // 몇 번째로 들어간 구역일수록 튼튼하다
   enemies.push(e); return e;
 }
 function damage(e, n) {
@@ -1460,7 +1461,7 @@ function openQuiz(onSolve, kind, room) {
 const DEV = {
   wash: { name: '비상 세척 선반', st: 'acid', use: '산·염기가 묻어 화학 화상을 입었을 때 중화해 씻어 낸다' },
   tap: { name: '비상 수도관', st: 'burn', use: '화상을 입었을 때 쓴다' },
-  fan: { name: '분무 냉각 팬', st: 'heat', use: '열사병에 걸렸을 때 쓴다' },
+  fan: { name: '분무 냉각 팬', st: 'heat', use: '열사병에 걸렸을 때 쓴다. 가면 냉각팩(2분 동안 열사병 막음)을 챙길 수 있다' },
   stove: { name: '철 가루 반응 난로', st: 'frost', use: '동상에 걸렸을 때 쓴다' },
   booth: { name: '진단 부스', st: 'infect', use: '감염됐을 때 병원체를 진단하고 맞는 약을 고른다' },
 };
@@ -1490,10 +1491,16 @@ function placeDevices() { // 구호실: 이 구역에서 걸릴 수 있는 상�
 const nearDev = () => devices.find(d => Math.hypot(d.x - P.x, (d.y - P.y) * 1.3) < 30);
 function penal(msg) { if (P.sh > 0) P.sh--; else if (P.hp > 1) P.hp--; say(P.x, P.y - 44, '-1', 'hurt'); return msg; } // 퍼즐을 틀리면 방어막이나 체력 1(쓰러지지는 않는다)
 function devBtns(opts) { return '<div class="qch">' + opts.map((o, i) => `<button class="qb" data-c="${i}">${esc(o)}</button>`).join('') + '</div>'; }
+const COOL_PACK = 120, WATER_COOL = 30; // 냉각팩 2분, 물 30초 동안 더위가 쌓이지 않는다
+function giveCoolPack(d) { // 팬 하나에서 냉각팩은 한 번만
+  if (d.pack) { say(P.x, P.y - 46, '이 팬의 냉각팩은 이미 챙겼다', 'block', 'small'); return; }
+  d.pack = true; P.heatX = 0; P.guard.heat = Math.max(P.guard.heat || 0, COOL_PACK); burst(P.x, P.y - 20, '#9fe0ff', 14);
+  say(P.x, P.y - 60, '냉각팩 · 2분 동안 열사병에 걸리지 않는다', 'heal'); }
 function openDevice(d) {
   const D = DEV[d.k], has0 = d.k === 'infect' ? P.st.infect : (D.st === 'infect' ? P.st.infect : P.st[D.st]);
   const show = (body, opts, pick) => openModal(D.name, `<div class="qz">${body}${opts ? devBtns(opts) : ''}</div>`, b => b.querySelectorAll('[data-c]').forEach(x => x.onclick = () => pick(+x.dataset.c)),
     opts ? Object.fromEntries(opts.map((o, i) => [String(i + 1), () => pick(i)])) : null);
+  if (d.k === 'fan' && !has0) { giveCoolPack(d); return; } // 열사병이 아니어도 냉각팩을 챙긴다
   if (!has0) { show(`<p class="qq">${D.use}. 지금은 쓸 일이 없다.</p>`); return; }
   const pick3 = (q, opts, right, why, wrong) => { const ord = shuffle(opts.map((o, i) => i)); let msg = '';
     const draw = () => show(`<p class="qq">${q}</p>${msg ? `<p class="qm">${msg}</p>` : ''}`, ord.map(i => opts[i]), c => { const i = ord[c];
@@ -1509,7 +1516,7 @@ function openDevice(d) {
     () => cure('burn', '흐르는 찬물이 열을 계속 빼앗아 화상이 가라앉았다'),
     i => i === 1 ? (P.coldX = Math.min(EXPOSE, P.coldX + 4), P.slowT = 2, penal('너무 차가워 몸이 얼어붙는다. 추위가 쌓였다')) : (P.st.burn += 2, penal('열을 더 받아 화상이 길어졌다')));
   if (d.k === 'fan') pick3('열사병을 어떻게 풀까?', ['냉각 팬 앞에서 물을 마시고 그늘에서 쉬기', '뜨거운 차 마시기', '두꺼운 담요 덮기'], 0,
-    () => { P.heatX = 0; P.guard.heat = 8; cure('heat', '물이 증발하며 열을 흡수하고, 그늘에서 복사열이 줄어 열사병이 풀렸다'); },
+    () => { P.heatX = 0; P.guard.heat = 8; cure('heat', '물이 증발하며 열을 흡수하고, 그늘에서 복사열이 줄어 열사병이 풀렸다'); d.pack = false; giveCoolPack(d); },
     i => penal(i === 1 ? '체온이 더 올라간다' : '열이 빠져나가지 못한다'));
   if (d.k === 'stove') pick3('얼어붙은 몸을 어떻게 녹일까?', ['철 가루 주머니를 흔들어 따뜻하게 하기', '눈으로 문지르기', '얼음물에 담그기'], 0,
     () => { P.coldX = 0; P.guard.frost = 8; cure('frost', '철이 산소와 반응하며 열을 방출해 몸이 녹았다(발열 반응)'); },
@@ -1686,7 +1693,7 @@ function bossGeneric(e, dx, dy, dist) {
   else if (p.t === 'wave') { const hot = p.kind === 'heat', safe = hot ? inHaz('water') : (inHaz('lava', 80) || warmWeapon()); // 폭염·한파: 방 전체에 더위·추위를 크게 쌓는다
     climFlash = { col: hot ? '#ff6a2a' : '#bfe6ff', t: 0.6 }; shake = Math.max(shake, 6);
     if (safe) say(P.x, P.y - 50, hot ? '물속이라 버텼다' : '열기 곁이라 버텼다', 'heal', 'small');
-    else if (hot) P.heatX = Math.min(EXPOSE, P.heatX + 5); else P.coldX = Math.min(EXPOSE, P.coldX + 5);
+    else if (hot) { if (!(P.guard.heat > 0)) P.heatX = Math.min(EXPOSE, P.heatX + 5); } else P.coldX = Math.min(EXPOSE, P.coldX + 5);
     done(); }
   else if (p.t === 'charge') { const hit = move(e, Math.cos(e.aim) * p.sp * T * DT, Math.sin(e.aim) * p.sp * T * DT);
     if (rand() < 0.6) fx.push({ t: 'dust', x: e.x + (rand() - 0.5) * 50, y: e.y - 2, life: 0.4, max: 0.4 });
@@ -1875,7 +1882,7 @@ function updateBullets() {
     if (bulletWall(b) || b.life <= 0) { b.dead = true; if (b.life > 0) hitProp(propAtPx(b.x, b.y), 1); if (b.hz) addHazard(b.x - b.vx * DT * 2, b.y - b.vy * DT * 2, b.hz); } // 적 탄도 엄폐물을 조금씩 깎는다
     if (!b.dead && Math.hypot(b.x - P.x, Math.max(P.y - 46, Math.min(P.y - 8, b.y)) - b.y) < 8 + b.r && !wallBetween(b.x, b.y, P.x, P.y - 4)) { b.dead = true; hurt(b.boss ? BOSS_DMG : 1);
       const s = b.st || (b.hz === 'fire' ? 'burn' : null);
-      if (s === 'heat') { if (!inHaz('water') && stOk('heat')) P.heatX = Math.min(EXPOSE, P.heatX + 2.5); } else if (s === 'frost') { if (stOk('frost')) P.coldX = Math.min(EXPOSE, P.coldX + 2.5); } else if (s) applyStatus(s); } } // 열기·냉기 탄은 몸에 더위·추위를 쌓는다
+      if (s === 'heat') { if (!inHaz('water') && stOk('heat') && !(P.guard.heat > 0)) P.heatX = Math.min(EXPOSE, P.heatX + 2.5); } else if (s === 'frost') { if (stOk('frost')) P.coldX = Math.min(EXPOSE, P.coldX + 2.5); } else if (s) applyStatus(s); } } // 열기·냉기 탄은 몸에 더위·추위를 쌓는다
   ebul = ebul.filter(b => !b.dead && b.life > 0);
   for (const s of shots) { if (!s.deflect && target && !target.dead) { // 자동 추적 탄(2026-10-28 교사 요청): 1초에 최대 3.5rad씩 대상 쪽으로 꺾인다
       const sp = Math.hypot(s.vx, s.vy), a = Math.atan2(s.vy, s.vx); let d = Math.atan2(target.y - (target.h || 0) / 2 - s.y, target.x - s.x) - a;
@@ -2129,7 +2136,7 @@ function drawProp(p) {
     ctx.drawImage(p.flash > 0 ? s.f : s.c, Math.round(p.x - w / 2) + jx, Math.round(p.y - h + 1), w, h);
     if (dmg > 0.5) { px(ctx, Math.round(p.x) - 3, Math.round(p.y - h * 0.6), 1, 5, O); px(ctx, Math.round(p.x) - 2, Math.round(p.y - h * 0.6) + 4, 3, 1, O); } return; }
 }
-function drawDevice(d) { const x = Math.round(d.x), y = Math.round(d.y), O = '#1a1512', need = DEV[d.k].st === 'infect' ? P.st.infect : P.st[DEV[d.k].st];
+function drawDevice(d) { const x = Math.round(d.x), y = Math.round(d.y), O = '#1a1512', need = DEV[d.k].st === 'infect' ? P.st.infect : P.st[DEV[d.k].st] || (d.k === 'fan' && !d.pack); // 냉각팩이 남은 팬도 반짝인다
   px(ctx, x - 13, y - 2, 26, 3, 'rgba(0,0,0,0.3)'); if (need) ringPx(d.x, d.y - 1, 16, Math.floor(time * 4) % 2 ? '#9fe0ff' : '#ffe08a'); // 지금 필요한 장치는 반짝인다
   if (d.k === 'wash') { px(ctx, x - 12, y - 24, 24, 24, O); px(ctx, x - 11, y - 23, 22, 22, '#6a5a42'); px(ctx, x - 11, y - 13, 22, 2, O);
     for (const [bx, c] of [[-8, '#e8d040'], [-2, '#3f7fd0'], [4, '#e6f6ff']]) { px(ctx, x + bx, y - 21, 4, 7, O); px(ctx, x + bx + 1, y - 20, 2, 5, c); } px(ctx, x - 7, y - 10, 14, 7, '#3f8f5a'); px(ctx, x - 5, y - 9, 10, 2, '#7ee07e'); }
