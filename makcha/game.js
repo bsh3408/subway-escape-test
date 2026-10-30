@@ -2525,7 +2525,7 @@ function drawProp(p) {
     cone: () => { px(ctx, X + 1, Y + 13, 14, 3, O); px(ctx, X + 2, Y + 13, 12, 2, '#e05a2a'); for (let j = 0; j < 12; j++) { const w = 2 + Math.floor(j / 2); px(ctx, X + 8 - w / 2 - 1, Y + 1 + j, w + 2, 1, O); px(ctx, X + 8 - w / 2, Y + 1 + j, w, 1, j % 5 > 2 ? '#f3f3f3' : '#e05a2a'); } },
   };
   px(ctx, X + 1, Y + T - 2, T - 2, 3, 'rgba(0,0,0,0.3)');
-  D[k]();
+  if (D[k]) D[k](); // 구역 그림이 아직 안 불러와졌으면 건너뛴다
   if (dmg > 0.4) { px(ctx, X + 4, Y + 4, 1, 5, O); px(ctx, X + 5, Y + 8, 3, 1, O); } // 금이 간다
   if (dmg > 0.7) { px(ctx, X + 10, Y + 3, 1, 6, O); px(ctx, X + 8, Y + 9, 3, 1, O); }
   if (p.flash > 0) { ctx.globalAlpha = 0.6; px(ctx, X, Y - 4, T, T + 4, '#ffffff'); ctx.globalAlpha = 1; }
