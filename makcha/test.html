@@ -2,11 +2,16 @@
 <html lang="ko">
 <head>
 <script>
-/* 연구소에 로그인한 탭에서만 들어올 수 있다(배포 사이트에서만 확인, 로컬 시험은 그대로) */
+/* 연구소에 로그인한 탭에서만 들어올 수 있다(배포 사이트에서만 확인, 로컬 시험은 그대로)
+   MAKCHA_OPEN = false면 학생은 들어올 수 없다(교사·시험 계정만). 다시 열려면 true로 바꿔 배포한다 (2026-10-30 교사 요청으로 닫음) */
+var MAKCHA_OPEN = false;
 (function(){
   if (!/github\.io$/.test(location.hostname)) return;
-  try { if (sessionStorage.getItem('lab_logged_in')) return; } catch (e) {}
-  location.replace('https://bsh3408.github.io/tonghapgwahak-yeonguso/shinjang_science.html');
+  var LAB = 'https://bsh3408.github.io/tonghapgwahak-yeonguso/shinjang_science.html', who = null;
+  try { who = sessionStorage.getItem('lab_logged_in'); } catch (e) {}
+  if (!MAKCHA_OPEN && ['변석환', '테스트'].indexOf(who) < 0) { alert('막차는 지금 닫혀 있어요. 선생님이 다시 열면 들어올 수 있어요.'); location.replace(LAB); return; }
+  if (who) return;
+  location.replace(LAB);
 })();
 </script>
 
