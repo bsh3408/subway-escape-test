@@ -28,7 +28,7 @@ window.TEST_MODE = true; // 패치 시험장: 문제 창에서 Space로 정답 �
   step = function () { origStep(); if (!running) return; if (infEn) P.en = P.maxEn; if (god) { P.hp = P.maxHp; P.inv = Math.max(P.inv, 0.05); } };
 
   // ---------- 단추판 ----------
-  const ENEMY = { tri: '삼엽충', amm: '암모나이트', rat: '텃밭 쥐', leaf: '잎벌레', spore: '곰팡이 포자', rust: '녹 덩어리', acid: '산성 방울', ember: '불씨 덩이', fog: '온실기체 안개', drone: '정전 드론', bias: '편향 자료 조각' };
+  const ENEMY = {}; for (const z of ZONES) for (const k of z.pool) ENEMY[k] = EDEF[k].name; // 지금 구역에 나오는 몬스터만
   const BOSS = {}; for (const zb of ZONE_BOSSES) for (const k of zb) BOSS[k] = EDEF[k].name; // 구역 순서대로 보스 12종
   const ZN = ZONES.map(z => z.name);
   const css = document.createElement('style');

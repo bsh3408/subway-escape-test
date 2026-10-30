@@ -40,6 +40,9 @@ function ell(g, cx, cy, w, h, c) {
   for (let j = 0; j < h; j++) { const yy = j + 0.5 - b; const half = Math.round(a * Math.sqrt(Math.max(0, 1 - yy * yy / (b * b))));
     if (half > 0) g.fillRect(Math.round(cx - half), Math.round(cy - b + j), half * 2, 1); }
 }
+let imgWait = 0; // 아직 불러오는 그림 파일 수: 0이 되어야 시작할 수 있다
+function loadImg(img, src) { imgWait++; const ok = img.onload; img.onload = () => { if (ok) ok(); imgWait--; assetsReady(); }; img.onerror = () => { imgWait--; assetsReady(); }; img.src = src; }
+function assetsReady() { const b = document.getElementById('startBtn'); if (!b) return; b.disabled = imgWait > 0; b.textContent = imgWait > 0 ? '그림 불러오는 중…' : '시작'; }
 function sprite(w, h, draw, done) {
   const mk = (a, b) => { const k = document.createElement('canvas'); k.width = a; k.height = b; return k; };
   if (done) { const c = mk(w, h); draw(c.getContext('2d')); const f = mk(w, h), fg = f.getContext('2d'); fg.drawImage(c, 0, 0); fg.globalCompositeOperation = 'source-atop'; fg.fillStyle = '#fff'; fg.fillRect(0, 0, w, h); return { c, f, w, h, pad: 0 }; } // 완성된 그림: 후처리 없이
@@ -68,314 +71,40 @@ function drawSpr(s, x, y, flip, flash, sq) {
   ctx.save(); ctx.translate(x + iw, y); ctx.scale(-1, 1); ctx.drawImage(img, 0, 0, iw, dh); ctx.restore();
 }
 
-// 지질학자 30×38: 팔 없음 — 탐사모, 머리, 짧은 네모 몸통(조끼), 작은 장화
-// 직업 6명 30×38: 모두 팔 없음 — 머리, 짧은 네모 몸통, 작은 발. 직업은 모자와 옷 색으로만 구분한다(그림은 설계가 끝난 뒤)
-function drawHero(g, ph, moving, L) {
-  const O = '#1a1512', x = 17, y = 39, bob = (ph % 2 === 1) ? 1 : 0, top = 1 + bob;
-  const step = moving ? [0, -1, 0, 1][ph % 4] : 0;
-  // 작은 둥근 발
-  for (const [fx, st] of [[11, Math.min(0, step)], [23, Math.min(0, -step)]]) { ell(g, fx, y - 3 + st, 10, 7, O); ell(g, fx, y - 3 + st, 8, 5, L.shoe); }
-  // 달걀꼴 몸통(옷·조끼·주머니는 몸통 안에서만)
-  const by = 28 + bob, bt = by - 7;
-  ell(g, x, by, 24, 15, O); ell(g, x, by, 22, 13, L.shirt);
-  g.save(); g.beginPath(); g.ellipse(x, by, 11, 6.5, 0, 0, Math.PI * 2); g.clip();
-  px(g, x - 11, by - 7, 6, 14, L.vest); px(g, x + 5, by - 7, 6, 14, L.vest); px(g, x - 9, by - 1, 4, 3, L.pocket); px(g, x + 5, by - 1, 4, 3, L.pocket);
-  if (L.mark) L.mark(g, x, bt); g.restore();
-  // 큰 둥근 머리
-  const hy = top + 12;
-  ell(g, x, hy, 31, 25, O); ell(g, x, hy, 29, 23, '#f2d0a9'); ell(g, x - 5, hy - 6, 8, 4, '#f8dfc0'); // 이마 빛
-  HAT[L.hat](g, x, top, L);
-  // 동그란 눈(반짝임), 볼터치, 작은 입
-  for (const ex of [x - 5, x + 6]) { ell(g, ex, hy + 3, 4, 5, O); px(g, ex - 1, hy + 1, 1, 1, '#ffffff'); }
-  ell(g, x - 9, hy + 7, 5, 3, '#f0a090'); ell(g, x + 10, hy + 7, 5, 3, '#f0a090'); px(g, x, hy + 7, 2, 1, '#b0604a');
-}
-// 모자: 모두 둥근 돔 꼴. (g, 머리 가운데 x, 머리 위 t, 외형)
-const HAT = {
-  brim(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 9, 36, 7, O); ell(g, x, t + 9, 34, 5, L.hatD); ell(g, x, t + 4, 22, 12, O); ell(g, x, t + 4, 20, 10, L.hatC); px(g, x - 9, t + 6, 18, 2, L.hatD); },
-  cap(g, x, t, L) { const O = '#1a1512'; ell(g, x + 9, t + 9, 16, 6, O); ell(g, x + 9, t + 9, 14, 4, L.hatD); ell(g, x, t + 5, 30, 15, O); ell(g, x, t + 5, 28, 13, L.hatC); ell(g, x, t + 4, 7, 5, '#e3c25a'); },
-  helmet(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 6, 34, 17, O); ell(g, x, t + 6, 32, 15, L.hatC); px(g, x - 2, t, 4, 9, '#d9483b'); px(g, x - 4, t + 2, 8, 4, '#d9483b'); ell(g, x - 7, t + 3, 6, 3, '#ffffff'); },
-  beanie(g, x, t, L) { const O = '#1a1512'; ell(g, x, t - 2, 7, 7, O); ell(g, x, t - 2, 5, 5, '#f3ead7'); ell(g, x, t + 4, 30, 15, O); ell(g, x, t + 4, 28, 13, L.hatC); ell(g, x, t + 9, 31, 6, O); ell(g, x, t + 9, 29, 4, L.hatD); },
-  hair(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 4, 31, 15, O); ell(g, x, t + 4, 29, 13, L.hatC); ell(g, x - 11, t + 9, 7, 9, L.hatC); ell(g, x + 9, t + 8, 10, 6, L.hatC); },
-  goggles(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 4, 29, 13, '#3a2a20'); px(g, x - 15, t + 7, 30, 3, O);
-    for (const gx of [x - 6, x + 6]) { ell(g, gx, t + 8, 11, 9, O); ell(g, gx, t + 8, 9, 7, L.hatC); px(g, gx - 2, t + 6, 2, 2, '#e6f6ff'); } },
-  bucket(g, x, t, L) { const O = '#1a1512'; ell(g, x, t + 9, 36, 8, O); ell(g, x, t + 9, 34, 6, L.hatD); ell(g, x, t + 4, 24, 13, O); ell(g, x, t + 4, 22, 11, L.hatC); },
-};
-// 최종 소비자 임시 도형: 매 22×14, 호랑이 36×22(오른쪽을 봄), 사람(팔 없는 같은 꼴)
-function drawHawk(g, f) { const O = '#1a1512';
-  if (f) { px(g, 1, 2, 9, 4, O); px(g, 2, 3, 8, 2, '#7a5230'); px(g, 12, 2, 9, 4, O); px(g, 12, 3, 8, 2, '#7a5230'); }
-  else { px(g, 2, 6, 8, 6, O); px(g, 3, 7, 7, 4, '#7a5230'); px(g, 12, 6, 8, 6, O); px(g, 12, 7, 7, 4, '#7a5230'); }
-  px(g, 7, 4, 9, 8, O); px(g, 8, 5, 7, 6, '#9a6a3a'); px(g, 14, 3, 6, 6, O); px(g, 15, 4, 4, 4, '#f3ead7'); px(g, 18, 5, 3, 2, '#e3b02a'); px(g, 16, 5, 1, 1, O); }
-function drawTiger(g, f) { const O = '#1a1512', B = '#e88a2a';
-  for (const [lx, i] of [[4, 0], [11, 1], [20, 0], [26, 1]]) { const up = (i === 0) === !!f ? 2 : 0; px(g, lx, 15 - up, 5, 7, O); px(g, lx + 1, 16 - up, 3, 5, B); }
-  px(g, 2, 6, 28, 11, O); px(g, 3, 7, 26, 9, B); px(g, 3, 13, 26, 3, '#f3ead7');
-  for (const x of [7, 12, 17, 22]) px(g, x, 7, 2, 6, O);
-  px(g, 24, 2, 12, 12, O); px(g, 25, 3, 10, 10, B); px(g, 25, 2, 3, 2, O); px(g, 32, 2, 3, 2, O); px(g, 29, 9, 6, 4, '#f3ead7'); px(g, 31, 6, 2, 2, O); px(g, 34, 9, 2, 1, O);
-  px(g, 0, 5, 3, 2, O); px(g, 0, 3, 2, 3, O); }
-const HUMAN_LOOK = { hat: 'hair', hatC: '#2a1d14', hatD: '#1a120c', shirt: '#6a8fc0', vest: '#6a8fc0', pocket: '#5a7aa8', shoe: '#2a2a30' };
 // 직업: 체력·방어막·에너지, 스킬(쿨타임 초), 겉모습. 스킬 내용은 컨셉_확정.md 4절(통박사 점검 반영)
 // 시작 무기: 직업에 어울리는 약한 무기, pick은 시작 방 바닥에 놓이는 두 번째 무기 (2026-10-27 교사 요청)
 const JOBS = {
-  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 8, weapons: ['flashlight'], pick: 'bb',
-    look: { hat: 'cap', hatC: '#24365c', hatD: '#16223d', shirt: '#dfe6ee', vest: '#2e4470', pocket: '#22355a', shoe: '#2a2a30' } },
-  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 10, weapons: ['shovel'], pick: 'sling',
-    look: { hat: 'brim', hatC: '#9a7b45', hatD: '#6e552b', shirt: '#c9b27a', vest: '#6f7d3c', pocket: '#55612c', shoe: '#5a3b22' } },
-  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 10, weapons: ['straw'], pick: 'broom',
-    look: { hat: 'bucket', hatC: '#5f8a3a', hatD: '#3f6024', shirt: '#e8e0c8', vest: '#7a9a4a', pocket: '#5a7a34', shoe: '#4a3a28' } },
-  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 6, weapons: ['watergun'], pick: 'ruler',
-    look: { hat: 'goggles', hatC: '#7fd0c8', hatD: '#3a8a84', shirt: '#f4f4f0', vest: '#f4f4f0', pocket: '#c9d2d6', shoe: '#3a3a40',
-      mark: (g, x, bt) => { px(g, x - 1, bt + 1, 2, 10, '#c9d2d6'); } } },
-  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 9, weapons: ['umbrella'], pick: 'rubber',
-    look: { hat: 'beanie', hatC: '#3f7fb8', hatD: '#2a5a86', shirt: '#d8e4ee', vest: '#e08a2e', pocket: '#b86a1e', shoe: '#2f3640' } },
-  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 11, weapons: ['dart'], pick: 'mop',
-    look: { hat: 'helmet', hatC: '#f3f3f3', hatD: '#c9c9c9', shirt: '#e05a3a', vest: '#f0c419', pocket: '#c99f10', shoe: '#2a2a30' } },
+  driver: { name: '지하철 기관사', hp: 8, sh: 4, en: 100, skill: '회생 제동', cd: 8, weapons: ['flashlight'], pick: 'bb' },
+  geo: { name: '지질학자', hp: 6, sh: 3, en: 120, skill: '지층 판독', cd: 10, weapons: ['shovel'], pick: 'sling' },
+  eco: { name: '생태학자', hp: 6, sh: 3, en: 140, skill: '최종 소비자', cd: 10, weapons: ['straw'], pick: 'broom' },
+  chem: { name: '화학 연구원', hp: 5, sh: 2, en: 160, skill: '중화제 투척', cd: 6, weapons: ['watergun'], pick: 'ruler' },
+  weather: { name: '기상 연구원', hp: 6, sh: 3, en: 140, skill: '대기 불안정', cd: 9, weapons: ['umbrella'], pick: 'rubber' },
+  medic: { name: '응급 구조사', hp: 7, sh: 3, en: 120, skill: '응급 처치', cd: 11, weapons: ['dart'], pick: 'mop' },
 };
 let jobKey = 'geo';
-// 삼엽충 22×16 (위에서 본 모습, 머리가 오른쪽)
-function drawTri(g, f) {
-  ell(g, 11, 8, 22, 16, '#2a1d12'); ell(g, 11, 8, 20, 14, '#9b7a52');
-  for (let i = 4; i < 15; i += 3) px(g, i, 2, 1, 12, '#6f5235');
-  px(g, 3, 7, 13, 2, '#c9a676');
-  ell(g, 17, 8, 8, 12, '#2a1d12'); ell(g, 17, 8, 6, 10, '#b8935f');
-  px(g, 18, 5, 2, 2, '#1a1512'); px(g, 18, 9, 2, 2, '#1a1512');
-  for (let i = 0; i < 4; i++) { const lx = 4 + i * 4 + (f ? 1 : 0); px(g, lx, 0, 1, 1, '#2a1d12'); px(g, lx, 15, 1, 1, '#2a1d12'); }
-}
-// 암모나이트 30×30
-function drawAmm(g) {
-  ell(g, 15, 15, 30, 30, '#2b2216'); ell(g, 15, 15, 28, 28, '#c8a46e');
-  ell(g, 15, 15, 19, 19, '#7c6038'); ell(g, 15, 15, 17, 17, '#d9bb87');
-  ell(g, 15, 15, 9, 9, '#7c6038'); ell(g, 15, 15, 7, 7, '#b38f5a');
-  for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; px(g, Math.round(15 + Math.cos(a) * 11), Math.round(15 + Math.sin(a) * 11), 2, 2, '#9b7c4c'); }
-  px(g, 22, 12, 3, 3, '#15161a');
-}
-// 매머드 96×84 (오른쪽을 봄)
-function drawMam(g, f) {
-  const O = '#1d120a', B = '#7a4a2a', D = '#5a341c', L = '#9a6638';
-  const legY = 64;
-  const legs = [[14, 0], [30, 1], [52, 0], [68, 1]];
-  for (const [lx, i] of legs) { const up = (i === 0) === !!f ? 2 : 0;
-    px(g, lx, legY - up, 14, 20, O); px(g, lx + 1, legY + 1 - up, 12, 18, i ? B : D); px(g, lx + 1, legY + 16 - up, 12, 2, '#d8c7a4'); }
-  ell(g, 44, 42, 80, 50, O); ell(g, 44, 42, 78, 48, B);
-  ell(g, 34, 22, 42, 22, O); ell(g, 34, 22, 40, 20, B);
-  for (let i = 0; i < 9; i++) px(g, 12 + i * 7, 26 + (i % 2) * 3, 2, 26, D);
-  px(g, 10, 58, 66, 3, D);
-  ell(g, 76, 34, 34, 36, O); ell(g, 76, 34, 32, 34, L); ell(g, 74, 24, 26, 14, B);
-  px(g, 82, 30, 3, 3, O);
-  px(g, 84, 40, 10, 30, O); px(g, 85, 41, 8, 28, L); px(g, 82, 66, 12, 6, O); px(g, 83, 67, 10, 4, L);
-  px(g, 72, 48, 16, 5, O); px(g, 73, 49, 15, 3, '#f4ecd8'); px(g, 86, 42, 6, 10, O); px(g, 87, 43, 4, 8, '#f4ecd8');
-}
-// 무기 20×8: 돌리지 않고 좌우만 뒤집는다
-function drawHammer(g) { px(g, 0, 2, 14, 4, '#1a1512'); px(g, 1, 3, 12, 2, '#8a5a2e'); px(g, 12, 0, 8, 8, '#1a1512'); px(g, 13, 1, 6, 6, '#8d96a3'); px(g, 13, 1, 6, 2, '#c3cad3'); }
-function drawSling(g) { px(g, 0, 2, 11, 4, '#1a1512'); px(g, 1, 3, 9, 2, '#8a5a2e'); px(g, 9, 0, 4, 8, '#1a1512'); px(g, 12, 0, 7, 2, '#1a1512'); px(g, 12, 6, 7, 2, '#1a1512'); px(g, 10, 1, 2, 6, '#a06a38'); px(g, 18, 1, 1, 6, '#d9483b'); }
-
-// 구역 2~4 적·보스 임시 도형 (모두 오른쪽을 봄, 무서운 괴물로 그리지 않음)
-const O_ = '#1a1512';
-const DRAW = {
-  rat(g, f) { ell(g, 10, 9, 18, 12, O_); ell(g, 10, 9, 16, 10, '#8a8a90'); ell(g, 17, 8, 9, 8, O_); ell(g, 17, 8, 7, 6, '#9a9aa0'); px(g, 15, 2, 3, 3, O_); px(g, 16, 3, 1, 1, '#e8a0a8');
-    px(g, 21, 8, 1, 1, '#e8a0a8'); px(g, 18, 6, 1, 1, O_); px(g, 0, 8 + (f ? 1 : 0), 3, 1, '#c89aa0'); px(g, 5 + (f ? 1 : 0), 14, 2, 2, O_); px(g, 12 - (f ? 1 : 0), 14, 2, 2, O_); },
-  leaf(g, f) { ell(g, 12, 9, 22, 14, O_); ell(g, 12, 9, 20, 12, '#7ab84a'); px(g, 4, 9, 16, 1, '#4f8a2a'); for (let i = 6; i < 18; i += 4) { px(g, i, 6, 1, 3, '#4f8a2a'); px(g, i, 10, 1, 3, '#4f8a2a'); }
-    px(g, 19, 6, 2, 2, O_); px(g, 22, 4 + (f ? 1 : 0), 2, 1, O_); },
-  spore(g, f) { for (const [x, y, r] of [[13, 15, 20], [7, 11, 12], [19, 10, 12], [13, 7, 12]]) ell(g, x, y, r, r, O_);
-    for (const [x, y, r] of [[13, 15, 18], [7, 11, 10], [19, 10, 10], [13, 7, 10]]) ell(g, x, y, r, r, '#efeadc'); for (const [x, y] of [[9, 13], [16, 16], [13, 9], [19, 12]]) px(g, x, y, 2, 2, '#b8b0a0'); px(g, 15, 13, 2, 2, O_); },
-  rust(g, f) { ell(g, 13, 13, 26, 22, O_); ell(g, 13, 13, 24, 20, '#9a4a26'); for (const [x, y] of [[6, 8], [14, 6], [9, 15], [18, 14]]) px(g, x, y, 4, 2, '#6a2a12'); px(g, 18, 9, 2, 2, '#f3ead7'); px(g, 4, 5, 3, 3, '#c26a3a'); },
-  acid(g, f) { ell(g, 11, 14, 20, 16, O_); ell(g, 11, 14, 18, 14, '#e8d040'); px(g, 9, 2, 4, 6, O_); px(g, 10, 3, 2, 6, '#e8d040'); px(g, 6, 11, 3, 3, '#fff6a0'); px(g, 14, 13 + (f ? 1 : 0), 2, 2, '#b8a020'); px(g, 15, 10, 2, 2, O_); },
-  ember(g, f) { ell(g, 12, 15, 22, 14, O_); ell(g, 12, 15, 20, 12, '#4a1a12'); for (const [x, y] of [[6, 14], [12, 17], [16, 13]]) px(g, x, y, 3, 2, '#ff7a2a');
-    px(g, 9, 3 + (f ? 1 : 0), 6, 6, '#ff7a2a'); px(g, 10, 1 + (f ? 1 : 0), 4, 4, '#ffd23f'); px(g, 16, 12, 2, 2, '#ffd23f'); },
-  fog(g, f) { g.globalAlpha = 0.85; for (const [x, y, w, h] of [[16, 14, 30, 18], [9, 10, 16, 14], [23, 9, 16, 14]]) ell(g, x, y, w, h, '#5a5e66'); for (const [x, y, w, h] of [[16, 14, 28, 16], [9, 10, 14, 12], [23, 9, 14, 12]]) ell(g, x, y, w, h, '#9aa0aa');
-    g.globalAlpha = 1; for (const [x, y] of [[10, 9], [20, 7], [15, 15], [25, 13]]) px(g, x, y, 2, 2, '#e8ecf0'); },
-  drone(g, f) { px(g, 5, 7, 16, 11, O_); px(g, 6, 8, 14, 9, '#4a5a6a'); for (const x of [1, 19]) for (const y of [3, 15]) { px(g, x, y, 6, 2, f ? '#c8d0d8' : '#8a96a2'); px(g, x + 2, y + 1, 2, 2, O_); }
-    px(g, 8, 10, 10, 4, O_); px(g, 9, 11, 8, 2, '#7ee07e'); px(g, 18, 9, 2, 2, '#ff5a3c'); },
-  bias(g, f) { px(g, 1, 3, 24, 22, O_); px(g, 2, 4, 22, 20, '#2a3440'); for (const [x, h] of [[4, 4], [9, 6], [14, 5], [19, 17]]) px(g, x, 22 - h, 4, h, x === 19 ? '#ff7a2a' : '#5fb8ff'); px(g, 3, 22, 20, 1, '#9aa0aa'); },
-  owl(g, f) { const B = '#8a6a44', L = '#c8a878', D = '#5a4228';
-    if (f) { ell(g, 14, 40, 30, 46, O_); ell(g, 14, 40, 28, 44, D); ell(g, 82, 40, 30, 46, O_); ell(g, 82, 40, 28, 44, D); } else { ell(g, 16, 52, 26, 40, O_); ell(g, 16, 52, 24, 38, D); ell(g, 80, 52, 26, 40, O_); ell(g, 80, 52, 24, 38, D); }
-    ell(g, 48, 46, 64, 66, O_); ell(g, 48, 46, 62, 64, B); ell(g, 48, 56, 40, 40, L); for (let i = 0; i < 4; i++) for (let j = 0; j < 3; j++) px(g, 36 + j * 10 + (i % 2) * 5, 46 + i * 7, 3, 2, D);
-    ell(g, 38, 30, 20, 20, O_); ell(g, 38, 30, 18, 18, '#f3ead7'); ell(g, 58, 30, 20, 20, O_); ell(g, 58, 30, 18, 18, '#f3ead7'); px(g, 40, 28, 5, 5, O_); px(g, 60, 28, 5, 5, O_);
-    px(g, 46, 36, 4, 6, '#e3b02a'); px(g, 34, 14, 6, 6, D); px(g, 56, 14, 6, 6, D); px(g, 38, 76, 6, 4, '#e3b02a'); px(g, 52, 76, 6, 4, '#e3b02a'); },
-  furnace(g, f) { px(g, 58, 0, 16, 26, O_); px(g, 60, 2, 12, 24, '#5a5a62'); px(g, 60, 2, 12, 3, f ? '#ff7a2a' : '#8a8a92');
-    ell(g, 44, 58, 84, 68, O_); ell(g, 44, 58, 82, 66, '#6a6a72'); for (const [x, y, c] of [[16, 40, '#9a4a26'], [40, 34, '#7a7a82'], [62, 44, '#9a4a26'], [26, 62, '#7a7a82'], [52, 66, '#9a4a26']]) { px(g, x, y, 18, 14, O_); px(g, x + 1, y + 1, 16, 12, c); }
-    px(g, 30, 50, 8, 6, '#7ee07e'); px(g, 50, 50, 8, 6, '#7ee07e'); px(g, 34, 78, 20, 8, O_); px(g, 35, 79, 18, 6, f ? '#ffd23f' : '#ff7a2a'); px(g, 14, 86, 14, 6, O_); px(g, 60, 86, 14, 6, O_); },
-  ai(g, f) { px(g, 0, 0, 100, 64, O_); px(g, 3, 3, 94, 58, '#24303c'); px(g, 6, 6, 88, 52, '#0e1a26'); for (let y = 8; y < 56; y += 4) px(g, 6, y, 88, 1, '#14222e');
-    ell(g, 50, 30, 30, 20, '#5fb8ff'); ell(g, 50, 30, 12, 12, '#0e1a26'); px(g, 48, 28, 4, 4, '#e6f6ff'); for (let i = 0; i < 6; i++) px(g, 12 + i * 14, 50, 8, 3, i % 2 === (f ? 1 : 0) ? '#7ee07e' : '#2a4a2a');
-    px(g, 40, 64, 20, 10, O_); px(g, 42, 64, 16, 8, '#3a4a5a'); },
-};
-// 새 보스 8종 임시 도형 (차분한 표정, 그림은 설계가 끝난 뒤)
-Object.assign(DRAW, {
-  trilo(g, f) { ell(g, 48, 32, 94, 56, O_); ell(g, 48, 32, 90, 52, '#8a6a44'); ell(g, 48, 32, 30, 50, '#a8845a'); for (let i = 10; i < 86; i += 8) px(g, i, 8 + (f && i % 16 ? 1 : 0), 2, 48, '#6a5034');
-    ell(g, 80, 32, 30, 44, O_); ell(g, 80, 32, 26, 40, '#b89468'); px(g, 82, 22, 5, 4, O_); px(g, 82, 38, 5, 4, O_); px(g, 84, 23, 2, 1, '#f3ead7'); px(g, 84, 39, 2, 1, '#f3ead7'); },
-  finch(g, f) { const bird = (x, y, bk) => { ell(g, x, y, 26, 22, O_); ell(g, x, y, 24, 20, '#9a7a54'); ell(g, x - 2, y + 3, 16, 12, '#d8c09a'); px(g, x + 4, y - 4, 3, 3, O_);
-      px(g, x + 11, y - 2, bk, bk > 5 ? 5 : 3, O_); px(g, x + 12, y - 1, bk - 2, bk > 5 ? 3 : 1, '#e3b02a'); px(g, x - 10, y - 4 + (f ? 2 : 0), 8, 5, '#6a5034'); };
-    bird(22, 34, 7); bird(48, 18, 4); bird(70, 38, 5); },
-  frog(g, f) { ell(g, 44, 52, 86, 24, O_); ell(g, 44, 52, 84, 22, '#3f8a4a'); ell(g, 44, 36, 70, 50, O_); ell(g, 44, 36, 66, 46, '#6ab84a'); ell(g, 44, 44, 44, 26, '#c8e09a');
-    for (const x of [26, 62]) { ell(g, x, 14 + (f ? 1 : 0), 18, 18, O_); ell(g, x, 14 + (f ? 1 : 0), 16, 16, '#f3ead7'); px(g, x - 2, 12 + (f ? 1 : 0), 5, 5, O_); }
-    px(g, 34, 40, 20, 2, '#2a5a2a'); },
-  vine(g, f) { for (let i = 0; i < 7; i++) { const a = i / 7 * Math.PI * 2, x = 46 + Math.cos(a) * 34, y = 56 + Math.sin(a) * 26; stroke(g, 46, 56, Math.cos(a), Math.sin(a) * 0.75, 36, 6, O_); stroke(g, 46, 56, Math.cos(a), Math.sin(a) * 0.75, 36, 4, '#4f7a2a');
-      ell(g, Math.round(x), Math.round(y), 12, 9, O_); ell(g, Math.round(x), Math.round(y), 10, 7, '#7ab84a'); px(g, Math.round(x + 4), Math.round(y - 5), 2, 3, '#c8d0a8'); }
-    ell(g, 46, 40, 26, 30, O_); ell(g, 46, 40, 22, 26, '#5f8a3a'); ell(g, 46, 30, 18, 16, O_); ell(g, 46, 30, 14, 12, f ? '#f0a0c8' : '#e080b0'); px(g, 44, 28, 4, 3, '#fff6a0'); },
-  neutral(g, f) { for (const [x, c] of [[24, '#e8d040'], [72, '#3f7fd0']]) { px(g, x - 20, 10, 40, 60, O_); px(g, x - 18, 12, 36, 56, '#c8d0d8'); px(g, x - 16, 30 + (f ? 2 : 0), 32, 36, c); px(g, x - 14, 32 + (f ? 2 : 0), 4, 2, '#ffffff'); }
-    px(g, 40, 30, 16, 24, O_); px(g, 42, 32, 12, 20, '#5a6470'); px(g, 44, 40, 8, 4, '#4fbf5a'); px(g, 10, 72, 76, 10, O_); px(g, 12, 74, 72, 6, '#3a3f46'); px(g, 18, 16, 6, 4, '#7ee07e'); px(g, 66, 16, 6, 4, '#7ee07e'); },
-  cooler(g, f) { px(g, 10, 14, 68, 62, O_); px(g, 12, 16, 64, 58, '#7a8a9a'); px(g, 12, 16, 64, 6, f ? '#3f7fd0' : '#e08a2e'); for (let y = 30; y < 70; y += 6) px(g, 20, y, 48, 2, '#5a6a7a');
-    for (const x of [0, 76]) { px(g, x, 30, 12, 40, O_); px(g, x + 1, 31, 10, 38, '#7fb2d9'); px(g, x + 1, 40, 10, 2, '#e6f6ff'); } px(g, 30, 24, 8, 4, '#7ee07e'); px(g, 50, 24, 8, 4, '#7ee07e'); px(g, 14, 76, 60, 8, O_); },
-  turbine(g, f) { ell(g, 46, 44, 84, 84, O_); ell(g, 46, 44, 80, 80, '#6a7480'); ell(g, 46, 44, 60, 60, '#3a4048');
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2 + (f ? 0.2 : 0); stroke(g, 46, 44, Math.cos(a), Math.sin(a), 26, 5, '#c3cad3'); }
-    ell(g, 46, 44, 14, 14, O_); ell(g, 46, 44, 10, 10, '#f0b429'); px(g, 30, 84, 32, 8, O_); px(g, 32, 86, 28, 4, '#c8783a'); px(g, 20, 20, 6, 4, '#7ee07e'); px(g, 66, 20, 6, 4, '#7ee07e'); },
-  solar(g, f) { px(g, 46, 40, 8, 50, O_); px(g, 48, 42, 4, 46, '#8d96a3'); for (const [x, y] of [[4, 6], [52, 6], [4, 30], [52, 30]]) { px(g, x, y + (f ? 1 : 0), 44, 22, O_); px(g, x + 2, y + 2 + (f ? 1 : 0), 40, 18, '#1e3a6a');
-      for (let i = 1; i < 4; i++) px(g, x + 2 + i * 10, y + 2 + (f ? 1 : 0), 1, 18, '#5fb8ff'); px(g, x + 2, y + 11 + (f ? 1 : 0), 40, 1, '#5fb8ff'); }
-    px(g, 44, 54, 12, 6, O_); px(g, 45, 55, 4, 4, '#7ee07e'); px(g, 51, 55, 4, 4, '#7ee07e'); px(g, 30, 86, 40, 4, O_); },
-});
-// 구역 5·6 적·보스 (2026-10-27)
-Object.assign(DRAW, {
-  conduct(g, f) { for (const x of [5, 10, 17, 22]) px(g, x, 14 + (f && x % 2 ? 1 : 0), 2, 5, O_); // 다리
-    ell(g, 14, 10, 28, 16, O_); ell(g, 14, 10, 26, 14, f ? '#ff7a2a' : '#ff5a1e'); ell(g, 14, 10, 20, 10, '#4a4a52'); // 빨갛게 달아오른 테두리
-    px(g, 7, 8, 14, 1, '#2a2a30'); px(g, 7, 11, 14, 1, '#2a2a30'); px(g, 11, 5, 1, 10, '#2a2a30'); px(g, 16, 5, 1, 10, '#2a2a30'); px(g, 19, 6, 2, 2, '#ffd23f'); },
-  convect(g, f) { for (let i = 0; i < 5; i++) { const y = 4 + i * 5, w = 24 - i * 4, x = 13 + Math.round(Math.sin(i * 1.3 + (f ? 1 : 0)) * 2); ell(g, x, y, w + 2, 7, O_); ell(g, x, y, w, 5, i % 2 ? '#ffb070' : '#ff7a2a'); }
-    px(g, 9, 6, 2, 2, O_); px(g, 15, 6, 2, 2, O_); for (const x of [4, 20]) px(g, x, 1 + (f ? 0 : 2), 1, 3, '#ffe08a'); }, // 위로 솟는 열기
-  radiate(g, f) { px(g, 10, 15, 4, 11, O_); px(g, 11, 16, 2, 9, '#8d96a3'); px(g, 4, 26, 16, 4, O_); px(g, 5, 27, 14, 2, '#5a6470');
-    ell(g, 12, 9, 22, 18, O_); ell(g, 12, 9, 20, 16, '#3a3f46'); ell(g, 12, 10, 14, 10, f ? '#ff8a3a' : '#ff5a1e'); ell(g, 12, 10, 6, 4, '#ffd23f'); }, // 받침대 위 적외선 램프
-  methane(g, f) { const r = f ? 20 : 18; ell(g, 11, 13, r + 2, r + 2, O_); g.globalAlpha = 0.85; ell(g, 11, 13, r, r, '#a8d8a8'); g.globalAlpha = 1;
-    ell(g, 7, 9, 5, 4, '#f4fff4'); px(g, 8, 14, 2, 2, O_); px(g, 13, 14, 2, 2, O_); px(g, 10, 17, 3, 1, O_); }, // 투명한 거품
-  fox(g, f) { ell(g, 6, 9, 12, 8, O_); ell(g, 6, 9, 10, 6, '#f4f4f0'); ell(g, 14, 11, 16, 10, O_); ell(g, 14, 11, 14, 8, '#ffffff');
-    ell(g, 22, 8, 10, 9, O_); ell(g, 22, 8, 8, 7, '#ffffff'); px(g, 20, 2, 3, 3, O_); px(g, 21, 3, 1, 1, '#e8c8c8'); px(g, 26, 8, 2, 2, O_); px(g, 23, 6, 1, 1, O_);
-    px(g, 9 + (f ? 1 : 0), 15, 2, 4, O_); px(g, 18 - (f ? 1 : 0), 15, 2, 4, O_); }, // 작은 귀·짧은 주둥이
-  snow(g, f) { for (const [x, y, w, h] of [[17, 10, 32, 16], [10, 8, 16, 14], [24, 6, 16, 14]]) ell(g, x, y, w, h, O_);
-    for (const [x, y, w, h] of [[17, 10, 30, 14], [10, 8, 14, 12], [24, 6, 14, 12]]) ell(g, x, y, w, h, '#8a96a2'); ell(g, 17, 6, 14, 5, '#c3cad3');
-    px(g, 12, 10, 2, 2, O_); px(g, 21, 10, 2, 2, O_); for (const x of [7, 14, 21, 28]) px(g, x, 19 + ((x + (f ? 3 : 0)) % 5), 2, 2, '#ffffff'); }, // 눈 내리는 구름
-  dome(g, f) { ell(g, 50, 56, 96, 92, O_); ell(g, 50, 56, 92, 88, '#ff7a2a'); ell(g, 50, 58, 70, 64, '#ff9a4a'); ell(g, 50, 60, 44, 38, '#ffc070'); g.clearRect(0, 58, 100, 20);
-    px(g, 2, 56, 96, 10, O_); px(g, 4, 57, 92, 7, '#8a4a2a'); // 반구 덮개와 바닥
-    px(g, 40, 26, 3, 14, O_); px(g, 57, 26, 3, 14, O_); px(g, 40, 31, 20, 3, O_); // 고기압 H
-    px(g, 34, 46, 5, 3, O_); px(g, 61, 46, 5, 3, O_); for (const x of [24, 50, 76]) px(g, x, 2 + (f ? 0 : 3), 2, 6, '#ffb070'); },
-  vortex(g, f) { ell(g, 48, 46, 92, 84, O_); ell(g, 48, 46, 88, 80, '#3f6fa0');
-    for (let i = 0; i < 44; i++) { const a = i * 0.45 + (f ? 0.4 : 0), r = 4 + i * 0.95; px(g, Math.round(46 + Math.cos(a) * r), Math.round(44 + Math.sin(a) * r * 0.9), 4, 3, i % 2 ? '#e6f6ff' : '#9fd8ff'); }
-    ell(g, 48, 46, 16, 14, O_); ell(g, 48, 46, 12, 10, '#e6f6ff'); px(g, 43, 43, 3, 3, O_); px(g, 51, 43, 3, 3, O_); px(g, 30, 86, 36, 4, O_); }, // 도는 찬 공기
-});
-Object.assign(DRAW, {
-  greenhouse(g, f) { for (const [x, y, w, h] of [[48, 44, 92, 58], [26, 36, 44, 40], [70, 34, 44, 40], [48, 24, 50, 40]]) ell(g, x, y, w, h, O_);
-    for (const [x, y, w, h] of [[48, 44, 88, 54], [26, 36, 40, 36], [70, 34, 40, 36], [48, 24, 46, 36]]) ell(g, x, y, w, h, '#8a8478'); ell(g, 44, 20, 24, 10, '#a8a296');
-    for (const [x, y] of [[22, 40], [48, 54], [72, 40], [36, 26], [62, 24]]) { ell(g, x, y + (f ? 1 : 0), 7, 7, '#2a2520'); ell(g, x - 6, y + (f ? 1 : 0), 5, 5, '#d9483b'); ell(g, x + 6, y + (f ? 1 : 0), 5, 5, '#d9483b'); } // 이산화 탄소 분자(O=C=O)
-    px(g, 40, 64, 4, 3, O_); px(g, 54, 64, 4, 3, O_); for (const x of [20, 48, 76]) px(g, x, 72 + (f ? 2 : 0), 2, 6, '#ff7a2a'); }, // 아래로 되돌려 보내는 열
-  sandstorm(g, f) { for (let i = 0; i < 6; i++) { const y = 8 + i * 13, w = 88 - i * 12, x = 46 + Math.round(Math.sin(i * 1.1 + (f ? 0.8 : 0)) * 5); ell(g, x, y, w + 2, 15, O_); ell(g, x, y, w, 12, i % 2 ? '#d8b878' : '#c8a060'); }
-    for (let i = 0; i < 16; i++) px(g, (i * 37 + (f ? 5 : 0)) % 90, (i * 23) % 80, 2, 2, '#a88848'); px(g, 38, 20, 4, 3, O_); px(g, 52, 20, 4, 3, O_); },
-  glacier(g, f) { g.fillStyle = O_; g.beginPath(); g.moveTo(2, 64); g.lineTo(22, 14); g.lineTo(40, 26); g.lineTo(58, 2); g.lineTo(80, 22); g.lineTo(98, 64); g.fill();
-    g.fillStyle = '#bfe6ff'; g.beginPath(); g.moveTo(6, 62); g.lineTo(23, 18); g.lineTo(40, 30); g.lineTo(58, 7); g.lineTo(78, 25); g.lineTo(94, 62); g.fill();
-    g.fillStyle = '#f4fbff'; g.beginPath(); g.moveTo(50, 16); g.lineTo(58, 7); g.lineTo(66, 15); g.fill(); px(g, 30, 36, 1, 14, '#5fa0d0'); px(g, 64, 30, 1, 18, '#5fa0d0');
-    px(g, 40, 44, 4, 3, O_); px(g, 56, 44, 4, 3, O_); px(g, 2, 62, 96, 8, '#3f8fd0'); for (const x of [18, 46, 74]) px(g, x, 64 + (f ? 2 : 0), 3, 4, '#7fc8ff'); }, // 녹아 흘러내리는 물
-  boiler(g, f) { px(g, 60, 0, 14, 30, O_); px(g, 62, 2, 10, 28, '#5a5a62'); for (const [x, y] of [[66, -4], [70, -10]]) ell(g, x + (f ? 2 : 0), y + 8, 10, 8, '#6a6a72'); // 굴뚝과 연기
-    px(g, 6, 24, 76, 62, O_); px(g, 8, 26, 72, 58, '#8a4a2a'); px(g, 8, 26, 72, 6, '#a8603a'); for (const y of [40, 60]) px(g, 8, y, 72, 2, '#5a2a12');
-    px(g, 26, 46, 36, 22, O_); px(g, 28, 48, 32, 18, f ? '#ffd23f' : '#ff7a2a'); for (const x of [32, 42, 52]) px(g, x, 60, 6, 4, '#2a2520'); // 석탄이 타는 화구
-    px(g, 20, 32, 6, 4, '#7ee07e'); px(g, 62, 32, 6, 4, '#7ee07e'); px(g, 10, 86, 16, 6, O_); px(g, 62, 86, 16, 6, O_); },
-});
-// 구역 1~6 추가 적 12종 (2026-10-27)
-Object.assign(DRAW, {
-  eury(g, f) { for (const x of [7, 12, 17, 22]) px(g, x, 12 + (f && x % 2 ? 1 : 0), 2, 5, O_);
-    ell(g, 15, 9, 26, 12, O_); ell(g, 15, 9, 24, 10, '#7a5a8a'); for (const x of [9, 13, 17, 21]) px(g, x, 4, 1, 10, '#5a3a6a');
-    px(g, 0, 7, 5, 3, O_); px(g, 1, 8, 4, 1, '#9a7aaa'); px(g, 0, 3, 2, 5, O_); px(g, 26, 3, 4, 3, O_); px(g, 26, 12, 4, 3, O_); px(g, 22, 6, 2, 2, '#ffd23f'); }, // 집게·꼬리 가시
-  ptero(g, f) { const wy = f ? 2 : 7; g.fillStyle = O_; g.beginPath(); g.moveTo(1, wy); g.lineTo(16, 9); g.lineTo(31, wy); g.lineTo(16, 15); g.fill();
-    g.fillStyle = '#b88a5a'; g.beginPath(); g.moveTo(4, wy + 1); g.lineTo(16, 10); g.lineTo(28, wy + 1); g.lineTo(16, 13); g.fill();
-    ell(g, 16, 12, 8, 8, O_); ell(g, 16, 12, 6, 6, '#d8a870'); px(g, 19, 10, 10, 2, O_); px(g, 19, 10, 9, 1, '#e8c890'); px(g, 11, 7, 6, 2, O_); px(g, 17, 11, 1, 1, O_); px(g, 14, 16, 1, 3, O_); px(g, 17, 16, 1, 3, O_); }, // 날개막·볏
-  snake(g, f) { for (let i = 0; i < 11; i++) { const x = 2 + i * 2, y = 7 + Math.round(Math.sin(i * 0.9 + (f ? 1 : 0)) * 3); px(g, x, y - 1, 3, 5, O_); px(g, x, y, 3, 3, i % 3 ? '#5a9a3a' : '#3f7a2a'); }
-    ell(g, 25, 7, 8, 7, O_); ell(g, 25, 7, 6, 5, '#6ab04a'); px(g, 26, 5, 1, 1, O_); px(g, 28, 8, 2, 1, '#e04848'); },
-  mole(g, f) { ell(g, 12, 10, 22, 14, O_); ell(g, 12, 10, 20, 12, '#5a4a42'); ell(g, 22, 10, 6, 5, O_); ell(g, 22, 10, 4, 3, '#e8a0a8'); px(g, 17, 7, 1, 1, O_);
-    px(g, 15 + (f ? 1 : 0), 14, 5, 3, O_); px(g, 16 + (f ? 1 : 0), 15, 3, 1, '#e8c8b8'); px(g, 5, 14, 4, 3, O_); }, // 큰 앞발
-  lime(g, f) { ell(g, 11, 14, 20, 16, O_); ell(g, 11, 14, 18, 14, '#e8eef4'); px(g, 9, 2, 4, 6, O_); px(g, 10, 3, 2, 6, '#cfe0f0'); px(g, 6, 11, 3, 3, '#ffffff');
-    px(g, 8, 15, 2, 2, O_); px(g, 14, 15, 2, 2, O_); px(g, 4, 19 + (f ? 1 : 0), 3, 2, '#3f7fd0'); }, // 뿌연 석회수, 염기성 방울
-  icepack(g, f) { px(g, 2, 5, 20, 16, O_); px(g, 3, 6, 18, 14, '#9fd8ff'); px(g, 3, 6, 18, 3, '#d8f0ff'); px(g, 11, 9, 2, 9, '#ffffff'); px(g, 7, 12, 10, 2, '#ffffff');
-    for (const [x, y] of [[8, 10], [15, 10], [8, 16], [15, 16]]) px(g, x, y, 1, 1, '#ffffff'); px(g, 6, f ? 0 : 1, 2, 3, '#e6f6ff'); px(g, 16, f ? 1 : 0, 2, 3, '#e6f6ff'); }, // 찬 김
-  fake(g, f) { px(g, 4, 6, 18, 14, O_); px(g, 5, 7, 16, 12, '#c0c8d0'); px(g, 8, 10, 3, 3, O_); px(g, 15, 10, 3, 3, O_); px(g, 9, 15, 8, 2, '#d9483b');
-    px(g, 12, 2, 2, 5, O_); ell(g, 13, 2, 5, 5, f ? '#ff5a3c' : '#ffd23f'); px(g, 7, 20, 3, 4, O_); px(g, 16, 20, 3, 4, O_); },
-  fake2(g, f) { px(g, 2, 3, 12, 9, O_); px(g, 3, 4, 10, 7, '#c0c8d0'); px(g, 5, 6, 2, 2, O_); px(g, 9, 6, 2, 2, O_); px(g, 6, 9, 4, 1, '#d9483b'); px(g, 4, 12, 2, 2, O_); px(g, 10, 12, 2, 2, O_); },
-  wind(g, f) { px(g, 12, 14, 4, 16, O_); px(g, 13, 15, 2, 14, '#d8dde3'); px(g, 6, 28, 16, 4, O_); px(g, 7, 29, 14, 2, '#5a6470'); const a0 = f ? 0.5 : 0;
-    for (let i = 0; i < 3; i++) { const a = a0 + i * 2.094; for (let r = 2; r < 12; r++) px(g, Math.round(14 + Math.cos(a) * r) - 1, Math.round(12 + Math.sin(a) * r) - 1, 3, 3, O_); }
-    for (let i = 0; i < 3; i++) { const a = a0 + i * 2.094; for (let r = 2; r < 11; r++) px(g, Math.round(14 + Math.cos(a) * r), Math.round(12 + Math.sin(a) * r), 1, 1, '#f4f8fb'); }
-    ell(g, 14, 12, 6, 6, O_); ell(g, 14, 12, 4, 4, '#7ee07e'); }, // 날개 3장
-  mosq(g, f) { ell(g, 8, f ? 4 : 6, 10, 6, 'rgba(220,235,255,0.8)'); ell(g, 14, f ? 4 : 6, 10, 6, 'rgba(220,235,255,0.8)'); ell(g, 10, 10, 14, 6, O_); ell(g, 10, 10, 12, 4, '#5a5a62');
-    for (const x of [6, 9, 12]) px(g, x, 9, 1, 3, '#c8c8d0'); ell(g, 17, 9, 6, 6, O_); ell(g, 17, 9, 4, 4, '#4a4a52'); px(g, 18, 8, 1, 1, '#ff5a3c'); px(g, 20, 10, 4, 1, O_);
-    for (const x of [7, 11, 14]) px(g, x, 12, 1, 5, O_); }, // 날개·긴 주둥이
-  cactus(g, f) { px(g, 7, 4, 8, 24, O_); px(g, 8, 5, 6, 23, '#4f9a3a'); px(g, 1, 6, 4, 8, O_); px(g, 1, 10, 7, 4, O_); px(g, 2, 7, 2, 7, '#4f9a3a'); px(g, 3, 11, 5, 2, '#4f9a3a');
-    px(g, 17, 9, 4, 9, O_); px(g, 14, 14, 7, 4, O_); px(g, 18, 10, 2, 7, '#4f9a3a'); px(g, 14, 15, 4, 2, '#4f9a3a');
-    for (const [x, y] of [[10, 8], [12, 13], [9, 18], [12, 22], [2, 9], [19, 12]]) px(g, x, y, 1, 1, '#f4f0d0'); ell(g, 11, 4, 6, 4, f ? '#ff7ab0' : '#ff5a8a');
-    px(g, 9, 10, 1, 2, O_); px(g, 12, 10, 1, 2, O_); px(g, 4, 28, 14, 2, '#b8935f'); }, // 가시로 변한 잎
-  bear(g, f) { for (const x of [7, 13, 23, 29]) px(g, x, 20 + (f && (x === 7 || x === 23) ? 1 : 0), 5, 8, O_); for (const x of [8, 14, 24, 30]) px(g, x, 21 + (f && (x === 8 || x === 24) ? 1 : 0), 3, 6, '#f4f4f0');
-    ell(g, 18, 15, 32, 18, O_); ell(g, 18, 15, 30, 16, '#f4f4f0'); ell(g, 16, 11, 14, 5, '#e4e4dc'); ell(g, 31, 11, 12, 11, O_); ell(g, 31, 11, 10, 9, '#ffffff');
-    px(g, 28, 5, 3, 3, O_); px(g, 35, 11, 3, 2, O_); px(g, 32, 9, 1, 1, O_); },
-  coal(g, f) { px(g, 2, 8, 26, 12, O_); px(g, 3, 9, 24, 10, '#6a4a2a'); px(g, 3, 9, 24, 2, '#8a6a3a'); const lumps = [[6, 7], [12, 6], [18, 7], [23, 8]];
-    for (const [x, y] of lumps) ell(g, x, y, 7, 6, O_); for (const [x, y] of lumps) ell(g, x, y, 5, 4, '#2a2520'); px(g, 11, 5, 2, 2, f ? '#ffd23f' : '#ff7a2a'); px(g, 20, 6, 2, 1, '#ff7a2a');
-    ell(g, 8, 21, 7, 7, O_); ell(g, 22, 21, 7, 7, O_); ell(g, 8, 21, 3, 3, '#8d96a3'); ell(g, 22, 21, 3, 3, '#8d96a3'); px(g, 9, 13, 3, 2, '#ffd23f'); px(g, 18, 13, 3, 2, '#ffd23f'); }, // 불씨가 남은 석탄
-});
-Object.assign(DRAW, {
-  hotiron(g, f) { px(g, 3, 5, 18, 13, O_); px(g, 4, 6, 16, 11, f ? '#e0603a' : '#d9483b'); for (const [x, y] of [[7, 9], [11, 12], [15, 9], [9, 14], [16, 14]]) px(g, x, y, 2, 2, '#5a5a62');
-    px(g, 8, 8, 2, 2, O_); px(g, 14, 8, 2, 2, O_); for (const x of [6, 12, 18]) px(g, x, f ? 0 : 1, 1, 3, '#ffb070'); }, // 철 가루가 든 손난로
-  mirror(g, f) { g.fillStyle = O_; g.beginPath(); g.moveTo(12, 0); g.lineTo(23, 12); g.lineTo(12, 23); g.lineTo(1, 12); g.fill(); g.fillStyle = '#bfe6ff'; g.beginPath(); g.moveTo(12, 2); g.lineTo(21, 12); g.lineTo(12, 21); g.lineTo(3, 12); g.fill();
-    g.fillStyle = '#f4fbff'; g.beginPath(); g.moveTo(12, 3); g.lineTo(17, 9); g.lineTo(9, 9); g.fill(); px(g, 9, 12, 2, 2, O_); px(g, 14, 12, 2, 2, O_); if (f) px(g, 18, 4, 2, 2, '#ffffff'); },
-  warmsea(g, f) { ell(g, 17, 13, 34, 18, O_); ell(g, 17, 13, 32, 16, '#3f8fd0'); ell(g, 17, 10, 26, 8, f ? '#ff9a4a' : '#ff7a2a'); for (const x of [6, 14, 22, 29]) px(g, x, 18 + (f ? 1 : 0), 3, 2, '#7fc8ff'); px(g, 12, 12, 2, 2, O_); px(g, 21, 12, 2, 2, O_); }, // 위가 따뜻한 해수층
-  dust(g, f) { for (let i = 0; i < 4; i++) { const y = 4 + i * 6, w = 24 - i * 5, x = 13 + Math.round(Math.sin(i * 1.4 + (f ? 1 : 0)) * 2); ell(g, x, y, w + 2, 7, O_); ell(g, x, y, w, 5, i % 2 ? '#d8b878' : '#c8a060'); }
-    px(g, 9, 5, 2, 2, O_); px(g, 15, 5, 2, 2, O_); for (let i = 0; i < 6; i++) px(g, (i * 7 + (f ? 3 : 0)) % 24, (i * 5) % 24, 1, 1, '#a88848'); },
-  fusion(g, f) { ell(g, 12, 12, 20, 20, O_); ell(g, 12, 12, 18, 18, '#ff7a2a'); ell(g, 12, 12, 12, 12, '#ffd23f'); ell(g, 12, 12, 6, 6, '#fff6c0'); const o = f ? 1 : 0;
-    for (const [x, y] of [[3, 3], [21, 3], [3, 21], [21, 21]]) { const X = x + (x < 12 ? o : -o), Y = y + (y < 12 ? o : -o); ell(g, X, Y, 6, 6, O_); ell(g, X, Y, 4, 4, '#ff5a8a'); } }, // 모여드는 수소 원자핵 4개
-  coil(g, f) { px(g, 5, 4, 16, 18, O_); px(g, 6, 5, 14, 16, '#5a6470'); for (let y = 6; y < 20; y += 3) px(g, 5, y, 16, 2, '#c87a3a'); px(g, 10, 10, 2, 2, '#7ee07e'); px(g, 15, 10, 2, 2, '#7ee07e');
-    px(g, 0, 8 + (f ? 1 : 0), 5, 8, O_); px(g, 1, 9 + (f ? 1 : 0), 3, 3, '#d9483b'); px(g, 1, 12 + (f ? 1 : 0), 3, 3, '#3f7fd0'); if (f) for (const [x, y] of [[22, 6], [24, 12], [22, 18]]) px(g, x, y, 2, 1, '#ffe08a'); }, // 구리 코일과 막대자석
-  steam(g, f) { for (const [x, y, w, h] of [[14, 12, 26, 14], [8, 9, 14, 12], [20, 8, 14, 12]]) ell(g, x, y, w, h, O_); for (const [x, y, w, h] of [[14, 12, 24, 12], [8, 9, 12, 10], [20, 8, 12, 10]]) ell(g, x, y, w, h, '#d8dde3');
-    px(g, 10, 11, 2, 2, O_); px(g, 17, 11, 2, 2, O_); for (const x of [6, 13, 20]) px(g, x, f ? 0 : 1, 1, 3, '#ff9a6a'); },
-  virus(g, f) { for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + (f ? 0.2 : 0); px(g, Math.round(12 + Math.cos(a) * 10) - 1, Math.round(12 + Math.sin(a) * 10) - 1, 3, 3, '#e05a8a'); }
-    ell(g, 12, 12, 16, 16, O_); ell(g, 12, 12, 14, 14, '#a86ad8'); px(g, 9, 10, 2, 2, O_); px(g, 14, 10, 2, 2, O_); px(g, 10, 15, 4, 1, O_); }, // 표면 돌기(항원)
-  privacy(g, f) { px(g, 4, 5, 18, 15, O_); px(g, 5, 6, 16, 13, '#8a96a2'); ell(g, 13, 12, 10, 10, O_); ell(g, 13, 12, 8, 8, f ? '#7fc8ff' : '#3f7fd0'); ell(g, 13, 12, 3, 3, '#ffffff');
-    px(g, 12, 0, 2, 5, O_); px(g, 11, 0, 4, 2, '#ffd23f'); px(g, 7, 20, 3, 4, O_); px(g, 16, 20, 3, 4, O_); for (const y of [8, 11, 14]) px(g, 22, y + (f ? 1 : 0), 3, 1, '#7ee07e'); },
-  elnino(g, f) { for (let i = 0; i < 4; i++) { const y = 20 + i * 14; ell(g, 48, y, 96 - i * 6, 22, O_); ell(g, 48, y, 92 - i * 6, 18, i === 0 ? (f ? '#ff9a4a' : '#ff7a2a') : i % 2 ? '#3f8fd0' : '#2f6fb0'); }
-    for (let x = 6; x < 90; x += 12) px(g, x, 12 + ((x / 12 | 0) % 2 ? 2 : 0) + (f ? 1 : 0), 6, 3, '#e6f6ff'); px(g, 36, 34, 5, 4, O_); px(g, 56, 34, 5, 4, O_); }, // 위층이 따뜻한 파도
-  upwell(g, f) { ell(g, 46, 48, 90, 72, O_); ell(g, 46, 48, 86, 68, '#1f4f80'); for (let i = 0; i < 5; i++) px(g, 26 + i * 10, 20 + ((i + (f ? 1 : 0)) % 2) * 6, 4, 50, '#3f7fd0');
-    for (const [x, y] of [[30, 40], [56, 30], [44, 60]]) { ell(g, x, y, 14, 7, O_); ell(g, x, y, 12, 5, '#c3cad3'); px(g, x + 6, y - 1, 4, 3, '#c3cad3'); } px(g, 36, 24, 5, 4, '#ffd23f'); px(g, 54, 24, 5, 4, '#ffd23f'); }, // 차가운 심층수와 물고기
-  fusionb(g, f) { for (let i = 0; i < 12; i++) { const a = i * Math.PI / 6 + (f ? 0.26 : 0); px(g, Math.round(48 + Math.cos(a) * 44) - 3, Math.round(48 + Math.sin(a) * 44) - 3, 6, 6, '#ffb347'); }
-    ell(g, 48, 48, 80, 80, O_); ell(g, 48, 48, 76, 76, '#ff7a2a'); ell(g, 48, 48, 56, 56, '#ffb347'); ell(g, 48, 48, 32, 32, '#ffe08a'); for (const [x, y] of [[38, 40], [58, 40], [48, 56], [48, 30]]) ell(g, x, y, 8, 8, '#fff6c0');
-    px(g, 38, 46, 5, 4, O_); px(g, 55, 46, 5, 4, O_); },
-  fuelcell(g, f) { px(g, 14, 10, 60, 70, O_); for (let i = 0; i < 7; i++) px(g, 16, 12 + i * 10, 56, 8, i % 2 ? '#5a6470' : '#8d96a3'); px(g, 0, 30, 14, 40, O_); px(g, 2, 32, 10, 36, '#e6f6ff'); px(g, 74, 30, 14, 40, O_); px(g, 76, 32, 10, 36, '#d9483b');
-    for (const x of [30, 44, 58]) ell(g, x, 84, 6 + (f ? 2 : 0), 4, '#7fc8ff'); px(g, 32, 40, 6, 4, '#7ee07e'); px(g, 50, 40, 6, 4, '#7ee07e'); }, // 수소통(흰색)·산소통(빨간색)·생성된 물
-  meter(g, f) { px(g, 4, 10, 76, 76, O_); px(g, 6, 12, 72, 72, '#3a3f46'); ell(g, 42, 46, 60, 60, O_); ell(g, 42, 46, 56, 56, '#f4f0d0');
-    for (let i = 0; i < 9; i++) { const a = Math.PI * (0.8 + i * 0.175); px(g, Math.round(42 + Math.cos(a) * 24), Math.round(46 + Math.sin(a) * 24), 2, 2, i < 3 ? '#d9483b' : i < 6 ? '#ffd23f' : '#7ee07e'); }
-    const a = Math.PI * (f ? 1.15 : 1.35); g.strokeStyle = O_; g.lineWidth = 2; g.beginPath(); g.moveTo(42, 46); g.lineTo(42 + Math.cos(a) * 20, 46 + Math.sin(a) * 20); g.stroke(); ell(g, 42, 46, 6, 6, O_);
-    px(g, 22, 70, 40, 8, O_); px(g, 24, 72, 36, 4, '#7ee07e'); px(g, 30, 0, 24, 12, O_); px(g, 32, 2, 20, 8, '#ffd23f'); }, // 효율 눈금
-  pathogen(g, f) { for (const [x, y, r, c] of [[46, 44, 40, '#a86ad8'], [24, 30, 22, '#7ab84a'], [70, 32, 22, '#e05a8a'], [30, 62, 20, '#a86ad8'], [64, 62, 22, '#7ab84a']]) {
-      for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 + (f ? 0.2 : 0); px(g, Math.round(x + Math.cos(a) * (r / 2 + 3)) - 1, Math.round(y + Math.sin(a) * (r / 2 + 3)) - 1, 3, 3, O_); }
-      ell(g, x, y, r + 2, r + 2, O_); ell(g, x, y, r, r, c); } px(g, 40, 40, 4, 4, O_); px(g, 50, 40, 4, 4, O_); },
-  ethics(g, f) { px(g, 4, 4, 88, 60, O_); px(g, 7, 7, 82, 54, '#1f2a3a'); px(g, 46, 14, 4, 36, '#e6dcc6'); px(g, 24, 16, 48, 3, '#e6dcc6');
-    for (const x of [24, 72]) { px(g, x - 1, 19, 2, 10, '#e6dcc6'); ell(g, x, 32 + (x === 24 ? (f ? 2 : -2) : (f ? -2 : 2)), 18, 6, '#ffd23f'); } px(g, 36, 50, 24, 4, '#e6dcc6');
-    px(g, 38, 64, 20, 8, O_); px(g, 20, 72, 56, 6, O_); px(g, 22, 73, 52, 4, '#5a6470'); }, // 화면 속 저울
-});
-const SIZE = { hotiron: [24, 20], mirror: [24, 24], warmsea: [34, 22], dust: [26, 26], fusion: [24, 24], coil: [26, 26], steam: [28, 22], virus: [24, 24], privacy: [26, 24],
-  elnino: [96, 80], upwell: [92, 84], fusionb: [96, 96], fuelcell: [88, 88], meter: [84, 90], pathogen: [92, 84], ethics: [96, 80], eury: [30, 18], ptero: [32, 20], snake: [30, 14], mole: [26, 18], lime: [22, 22], icepack: [24, 22], fake: [26, 24], fake2: [16, 14], wind: [28, 32], mosq: [24, 18], cactus: [22, 30], bear: [38, 28], coal: [30, 24], greenhouse: [96, 80], sandstorm: [92, 88], glacier: [100, 72], boiler: [88, 92], conduct: [28, 20], convect: [26, 30], radiate: [24, 30], methane: [22, 24], fox: [28, 20], snow: [34, 26], dome: [100, 70], vortex: [96, 90], trilo: [96, 60], finch: [90, 56], frog: [88, 66], vine: [92, 88], neutral: [96, 84], cooler: [88, 84], turbine: [92, 92], solar: [100, 90], rat: [22, 16], leaf: [24, 18], spore: [26, 26], rust: [26, 24], acid: [22, 22], ember: [24, 22], fog: [32, 24], drone: [26, 20], bias: [26, 26], owl: [96, 80], furnace: [88, 92], ai: [100, 74] };
 function sprFor(e) {
-  if (e.kind === 'tri') return SPR.tri[e.ph % 2];
-  if (e.kind === 'amm') return SPR.amm[0];
-  if (e.kind === 'mam') return SPR.mam[(e.st === 'walk' || e.st === 'charge') ? (e.ph >> (e.st === 'charge' ? 0 : 1)) % 2 : 0];
   return SPR[e.kind][(e.ph >> 1) % 2];
 }
 const SPR = {};
 function buildSprites() {
-  for (const k in DRAW) SPR[k] = [0, 1].map(f => sprite(SIZE[k][0], SIZE[k][1], g => DRAW[k](g, f)));
-  SPR.hawk = [0, 1].map(f => sprite(22, 14, g => drawHawk(g, f)));
-  SPR.tiger = [0, 1].map(f => sprite(36, 22, g => drawTiger(g, f)));
-  SPR.human = { idle: [0, 1].map(p => sprite(34, 40, g => drawHero(g, p, false, HUMAN_LOOK))) };
   { const AL = { hawk0: [0, 0, 32, 32], hawk1: [33, 0, 32, 14], tiger0: [66, 0, 49, 26], tiger1: [116, 0, 48, 26], human0: [165, 0, 29, 37], human1: [195, 0, 29, 33] }, aimg = new Image();
     aimg.onload = () => { const f = k => { const [sx, sy, w, h] = AL[k]; return sprite(w, h, g => g.drawImage(aimg, sx, sy, w, h, 0, 0, w, h), true); };
       SPR.hawk = [f('hawk0'), f('hawk1')]; SPR.tiger = [f('tiger0'), f('tiger1')]; SPR.human = { idle: [f('human0'), f('human1')] }; };
-    aimg.src = 'allies.png'; }
+    loadImg(aimg, 'allies.png'); }
   SPR.hero = {};
   const HCW = 47, HCH = 57, HORDER = ['driver', 'geo', 'eco', 'chem', 'weather', 'medic'], heroImg = new Image();
   heroImg.onload = () => { HORDER.forEach((k, i) => { if (!JOBS[k]) return; const fr = r => sprite(HCW, HCH, g => g.drawImage(heroImg, i * HCW, r * HCH, HCW, HCH, 0, 0, HCW, HCH), true);
       const f0 = fr(0), f1 = fr(1), f2 = fr(2); SPR.hero[k] = { idle: [f0, f0], walk: [f1, f0, f2, f0] }; });
     document.querySelectorAll('#jobs canvas').forEach(cv => { const k = cv.dataset.k; if (!SPR.hero[k]) return; cv.width = HCW; cv.height = HCH; const g = cv.getContext('2d'); g.clearRect(0, 0, HCW, HCH); g.drawImage(SPR.hero[k].idle[0].c, 0, 0); }); };
-  heroImg.src = 'heroes.png'; // 불러오기 전까지는 아래 그림을 쓴다
-  for (const k in JOBS) SPR.hero[k] = { idle: [0, 1].map(p => sprite(34, 40, g => drawHero(g, p, false, JOBS[k].look))), walk: [0, 1, 2, 3].map(p => sprite(34, 40, g => drawHero(g, p, true, JOBS[k].look))) };
-  SPR.tri = [0, 1].map(f => sprite(22, 16, g => drawTri(g, f)));
-  SPR.amm = [sprite(30, 30, drawAmm)];
-  SPR.mam = [0, 1].map(f => sprite(96, 84, g => drawMam(g, f)));
-  SPR.hammer = sprite(20, 8, drawHammer);
-  SPR.sling = sprite(20, 8, drawSling);
+  loadImg(heroImg, 'heroes.png');
   SPR.wf = {};
-  for (const k in WDRAW) SPR.wf[k] = weaponFrames(WDRAW[k]);
   if (typeof MONSTER_ATLAS !== 'undefined') { const mimg = new Image();
     mimg.onload = () => { for (const k in MONSTER_ATLAS) { const D = EDEF[k]; if (!D) continue; const [sx, sy, w, h] = MONSTER_ATLAS[k], m = D.boss ? 2 : 1, W2 = w * m, H2 = h * m;
         const sp = sprite(W2, H2, g => { g.imageSmoothingEnabled = false; g.drawImage(mimg, sx, sy, w, h, 0, 0, W2, H2); }, true);
         SPR[k] = [sp, sp]; // 움직임은 출렁임으로
         D.w = W2; D.h = H2; D.bw = Math.max(14, Math.round(W2 * 0.7)); } // 그림 크기에 맞춘 몸 판정
       for (const e of enemies || []) { const D = EDEF[e.kind]; e.w = D.w; e.h = D.h; e.bw = D.bw; } };
-    mimg.src = 'monsters.png'; }
+    loadImg(mimg, 'monsters.png'); }
   SPR.wi = {};
   if (typeof WEAPON_ATLAS !== 'undefined') { const wimg = new Image();
     wimg.onload = () => { const N = 100;
@@ -384,94 +113,11 @@ function buildSprites() {
         SPR.wi[k] = sprite(w, h, g => g.drawImage(wimg, sx, sy, w, h, 0, 0, w, h), true);
         const fr = {}; for (let i = -4; i <= 4; i++) fr[i] = sprite(N, N, g => { g.imageSmoothingEnabled = false; g.translate(N / 2, N / 2); g.rotate(i * WSTEP); g.drawImage(wimg, sx, sy, w, h, -gx, -gy, w, h); }, true);
         SPR.wf[k] = fr; WEAP[k].len = Math.max(8, w - gx - 2); } }; // 총구: 쥐는 곳에서 그림 끝까지
-    wimg.src = 'weapons.png'; }
+    loadImg(wimg, 'weapons.png'); }
 }
-// 무기 방향별 그림: 그림을 회전시키지 않고(도트가 깨짐) 22.5° 간격마다 도트로 따로 그린다.
+// 무기 방향별 그림: weapons.png를 22.5° 간격으로 미리 돌려 둔다.
 // 오른쪽 반(-90°~+90°) 9장만 그리고 왼쪽은 좌우 뒤집기로 쓴다. 손잡이(축)는 그림 가운데(20,20)
 const WSTEP = Math.PI / 8, WC = 20;
-function weaponFrames(drawAt) { const fr = {}; for (let k = -4; k <= 4; k++) { const a = k * WSTEP; fr[k] = sprite(40, 40, g => drawAt(g, Math.cos(a), Math.sin(a))); } return fr; }
-function stroke(g, x0, y0, ux, uy, len, w, col) {
-  g.fillStyle = col; const o = (w - 1) / 2;
-  for (let t = 0; t <= len; t += 0.5) g.fillRect(Math.round(x0 + ux * t - o), Math.round(y0 + uy * t - o), w, w);
-}
-function drawHammerAt(g, ux, uy) {
-  stroke(g, WC, WC, ux, uy, 11, 4, '#1a1512'); stroke(g, WC, WC, ux, uy, 11, 2, '#8a5a2e');
-  const hx = Math.round(WC + ux * 13), hy = Math.round(WC + uy * 13);
-  px(g, hx - 4, hy - 4, 9, 9, '#1a1512'); px(g, hx - 3, hy - 3, 7, 7, '#8d96a3'); px(g, hx - 3, hy - 3, 7, 2, '#c3cad3');
-}
-function drawSlingAt(g, ux, uy) {
-  const vx = -uy, vy = ux;
-  stroke(g, WC, WC, ux, uy, 8, 4, '#1a1512'); stroke(g, WC, WC, ux, uy, 8, 2, '#8a5a2e');
-  const bx = WC + ux * 8, by = WC + uy * 8;
-  for (const s of [1, -1]) { const dx = ux * 0.8 + vx * s * 0.6, dy = uy * 0.8 + vy * s * 0.6, l = Math.hypot(dx, dy);
-    stroke(g, bx, by, dx / l, dy / l, 7, 4, '#1a1512'); stroke(g, bx, by, dx / l, dy / l, 7, 2, '#a06a38'); }
-  const t1x = bx + (ux * 0.8 + vx * 0.6) / 1.0 * 7, t1y = by + (uy * 0.8 + vy * 0.6) * 7, t2x = bx + (ux * 0.8 - vx * 0.6) * 7, t2y = by + (uy * 0.8 - vy * 0.6) * 7;
-  const n = Math.max(Math.abs(t2x - t1x), Math.abs(t2y - t1y)); g.fillStyle = '#d9483b';
-  for (let i = 0; i <= n; i++) g.fillRect(Math.round(t1x + (t2x - t1x) * i / n), Math.round(t1y + (t2y - t1y) * i / n), 1, 1);
-}
-// 나머지 무기의 방향별 그림: 손잡이(가운데)에서 조준 방향(ux, uy)으로 뻗는다. vx, vy는 옆 방향
-function bar(g, len, w, col, ux, uy, from) { const s = from || 0; stroke(g, WC + ux * s, WC + uy * s, ux, uy, len, w + 2, '#1a1512'); stroke(g, WC + ux * s, WC + uy * s, ux, uy, len, w, col); }
-function blob(g, ux, uy, at, w, h, col) { const x = Math.round(WC + ux * at), y = Math.round(WC + uy * at); px(g, x - (w >> 1) - 1, y - (h >> 1) - 1, w + 2, h + 2, '#1a1512'); px(g, x - (w >> 1), y - (h >> 1), w, h, col); }
-const WDRAW = {
-  hammer: drawHammerAt, sling: drawSlingAt,
-  nail(g, ux, uy) { bar(g, 13, 4, '#7d8794', ux, uy); bar(g, 4, 2, '#3a3f46', ux, uy, 13); blob(g, ux, uy, 4, 4, 4, '#5a6470'); },
-  umbrella(g, ux, uy) { bar(g, 10, 2, '#8a5a2e', ux, uy); const vx = -uy, vy = ux, cx = WC + ux * 12, cy = WC + uy * 12;
-    stroke(g, cx - vx * 9, cy - vy * 9, vx, vy, 18, 5, '#1a1512'); stroke(g, cx - vx * 8, cy - vy * 8, vx, vy, 16, 3, '#d9483b'); stroke(g, cx - vx * 3, cy - vy * 3, vx, vy, 6, 3, '#f3ead7'); },
-  ladle(g, ux, uy) { bar(g, 11, 2, '#c3cad3', ux, uy); const x = Math.round(WC + ux * 14), y = Math.round(WC + uy * 14); ell(g, x, y, 9, 9, '#1a1512'); ell(g, x, y, 7, 7, '#c3cad3'); ell(g, x, y, 3, 3, '#8d96a3'); },
-  rod(g, ux, uy) { bar(g, 18, 3, '#6a7480', ux, uy); bar(g, 4, 3, '#8a5a2e', ux, uy); blob(g, ux, uy, 18, 3, 3, '#c3cad3'); },
-  base(g, ux, uy) { bar(g, 8, 6, '#f4f4f0', ux, uy); bar(g, 7, 2, '#8d96a3', ux, uy, 8); blob(g, ux, uy, 3, 3, 3, '#5fb8ff'); },
-  reduct(g, ux, uy) { bar(g, 8, 5, '#6a8a5a', ux, uy); bar(g, 8, 1, '#c3cad3', ux, uy, 8); blob(g, ux, uy, 3, 3, 3, '#9ad08a'); },
-  pack(g, ux, uy) { bar(g, 6, 5, '#3f7fd0', ux, uy); bar(g, 6, 5, '#d9483b', ux, uy, 6); bar(g, 3, 3, '#3a3f46', ux, uy, 12); },
-  beam(g, ux, uy) { bar(g, 16, 2, '#8d96a3', ux, uy); blob(g, ux, uy, 17, 4, 4, '#fff6a0'); },
-  pistol(g, ux, uy) { bar(g, 10, 4, '#3a3f46', ux, uy, 2); blob(g, ux, uy, 3, 3, 4, '#5a3a22'); },
-  revolver(g, ux, uy) { bar(g, 12, 3, '#8d96a3', ux, uy, 2); blob(g, ux, uy, 5, 5, 5, '#5a6470'); blob(g, ux, uy, 2, 3, 4, '#7a4a22'); },
-  smg(g, ux, uy) { bar(g, 11, 5, '#2a2a30', ux, uy, 1); bar(g, 3, 2, '#3a3f46', ux, uy, 12); const vx = -uy, vy = ux; stroke(g, WC + ux * 6 + vx * 2, WC + uy * 6 + vy * 2, vx, vy, 5, 2, '#5a6470'); },
-  shotgun(g, ux, uy) { bar(g, 6, 4, '#7a4a22', ux, uy, -2); bar(g, 12, 3, '#3a3f46', ux, uy, 4); bar(g, 6, 3, '#8a5a2e', ux, uy, 7); },
-  rifle(g, ux, uy) { bar(g, 5, 4, '#2a2a30', ux, uy, -3); bar(g, 12, 4, '#3a3f46', ux, uy, 2); bar(g, 4, 2, '#2a2a30', ux, uy, 14); const vx = -uy, vy = ux; stroke(g, WC + ux * 7 + vx * 2, WC + uy * 7 + vy * 2, vx, vy, 4, 2, '#5a6470'); },
-  sniper(g, ux, uy) { bar(g, 5, 4, '#5a4a32', ux, uy, -3); bar(g, 18, 3, '#3a3f2a', ux, uy, 2); const vx = -uy, vy = ux; stroke(g, WC + ux * 4 - vx * 3, WC + uy * 4 - vy * 3, ux, uy, 6, 2, '#1a1512'); },
-  lmg(g, ux, uy) { bar(g, 17, 5, '#2a2a30', ux, uy); const vx = -uy, vy = ux; blob(g, ux, uy, 6, 6, 6, '#5a6a3a'); stroke(g, WC + ux * 12 + vx * 2, WC + uy * 12 + vy * 2, vx, vy, 3, 1, '#8d96a3'); },
-  rocket(g, ux, uy) { bar(g, 16, 6, '#5a6a3a', ux, uy, -2); bar(g, 3, 6, '#3a3f2a', ux, uy, 13); blob(g, ux, uy, 2, 4, 4, '#3a3f46'); blob(g, ux, uy, 15, 3, 3, '#ff7a2a'); },
-  grenade(g, ux, uy) { bar(g, 11, 6, '#4a4a3a', ux, uy); bar(g, 4, 4, '#2a2a22', ux, uy, 11); blob(g, ux, uy, 6, 5, 5, '#6a7a4a'); },
-  baton(g, ux, uy) { bar(g, 6, 3, '#2a2a30', ux, uy); bar(g, 10, 3, '#3f7fd0', ux, uy, 6); blob(g, ux, uy, 16, 3, 3, '#9fd8ff'); },
-  saw(g, ux, uy) { bar(g, 8, 3, '#d9483b', ux, uy); const x = Math.round(WC + ux * 13), y = Math.round(WC + uy * 13); ell(g, x, y, 13, 13, '#1a1512'); ell(g, x, y, 11, 11, '#c3cad3'); ell(g, x, y, 4, 4, '#3a3f46');
-    for (let i = 0; i < 8; i++) { const a = i / 8 * Math.PI * 2; px(g, Math.round(x + Math.cos(a) * 6), Math.round(y + Math.sin(a) * 6), 1, 1, '#1a1512'); } },
-  plasma(g, ux, uy) { bar(g, 7, 4, '#3a3f46', ux, uy); bar(g, 3, 2, '#8d96a3', ux, uy, 7); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 10, 3, '#7fd8ff'); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 10, 1, '#ffffff'); }, // 손잡이 끝에서 뿜는 파란 플라스마
-  meteor(g, ux, uy) { bar(g, 12, 2, '#5a3a22', ux, uy); const x = Math.round(WC + ux * 15), y = Math.round(WC + uy * 15); ell(g, x, y, 11, 11, '#1a1512'); ell(g, x, y, 9, 9, '#5a4a3a'); px(g, x - 2, y - 2, 2, 2, '#ff7a2a'); px(g, x + 1, y + 1, 2, 1, '#ffb347'); }, // 달아오른 운석 머리
-  magnet(g, ux, uy) { bar(g, 10, 2, '#8d96a3', ux, uy); const vx = -uy, vy = ux, cx = WC + ux * 14, cy = WC + uy * 14;
-    stroke(g, cx - vx * 5, cy - vy * 5, ux, uy, 5, 3, '#d9483b'); stroke(g, cx + vx * 5, cy + vy * 5, ux, uy, 5, 3, '#3f7fd0'); stroke(g, cx - vx * 5, cy - vy * 5, vx, vy, 10, 3, '#8d96a3'); }, // 빨강·파랑 극이 있는 말굽 전자석
-  sonic(g, ux, uy) { bar(g, 6, 3, '#2a2a30', ux, uy); stroke(g, WC + ux * 6, WC + uy * 6, ux, uy, 13, 3, '#c3cad3'); const vx = -uy, vy = ux; px(g, Math.round(WC + ux * 12 + vx * 3), Math.round(WC + uy * 12 + vy * 3), 1, 1, '#9fd8ff'); px(g, Math.round(WC + ux * 15 - vx * 3), Math.round(WC + uy * 15 - vy * 3), 1, 1, '#9fd8ff'); }, // 떨리는 칼날
-  saber(g, ux, uy) { bar(g, 5, 3, '#3a3f46', ux, uy); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 4, '#ff6ad5'); stroke(g, WC + ux * 5, WC + uy * 5, ux, uy, 14, 2, '#ffe6f8'); },
-  watergun(g, ux, uy) { bar(g, 9, 5, '#3f9fe0', ux, uy); bar(g, 3, 2, '#ffd23f', ux, uy, 9); blob(g, ux, uy, 2, 4, 4, '#f0b429'); }, // 파란 장난감 물총
-  rubber(g, ux, uy) { bar(g, 11, 2, '#c8a070', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 11 - vx * 2, WC + uy * 11 - vy * 2, vx, vy, 4, 1, '#d9483b'); }, // 나무젓가락과 고무줄
-  dart(g, ux, uy) { bar(g, 7, 2, '#3a3f46', ux, uy, 2); stroke(g, WC + ux * 9, WC + uy * 9, ux, uy, 3, 1, '#c3cad3'); blob(g, ux, uy, 1, 3, 3, '#ffd23f'); }, // 깃 달린 다트
-  bb(g, ux, uy) { bar(g, 10, 4, '#4a6a3a', ux, uy, 1); bar(g, 3, 2, '#2a2a30', ux, uy, 11); blob(g, ux, uy, 2, 3, 4, '#f0b429'); }, // 장난감 비비탄총
-  straw(g, ux, uy) { bar(g, 14, 2, '#f4f4f0', ux, uy); stroke(g, WC + ux * 4, WC + uy * 4, ux, uy, 3, 2, '#d9483b'); stroke(g, WC + ux * 10, WC + uy * 10, ux, uy, 2, 2, '#d9483b'); }, // 줄무늬 빨대
-  paint(g, ux, uy) { bar(g, 11, 4, '#3a3f46', ux, uy, 1); blob(g, ux, uy, 6, 5, 5, '#ff6ad5'); }, // 위에 페인트 통
-  crossbow(g, ux, uy) { bar(g, 12, 3, '#8a5a2e', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 10 - vx * 6, WC + uy * 10 - vy * 6, vx, vy, 12, 2, '#5a3a22'); stroke(g, WC + ux * 3, WC + uy * 3, ux, uy, 12, 1, '#c3cad3'); }, // 활대와 화살
-  tennis(g, ux, uy) { bar(g, 12, 6, '#2e4470', ux, uy); blob(g, ux, uy, 13, 4, 4, '#d8f04a'); }, // 발사관 끝에 공
-  extinguisher(g, ux, uy) { bar(g, 8, 7, '#d9483b', ux, uy, -1); bar(g, 6, 2, '#2a2a30', ux, uy, 8); blob(g, ux, uy, 0, 4, 3, '#c3cad3'); }, // 빨간 소화기
-  mop(g, ux, uy) { bar(g, 16, 2, '#8a5a2e', ux, uy); const vx = -uy, vy = ux; stroke(g, WC + ux * 17 - vx * 5, WC + uy * 17 - vy * 5, vx, vy, 10, 4, '#e8e0c8'); }, // 막대 끝 걸레
-  broom(g, ux, uy) { bar(g, 14, 2, '#c8a070', ux, uy); const vx = -uy, vy = ux; for (let i = -3; i <= 3; i++) stroke(g, WC + ux * 15 + vx * i, WC + uy * 15 + vy * i, ux, uy, 4, 1, i % 2 ? '#b8935f' : '#d8b878'); }, // 싸리비
-  ruler(g, ux, uy) { bar(g, 18, 2, '#c3cad3', ux, uy); g.fillStyle = '#3a3f46'; for (let t = 3; t < 18; t += 3) g.fillRect(Math.round(WC + ux * t), Math.round(WC + uy * t), 1, 1); }, // 눈금 있는 쇠자
-  flashlight(g, ux, uy) { bar(g, 9, 4, '#3a3f46', ux, uy); blob(g, ux, uy, 11, 5, 5, '#5a6470'); blob(g, ux, uy, 13, 3, 3, '#fff6a0'); }, // 손전등
-  shovel(g, ux, uy) { bar(g, 13, 2, '#8a5a2e', ux, uy); const x = Math.round(WC + ux * 16), y = Math.round(WC + uy * 16); ell(g, x, y, 9, 9, '#1a1512'); ell(g, x, y, 7, 7, '#8d96a3'); }, // 삽날
-  pan(g, ux, uy) { bar(g, 8, 2, '#2a2a30', ux, uy); const x = Math.round(WC + ux * 14), y = Math.round(WC + uy * 14); ell(g, x, y, 13, 13, '#1a1512'); ell(g, x, y, 11, 11, '#3a3f46'); ell(g, x, y, 7, 7, '#5a6470'); }, // 프라이팬
-  wrench(g, ux, uy) { bar(g, 11, 3, '#8d96a3', ux, uy); const vx = -uy, vy = ux; blob(g, ux, uy, 13, 6, 6, '#8d96a3'); px(g, Math.round(WC + ux * 14 + vx), Math.round(WC + uy * 14 + vy), 2, 2, '#1a1512'); }, // 몽키 스패너
-  steelpipe(g, ux, uy) { bar(g, 18, 3, '#6a7480', ux, uy); blob(g, ux, uy, 18, 4, 4, '#5a6470'); }, // 쇠파이프
-  bat(g, ux, uy) { bar(g, 6, 2, '#5a3a22', ux, uy); bar(g, 12, 4, '#c8a070', ux, uy, 6); }, // 손잡이가 가는 나무 방망이
-  rail(g, ux, uy) { bar(g, 6, 5, '#2a2a30', ux, uy, -2); const vx = -uy, vy = ux; stroke(g, WC + ux * 3 + vx * 2, WC + uy * 3 + vy * 2, ux, uy, 16, 2, '#8d96a3'); stroke(g, WC + ux * 3 - vx * 2, WC + uy * 3 - vy * 2, ux, uy, 16, 2, '#8d96a3');
-    stroke(g, WC + ux * 4, WC + uy * 4, ux, uy, 13, 1, '#7fd8ff'); blob(g, ux, uy, 2, 4, 4, '#3f7fd0'); }, // 레일 두 줄 사이로 전류
-  nitro(g, ux, uy) { bar(g, 9, 7, '#c3cad3', ux, uy, -1); bar(g, 2, 7, '#8d96a3', ux, uy, 3); bar(g, 7, 2, '#8d96a3', ux, uy, 8); blob(g, ux, uy, 15, 3, 3, '#e6f6ff'); }, // 은빛 보온통과 노즐
-  tesla(g, ux, uy) { bar(g, 7, 4, '#5a3a22', ux, uy); const vx = -uy, vy = ux; g.fillStyle = '#c8783a';
-    for (let t = 6; t < 13; t += 2) g.fillRect(Math.round(WC + ux * t - vx * 2), Math.round(WC + uy * t - vy * 2), 1, 5);
-    const x = Math.round(WC + ux * 15), y = Math.round(WC + uy * 15); ell(g, x, y, 7, 7, '#1a1512'); ell(g, x, y, 5, 5, '#c3cad3'); px(g, x, y - 1, 1, 1, '#ffffff'); }, // 감은 코일과 위의 둥근 방전구
-  quake(g, ux, uy) { bar(g, 12, 3, '#6a7480', ux, uy); const x = Math.round(WC + ux * 13), y = Math.round(WC + uy * 13); px(g, x - 4, y - 3, 9, 7, '#1a1512'); px(g, x - 3, y - 2, 7, 5, '#8a6a3a'); px(g, x - 3, y + 1, 7, 1, '#5a4a32'); }, // 쇠막대 끝의 무거운 진동추
-  lens(g, ux, uy) { bar(g, 9, 2, '#8a5a2e', ux, uy); const vx = -uy, vy = ux, cx = WC + ux * 14, cy = WC + uy * 14;
-    stroke(g, cx - vx * 6, cy - vy * 6, vx, vy, 13, 5, '#1a1512'); stroke(g, cx - vx * 5, cy - vy * 5, vx, vy, 11, 3, '#bfe6ff'); stroke(g, cx - vx * 2, cy - vy * 2, vx, vy, 3, 1, '#ffffff'); }, // 손잡이 달린 볼록 렌즈
-  coil(g, ux, uy) { bar(g, 12, 6, '#c8783a', ux, uy); const vx = -uy, vy = ux; g.fillStyle = '#7a4a1e';
-    for (let t = 3; t < 12; t += 3) g.fillRect(Math.round(WC + ux * t - vx * 3), Math.round(WC + uy * t - vy * 3), 1, 1), g.fillRect(Math.round(WC + ux * t + vx * 3), Math.round(WC + uy * t + vy * 3), 1, 1);
-    blob(g, ux, uy, 13, 3, 3, '#ffd23f'); },
-};
 // 조준 각도 → 그릴 그림 번호(k)와 좌우 뒤집기, 실제 그려지는 방향(총구 위치 계산용)
 function weaponPose(a) {
   const flip = Math.cos(a) < 0, am = flip ? Math.PI - a : a;
@@ -680,20 +326,7 @@ function randomWeapon(minR) {
 const CRIT = 0.05; // 치명타 확률 (2026-10-26 교사 요청: 15% → 5%)
 const KNOCK = { tri: 520, amm: 380 }; // 망치 넉백 초기 속도(도트/초), 보스는 밀리지 않음
 const EDEF = {
-  tri: { hp: 6, bw: 18, bh: 8, w: 22, h: 16 },
-  amm: { hp: 14, bw: 24, bh: 10, w: 30, h: 30 },
-  eury: { hp: 18, bw: 24, bh: 9, w: 30, h: 18, ai: 'charge', speed: 1.8, lunge: 9, tell: 0.5, name: '바다전갈', desc: '바다전갈: 고생대 바다에 살던 절지동물. 고생대 말 대멸종 때 사라졌다' },
-  ptero: { hp: 10, bw: 22, bh: 9, w: 32, h: 20, ai: 'swoop', speed: 1.6, name: '익룡', desc: '익룡: 중생대 하늘을 날던 파충류. 중생대 말 대멸종 때 공룡과 함께 사라졌다' },
-  mam: { hp: 420, bw: 76, bh: 22, w: 96, h: 84, boss: true, name: '매머드' },
-  // 구역 2 지하 텃밭 마을 (통박사 초안 2절)
-  rat: { hp: 5, bw: 18, bh: 8, w: 22, h: 16, ai: 'charge', speed: 3.2, lunge: 11, tell: 0.4 },
-  leaf: { hp: 12, bw: 22, bh: 9, w: 24, h: 18, ai: 'shoot', fan: 5, spread: 0.2, bsp: 95, br: 5, cd: 2.2 },
   spore: { hp: 10, bw: 22, bh: 10, w: 26, h: 26, ai: 'spore', speed: 1.3 },
-  snake: { hp: 12, bw: 24, bh: 8, w: 30, h: 14, ai: 'charge', speed: 2.0, lunge: 14, tell: 0.45, name: '뱀', desc: '뱀: 쥐를 먹는 2차 소비자. 뱀이 사라지면 쥐가 늘어나 생태계 평형이 깨진다' },
-  mole: { hp: 12, bw: 20, bh: 9, w: 26, h: 18, ai: 'burrow', name: '두더지', desc: '두더지: 땅속에서 지렁이·곤충을 먹는 소비자. 땅을 파서 흙 속에 공기가 통하게 한다' },
-  owl: { hp: 460, bw: 60, bh: 20, w: 96, h: 80, boss: true, name: '포식자 여왕' },
-  // 구역 3 녹슨 침수 터널 (통박사 초안 3절)
-  rust: { hp: 14, bw: 22, bh: 10, w: 26, h: 24, ai: 'charge', speed: 2.0, lunge: 9, tell: 0.5 },
   acid: { hp: 10, bw: 20, bh: 9, w: 22, h: 22, ai: 'shoot', fan: 3, spread: 0.3, bsp: 100, br: 6, cd: 2.0, hz: 'acid' },
   ember: { hp: 10, bw: 20, bh: 9, w: 24, h: 22, ai: 'shoot', fan: 3, burst: true, bsp: 170, br: 5, cd: 2.4, tell: 0.6, hz: 'fire', near: 6, far: 11 },
   lime: { hp: 10, bw: 20, bh: 9, w: 22, h: 22, ai: 'shoot', fan: 3, spread: 0.3, bsp: 100, br: 6, cd: 2.0, hz: 'base', name: '석회수 거품', desc: '염기: 물에 녹아 수산화 이온(OH⁻)을 내놓는다. 산과 만나면 중화 반응이 일어난다' },
@@ -708,7 +341,6 @@ const EDEF = {
   wind: { hp: 16, bw: 20, bh: 9, w: 28, h: 32, ai: 'spiral', speed: 0.8, name: '풍력 날개 로봇', desc: '풍력 발전: 바람의 운동 에너지를 전기 에너지로 바꾼다' },
   ai: { hp: 540, bw: 90, bh: 20, w: 100, h: 74, boss: true, name: '관제 AI' },
   // 구역 5 폭염 열섬 환승역: 열이 이동하는 세 방식(전도·대류·복사), 문구는 통박사 점검안
-  conduct: { hp: 14, bw: 22, bh: 10, w: 28, h: 20, ai: 'charge', speed: 2.2, lunge: 10, tell: 0.5, name: '달궈진 맨홀 로봇', desc: '전도: 맞닿은 물체를 따라 열이 이동한다. 몸에 닿으면 화상을 입는다' },
   convect: { hp: 12, bw: 22, bh: 10, w: 26, h: 30, ai: 'convect', speed: 1.6, name: '대류 회오리', desc: '대류: 데워진 공기가 올라가고 찬 공기가 내려오며 열이 이동한다' },
   radiate: { hp: 12, bw: 20, bh: 9, w: 24, h: 30, ai: 'shoot', fan: 3, spread: 0.18, bsp: 120, br: 5, cd: 2.6, near: 6, far: 11, speed: 0.9, name: '복사열 램프', desc: '복사: 물질 없이 전자기파로 열이 이동한다. 장애물 뒤 그늘에서는 줄어든다' },
   mosq: { hp: 4, bw: 16, bh: 8, w: 24, h: 18, ai: 'charge', speed: 3.6, lunge: 12, tell: 0.3, name: '모기', desc: '모기: 기온이 오르면 사는 곳이 넓어져 감염병을 옮기는 범위도 넓어진다. 물리면 감염될 수 있다' },
@@ -718,11 +350,7 @@ const EDEF = {
   sandstorm: { hp: 500, bw: 76, bh: 22, w: 92, h: 88, boss: true, name: '사막화 모래 폭풍', desc: '사막화: 가뭄과 지나친 방목·벌목으로 땅이 메말라 사막이 넓어진다' },
   // 구역 6 영구 동토층 터널
   methane: { hp: 6, bw: 18, bh: 9, w: 22, h: 24, ai: 'bomb', speed: 1.6, name: '메테인 거품', desc: '메테인: 온실 기체. 영구 동토층이 녹으면 방출되어 온난화를 키운다. 연소하면 열이 나온다' },
-  fox: { hp: 9, bw: 22, bh: 9, w: 28, h: 20, ai: 'charge', speed: 3.4, lunge: 12, tell: 0.35, name: '북극여우', desc: '북극여우: 귀·주둥이가 작아 열이 덜 빠져나간다. 추위에 알맞게 자연선택된 형질이다' },
-  snow: { hp: 12, bw: 26, bh: 10, w: 34, h: 26, ai: 'snow', speed: 1.2, name: '눈구름', desc: '눈: 구름 속 수증기가 얼음 결정이 되어 내린다. 맞으면 몸이 빨리 식는다' },
-  bear: { hp: 30, bw: 30, bh: 12, w: 38, h: 28, ai: 'charge', speed: 1.6, lunge: 13, tell: 0.6, name: '북극곰', desc: '북극곰: 바다 위 얼음(해빙)에서 물범을 사냥한다. 해빙이 녹으면 사냥터를 잃는다' },
   coal: { hp: 16, bw: 26, bh: 10, w: 30, h: 24, ai: 'shoot', fan: 3, spread: 0.25, bsp: 110, br: 6, cd: 2.4, hz: 'fire', near: 5, far: 10, speed: 1.0, name: '석탄 수레', desc: '석탄: 고생대 식물이 땅속에 묻혀 만들어진 화석 연료다. 태우면 열과 이산화 탄소가 나온다' },
-  vortex: { hp: 540, bw: 80, bh: 22, w: 96, h: 90, boss: true, name: '극 소용돌이', desc: '극 소용돌이: 극지방 상공을 도는 찬 공기 흐름. 약해지면 찬 공기가 내려와 한파가 온다' },
   glacier: { hp: 560, bw: 86, bh: 22, w: 100, h: 72, boss: true, name: '녹는 빙하', desc: '빙하: 지구 온난화로 육지의 빙하가 녹아 바다로 흘러들면 해수면이 높아진다' },
   boiler: { hp: 520, bw: 70, bh: 22, w: 88, h: 92, boss: true, name: '화석 연료 보일러', desc: '화석 연료: 산소와 반응해 연소하면 열과 함께 이산화 탄소가 나와 지구 온난화를 키운다' },
   // 기말 범위 새 몬스터 9종·보스 7종 (통박사 기말_재구성안.md, 2026-10-28)
@@ -742,17 +370,12 @@ const EDEF = {
   meter: { hp: 520, bw: 76, bh: 22, w: 84, h: 90, boss: true, name: '에너지 효율 계량기', desc: '에너지 효율: 공급한 에너지 중 유용하게 쓰인 에너지의 비율이다. 나머지는 주로 열로 흩어진다' },
   pathogen: { hp: 520, bw: 80, bh: 22, w: 92, h: 84, boss: true, name: '병원체 변이 군집', desc: '감염병 진단: 중합 효소 연쇄 반응은 병원체의 유전 물질을 증폭해 종류를 정확히 밝힌다' },
   ethics: { hp: 540, bw: 86, bh: 22, w: 96, h: 80, boss: true, name: '데이터 윤리 심의 AI', desc: '과학 윤리: 빅데이터를 활용할 때는 개인 정보 보호와 공정성을 함께 따져야 한다' },
-  // 새 보스 8종 (통박사 초안 2026-10-27)
-  trilo: { hp: 440, bw: 80, bh: 22, w: 96, h: 60, boss: true, name: '고생대 삼엽충' },
-  finch: { hp: 420, bw: 70, bh: 20, w: 90, h: 56, boss: true, name: '섬 핀치 무리' },
-  frog: { hp: 460, bw: 70, bh: 22, w: 88, h: 66, boss: true, name: '연못 개구리' },
-  vine: { hp: 500, bw: 70, bh: 24, w: 92, h: 88, boss: true, name: '가시덩굴 군락' },
   neutral: { hp: 500, bw: 80, bh: 22, w: 96, h: 84, boss: true, name: '중화조 관리 장치' },
   cooler: { hp: 500, bw: 76, bh: 22, w: 88, h: 84, boss: true, name: '냉각 설비 관리기' },
   turbine: { hp: 540, bw: 80, bh: 22, w: 92, h: 92, boss: true, name: '터빈 발전기 관리기' },
   solar: { hp: 520, bw: 70, bh: 20, w: 100, h: 90, boss: true, name: '태양광 추적 어레이' },
 };
-const BOSS_IDLE = { mam: 'walk', owl: 'perch', furnace: 'walk', ai: 'idle', trilo: 'walk', finch: 'walk', frog: 'walk', vine: 'walk', neutral: 'walk', cooler: 'walk', turbine: 'walk', solar: 'walk', dome: 'walk', vortex: 'walk', greenhouse: 'walk', sandstorm: 'walk', glacier: 'walk', boiler: 'walk', elnino: 'walk', upwell: 'walk', fusionb: 'walk', fuelcell: 'walk', meter: 'walk', pathogen: 'walk', ethics: 'walk' };
+const BOSS_IDLE = { furnace: 'walk', ai: 'idle', neutral: 'walk', cooler: 'walk', turbine: 'walk', solar: 'walk', dome: 'walk', greenhouse: 'walk', sandstorm: 'walk', glacier: 'walk', boiler: 'walk', elnino: 'walk', upwell: 'walk', fusionb: 'walk', fuelcell: 'walk', meter: 'walk', pathogen: 'walk', ethics: 'walk' };
 // 구역마다 보스 3종 중 하나를 무작위로 (2026-10-27 교사 요청)
 const ZONE_BOSSES = [['neutral', 'cooler', 'furnace'], ['dome', 'greenhouse', 'glacier'], ['sandstorm', 'elnino', 'upwell'], ['turbine', 'solar', 'fusionb'], ['boiler', 'fuelcell', 'meter'], ['ai', 'pathogen', 'ethics']];
 // 구역 그림(벽·바닥·지형지물)은 예전 구역의 것을 빌려 쓴다: 중화조←녹슨 침수, 열돔←폭염, 해류←동토, 발전소·관제←지상 출구, 변전소←지층
@@ -1289,9 +912,9 @@ const DESC2 = {
   solar: '태양광 발전: 태양 전지는 빛에너지를 전기 에너지로 전환한다',
   ai: '인공지능: 자료를 바탕으로 판단하지만, 학습한 자료에 따라 한계가 있다',
 };
-for (const k in DESC2) EDEF[k].desc = DESC2[k];
-const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안개', drone: '정전 드론', bias: '편향 AI', spore: '곰팡이 포자', rust: '녹 덩어리', fake2: '가짜 정보 봇' }; // 이름이 비어 있던 몬스터
-for (const k in NAME2) EDEF[k].name = NAME2[k];
+for (const k in DESC2) if (EDEF[k]) EDEF[k].desc = DESC2[k];
+const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안개', drone: '정전 드론', bias: '편향 AI', spore: '곰팡이 포자', fake2: '가짜 정보 봇' }; // 이름이 비어 있던 몬스터
+for (const k in NAME2) if (EDEF[k]) EDEF[k].name = NAME2[k];
 function spawnEnemy(kind, x, y, room) {
   const ov = (ZONES[stage.zone].ov || {})[kind] || {}, nm = ov.name || EDEF[kind].name, ds = ov.desc || EDEF[kind].desc;
   // 처음 만난 몬스터 설명 줄은 띄우지 않는다(2026-10-28 교사 요청) // 처음 만난 적: 과학 설명
@@ -2011,18 +1634,13 @@ let clouds = [], dark = 0;
 // 모든 패턴은 「!」(patTell)로 먼저 예고하고, 끝나면 잠깐 쉰다. 과학 장치(약점)는 무기·장비 단계에서 붙인다
 // 패턴: fan 부채꼴 / ring 원형 / spin 회전 방사 / charge 돌진 / jump 점프 착지 / laser 레이저 줄 / rays 몸에서 뻗는 줄 / haz 웅덩이 / roots 바닥에서 솟음 / summon 졸개
 const BOSS2 = {
-  trilo: { move: 1.2, seq: [{ t: 'charge', sp: 13, bounce: 1 }, { t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2 }, { t: 'ring', n: 20, sp: 110, r: 7, rep: 2, slow: true }, { t: 'summon', kind: 'tri', n: 4 }, { t: 'roots', n: 5, near: true }] },
-  finch: { move: 1.8, seq: [{ t: 'fan', n: 7, spread: 0.14, sp: 115, r: 5, rep: 2 }, { t: 'fan', n: 3, spread: 0.3, sp: 90, r: 10, rep: 2 }, { t: 'charge', sp: 16, bounce: 0 }, { t: 'ring', n: 22, sp: 95, r: 7, rep: 2, gap: 2 }, { t: 'haz', hz: 'nutri', n: 3 }] },
-  frog: { move: 0.6, seq: [{ t: 'jump' }, { t: 'laser', n: 1, len: 300 }, { t: 'fan', n: 5, spread: 0.2, sp: 115, r: 7, rep: 2 }, { t: 'summon', kind: 'leaf', n: 3 }, { t: 'haz', hz: 'nutri', n: 4 }] },
-  vine: { move: 0, seq: [{ t: 'rays', n: 3 }, { t: 'ring', n: 24, sp: 100, r: 7, rep: 2 }, { t: 'roots', n: 4 }, { t: 'summon', kind: 'spore', n: 3 }, { t: 'spin', arms: 3, dur: 2.4, sp: 100, r: 6, spin: 1.8 }] },
   neutral: { move: 0.8, seq: [{ t: 'fan', n: 5, spread: 0.22, sp: 110, r: 7, rep: 2, hz: 'acid' }, { t: 'laser', n: 1, len: 360 }, { t: 'ring', n: 20, sp: 100, r: 7, rep: 2 }, { t: 'haz', hz: 'acid', n: 5 }] },
   cooler: { move: 0.9, seq: [{ t: 'fan', n: 5, spread: 0.2, sp: 110, r: 7, rep: 2, st: 'frost' }, { t: 'laser', n: 1, len: 340 }, { t: 'ring', n: 20, sp: 95, r: 7, rep: 2, st: 'heat' }, { t: 'fan', n: 2, spread: 0.6, sp: 70, r: 12, rep: 2 }, { t: 'haz', hz: 'frostT', n: 4 }] },
   turbine: { move: 0.5, seq: [{ t: 'spin', arms: 6, dur: 2.6, sp: 110, r: 6, spin: 2.6 }, { t: 'laser', n: 2, len: 380 }, { t: 'haz', hz: 'fire', n: 3 }, { t: 'roots', n: 3, near: true }, { t: 'ring', n: 26, sp: 120, r: 7, rep: 1 }] },
   dome: { move: 0.5, seq: [{ t: 'wave', kind: 'heat' }, { t: 'ring', n: 22, sp: 95, r: 7, rep: 2, st: 'heat' }, { t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2 }, { t: 'summon', kind: 'convect', n: 2 }, { t: 'wave', kind: 'heat' }, { t: 'haz', hz: 'fire', n: 3 }, { t: 'summon', kind: 'radiate', n: 1 }] },
-  vortex: { move: 0.7, seq: [{ t: 'spin', arms: 4, dur: 2.8, sp: 100, r: 6, spin: 2.2, st: 'frost' }, { t: 'wave', kind: 'cold' }, { t: 'fan', n: 7, spread: 0.15, sp: 120, r: 6, rep: 2 }, { t: 'summon', kind: 'methane', n: 3 }, { t: 'snows', n: 6 }, { t: 'wave', kind: 'cold' }, { t: 'summon', kind: 'fox', n: 2 }] },
   greenhouse: { move: 0.6, seq: [{ t: 'ring', n: 18, sp: 110, r: 7, rep: 1, ret: true }, { t: 'fan', n: 5, spread: 0.2, sp: 115, r: 7, rep: 2, st: 'heat' }, { t: 'wave', kind: 'heat' }, { t: 'ring', n: 24, sp: 90, r: 6, rep: 2, ret: true }, { t: 'summon', kind: 'radiate', n: 1 }] },
-  sandstorm: { move: 1.0, seq: [{ t: 'spin', arms: 5, dur: 2.6, sp: 110, r: 5, spin: 2.4 }, { t: 'charge', sp: 14, bounce: 2 }, { t: 'haz', hz: 'sand', n: 5 }, { t: 'fan', n: 9, spread: 0.12, sp: 150, r: 4, rep: 2 }, { t: 'wave', kind: 'heat' }, { t: 'summon', kind: 'conduct', n: 2 }] },
-  glacier: { move: 0.4, seq: [{ t: 'charge', sp: 9, bounce: 1 }, { t: 'roots', n: 6 }, { t: 'ring', n: 20, sp: 90, r: 8, rep: 2, st: 'frost' }, { t: 'haz', hz: 'frostT', n: 4 }, { t: 'wave', kind: 'cold' }, { t: 'summon', kind: 'fox', n: 2 }] },
+  sandstorm: { move: 1.0, seq: [{ t: 'spin', arms: 5, dur: 2.6, sp: 110, r: 5, spin: 2.4 }, { t: 'charge', sp: 14, bounce: 2 }, { t: 'haz', hz: 'sand', n: 5 }, { t: 'fan', n: 9, spread: 0.12, sp: 150, r: 4, rep: 2 }, { t: 'wave', kind: 'heat' }, { t: 'summon', kind: 'dust', n: 2 }] },
+  glacier: { move: 0.4, seq: [{ t: 'charge', sp: 9, bounce: 1 }, { t: 'roots', n: 6 }, { t: 'ring', n: 20, sp: 90, r: 8, rep: 2, st: 'frost' }, { t: 'haz', hz: 'frostT', n: 4 }, { t: 'wave', kind: 'cold' }, { t: 'summon', kind: 'mirror', n: 2 }] },
   boiler: { move: 0.6, seq: [{ t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2, hz: 'fire' }, { t: 'ring', n: 22, sp: 100, r: 7, rep: 2 }, { t: 'summon', kind: 'methane', n: 3 }, { t: 'haz', hz: 'fire', n: 4 }, { t: 'laser', n: 2, len: 360 }, { t: 'wave', kind: 'cold' }] },
   elnino: { move: 0.6, seq: [{ t: 'fan', n: 9, spread: 0.12, sp: 110, r: 7, rep: 2 }, { t: 'wave', kind: 'heat' }, { t: 'ring', n: 22, sp: 95, r: 7, rep: 2 }, { t: 'summon', kind: 'warmsea', n: 2 }, { t: 'spin', arms: 4, dur: 2.4, sp: 100, r: 6, spin: 2.0 }] },
   upwell: { move: 0.5, seq: [{ t: 'ring', n: 20, sp: 90, r: 7, rep: 2, st: 'frost' }, { t: 'summon', kind: 'wind', n: 2 }, { t: 'fan', n: 5, spread: 0.2, sp: 120, r: 7, rep: 2 }, { t: 'haz', hz: 'sand', n: 4 }, { t: 'wave', kind: 'cold' }] },
@@ -2296,7 +1914,7 @@ function saveRun() {
   try { localStorage.setItem(RUN_KEY, JSON.stringify(d)); return d.at; } catch (e) { return null; }
 }
 function loadRunData() { try { return JSON.parse(localStorage.getItem(RUN_KEY)); } catch (e) { return null; } }
-function continueRun() {
+function continueRun() { if (imgWait > 0) return;
   const d = loadRunData(); if (!d || !JOBS[d.job]) return;
   jobKey = d.job; start(); const Q = d.P;
   Object.assign(P, { hp: Q.hp, maxHp: Q.maxHp, sh: Q.sh, maxSh: Q.maxSh, en: Q.en, maxEn: Q.maxEn, skillMax: Q.skillMax, weapons: Q.weapons, stars: Q.stars, wi: Q.wi, relics: Q.relics,
@@ -2450,12 +2068,6 @@ function drawBlock(tx, ty) {
 // ---------- 지형지물: 구역마다 특색 있는, 부서지는 물건 (2026-10-26 교사 요청) ----------
 // 바닥 1칸을 막고(이동·탄 모두 막는 엄폐물), 부수면 에너지·체력·재료가 나온다
 const PROP = {
-  fossilRock: { z: 0, name: '화석 바위', hp: 9, extra: 'mat' }, cart: { z: 0, name: '광차', hp: 6 }, timber: { z: 0, name: '나무 버팀목 더미', hp: 4 },
-  pot: { z: 1, name: '화분', hp: 3 }, compost: { z: 1, name: '퇴비 자루', hp: 4, extra: 'nutri' }, hay: { z: 1, name: '짚더미', hp: 3 },
-  drum: { z: 2, name: '녹슨 드럼통', hp: 6, extra: 'boom' }, crate: { z: 2, name: '나무 궤짝', hp: 4 }, pipe: { z: 2, name: '녹슨 배관 토막', hp: 7 },
-  aircon: { z: 4, name: '실외기', hp: 7 }, waterbox: { z: 4, name: '생수 상자', hp: 3, extra: 'water' }, fan: { z: 4, name: '선풍기', hp: 3 },
-  iceblock: { z: 5, name: '얼음 덩어리', hp: 6 }, snowpile: { z: 5, name: '눈 더미', hp: 2 }, sled: { z: 5, name: '썰매', hp: 4 },
-  server: { z: 3, name: '서버 상자', hp: 7, extra: 'energy' }, battery: { z: 3, name: '배터리 묶음', hp: 5 }, cone: { z: 3, name: '공사용 원뿔', hp: 2 },
 };
 const MP_NAME = {
   Z0_p1: ['약품 드럼통', 'boom'], Z0_p2: ['시약병 상자'], Z0_p3: ['산·염기 탱크'], Z0_p4: ['비커 선반'],
@@ -2467,11 +2079,11 @@ const MP_NAME = {
 };
 for (const k in MP_NAME) PROP[k] = { z: -1, name: MP_NAME[k][0], hp: 5, extra: MP_NAME[k][1] }; // z -1: 구역 번호로 고른다
 SPR.mp = {}; const MP_OK = typeof MAPPROP_ATLAS !== 'undefined';
-if (MP_OK) { const mpi = new Image(); mpi.onload = () => { for (const k in MAPPROP_ATLAS) { const [sx, sy, w, h] = MAPPROP_ATLAS[k]; SPR.mp[k] = sprite(w, h, g => g.drawImage(mpi, sx, sy, w, h, 0, 0, w, h), true); } }; mpi.src = 'mapprops.png'; }
+if (MP_OK) { const mpi = new Image(); mpi.onload = () => { for (const k in MAPPROP_ATLAS) { const [sx, sy, w, h] = MAPPROP_ATLAS[k]; SPR.mp[k] = sprite(w, h, g => g.drawImage(mpi, sx, sy, w, h, 0, 0, w, h), true); } }; loadImg(mpi, 'mapprops.png'); }
 let props = [];
 function placeProps(r) {
   const n = r.type === 'crate' ? 16 + Math.floor(rand() * 5) : r.type === 'fight' ? 2 + Math.floor(rand() * 2) : r.type === 'boss' ? 2 : r.type === 'start' ? 2 : r.type === 'aid' || r.type === 'treasure' ? 0 : 1;
-  const kinds = MP_OK ? ['p1', 'p2', 'p3', 'p4'].map(s => 'Z' + stage.zone + '_' + s) : Object.keys(PROP).filter(k => PROP[k].z === VIS[stage.zone]), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
+  const kinds = ['p1', 'p2', 'p3', 'p4'].map(s => 'Z' + stage.zone + '_' + s), cx = r.x0 + (r.w >> 1), cy = r.y0 + (r.h >> 1);
   for (let i = 0, tries = 0; i < n && tries < 80; tries++) {
     const tx = r.x0 + 2 + Math.floor(rand() * (r.w - 4)), ty = r.y0 + 3 + Math.floor(rand() * (r.h - 5));
     if ((r.type === 'crate' ? Math.abs(tx - cx) <= 1 && Math.abs(ty - cy) <= 1 : Math.abs(tx - cx) <= 2 || Math.abs(ty - cy) <= 2) || tile(tx, ty) !== 1) continue; // 통로 줄과 가운데는 비운다
@@ -2504,31 +2116,6 @@ function drawProp(p) {
     px(ctx, X - 4, Y + T - 3, T + 8, 3, 'rgba(0,0,0,0.3)'); ctx.imageSmoothingEnabled = false;
     ctx.drawImage(p.flash > 0 ? s.f : s.c, Math.round(p.x - w / 2) + jx, Math.round(p.y - h + 1), w, h);
     if (dmg > 0.5) { px(ctx, Math.round(p.x) - 3, Math.round(p.y - h * 0.6), 1, 5, O); px(ctx, Math.round(p.x) - 2, Math.round(p.y - h * 0.6) + 4, 3, 1, O); } return; }
-  const D = {
-    fossilRock: () => { ell(ctx, X + 8, Y + 9, 18, 16, O); ell(ctx, X + 8, Y + 9, 16, 14, '#7a746a'); ell(ctx, X + 6, Y + 6, 8, 6, '#9a9387'); px(ctx, X + 7, Y + 9, 6, 4, '#d8c7a4'); px(ctx, X + 8, Y + 10, 4, 1, '#a8916a'); },
-    cart: () => { px(ctx, X, Y + 2, 16, 11, O); px(ctx, X + 1, Y + 3, 14, 8, '#6a5a4a'); px(ctx, X + 1, Y + 3, 14, 2, '#8a7a6a'); ell(ctx, X + 4, Y + 14, 5, 5, O); ell(ctx, X + 12, Y + 14, 5, 5, O); px(ctx, X + 3, Y + 1, 10, 2, '#5a4a3a'); },
-    timber: () => { for (let i = 0; i < 3; i++) { px(ctx, X, Y + 3 + i * 4, 16, 4, O); px(ctx, X + 1, Y + 4 + i * 4, 14, 2, i % 2 ? '#8a5a2e' : '#a06a38'); } },
-    pot: () => { px(ctx, X + 2, Y + 6, 12, 10, O); px(ctx, X + 3, Y + 7, 10, 8, '#a8542e'); px(ctx, X + 3, Y + 7, 10, 2, '#c8743e'); px(ctx, X + 5, Y - 2, 2, 8, '#5f8a3a'); px(ctx, X + 9, Y - 4, 2, 10, '#7ab84a'); px(ctx, X + 3, Y - 1, 4, 3, '#7ab84a'); px(ctx, X + 10, Y - 5, 4, 3, '#5f8a3a'); },
-    compost: () => { ell(ctx, X + 8, Y + 9, 16, 14, O); ell(ctx, X + 8, Y + 9, 14, 12, '#8a7a4a'); px(ctx, X + 5, Y + 2, 6, 3, '#6a5a3a'); px(ctx, X + 4, Y + 9, 8, 2, '#6a5a3a'); px(ctx, X + 6, Y + 11, 2, 2, '#4a6a2a'); },
-    hay: () => { ell(ctx, X + 8, Y + 10, 18, 13, O); ell(ctx, X + 8, Y + 10, 16, 11, '#d8b84a'); for (let i = 0; i < 5; i++) px(ctx, X + 2 + i * 3, Y + 6 + (i % 2), 1, 7, '#a88a2a'); },
-    drum: () => { px(ctx, X + 1, Y - 4, 14, 20, O); px(ctx, X + 2, Y - 3, 12, 18, '#9a4a26'); px(ctx, X + 2, Y + 1, 12, 2, '#6a2a12'); px(ctx, X + 2, Y + 9, 12, 2, '#6a2a12'); px(ctx, X + 2, Y - 3, 12, 2, '#c26a3a'); px(ctx, X + 4, Y + 4, 3, 3, '#e8d040'); },
-    crate: () => { px(ctx, X, Y, 16, 16, O); px(ctx, X + 1, Y + 1, 14, 14, '#9c6b3c'); px(ctx, X + 1, Y + 7, 14, 2, '#6e4826'); px(ctx, X + 7, Y + 1, 2, 14, '#6e4826'); },
-    pipe: () => { px(ctx, X - 1, Y + 4, 18, 10, O); px(ctx, X, Y + 5, 16, 8, '#7a5a4a'); px(ctx, X, Y + 5, 16, 2, '#9a7a6a'); px(ctx, X, Y + 4, 3, 10, '#5a4038'); px(ctx, X + 13, Y + 4, 3, 10, '#5a4038'); px(ctx, X + 6, Y + 8, 3, 3, '#9a4a26'); },
-    aircon: () => { px(ctx, X, Y - 2, 16, 18, O); px(ctx, X + 1, Y - 1, 14, 16, '#c3c8cc'); ell(ctx, X + 8, Y + 7, 12, 12, O); ell(ctx, X + 8, Y + 7, 10, 10, '#5a6470'); const a = time * 12; px(ctx, Math.round(X + 7 + Math.cos(a) * 3), Math.round(Y + 6 + Math.sin(a) * 3), 2, 2, '#c3c8cc'); px(ctx, X + 2, Y + 1, 3, 1, '#ff6a2a'); },
-    waterbox: () => { px(ctx, X, Y + 2, 16, 14, O); px(ctx, X + 1, Y + 3, 14, 12, '#c8a070'); px(ctx, X + 1, Y + 8, 14, 2, '#8a6a44'); for (const i of [3, 7, 11]) { px(ctx, X + i, Y - 3, 3, 6, O); px(ctx, X + i, Y - 2, 2, 5, '#7fc8ff'); } },
-    fan: () => { px(ctx, X + 7, Y + 6, 2, 9, O); px(ctx, X + 3, Y + 14, 10, 2, O); ell(ctx, X + 8, Y + 4, 14, 14, O); ell(ctx, X + 8, Y + 4, 12, 12, '#7fb2d9'); const a = time * 15; for (let i = 0; i < 3; i++) px(ctx, Math.round(X + 7 + Math.cos(a + i * 2.1) * 4), Math.round(Y + 3 + Math.sin(a + i * 2.1) * 4), 2, 2, '#e6f6ff'); },
-    iceblock: () => { px(ctx, X, Y - 3, 16, 19, O); px(ctx, X + 1, Y - 2, 14, 17, '#9fd8ff'); px(ctx, X + 1, Y - 2, 14, 4, '#e6f6ff'); px(ctx, X + 4, Y + 4, 2, 7, '#e6f6ff'); px(ctx, X + 9, Y + 6, 4, 2, '#5fa0d0'); },
-    snowpile: () => { ell(ctx, X + 8, Y + 11, 18, 11, O); ell(ctx, X + 8, Y + 11, 16, 9, '#f4f4f0'); ell(ctx, X + 6, Y + 9, 8, 4, '#ffffff'); px(ctx, X + 10, Y + 12, 3, 1, '#bfe6ff'); },
-    sled: () => { px(ctx, X, Y + 6, 16, 6, O); px(ctx, X + 1, Y + 7, 14, 3, '#a03a2a'); px(ctx, X, Y + 12, 16, 2, O); px(ctx, X + 14, Y + 9, 2, 4, O); px(ctx, X + 3, Y + 10, 2, 2, O); px(ctx, X + 10, Y + 10, 2, 2, O); },
-    server: () => { px(ctx, X + 1, Y - 6, 14, 22, O); px(ctx, X + 2, Y - 5, 12, 20, '#2a3440'); for (let i = 0; i < 4; i++) { px(ctx, X + 3, Y - 3 + i * 5, 10, 3, '#14202c'); px(ctx, X + 11, Y - 2 + i * 5, 1, 1, (Math.floor(time * 3) + i) % 2 ? '#7ee07e' : '#f0b429'); } },
-    battery: () => { for (let i = 0; i < 3; i++) { px(ctx, X + i * 5, Y + 2, 6, 14, O); px(ctx, X + 1 + i * 5, Y + 3, 4, 12, i === 1 ? '#3f7fd0' : '#2a2a30'); px(ctx, X + 2 + i * 5, Y, 2, 3, '#c3cad3'); px(ctx, X + 1 + i * 5, Y + 6, 4, 2, '#f0b429'); } },
-    cone: () => { px(ctx, X + 1, Y + 13, 14, 3, O); px(ctx, X + 2, Y + 13, 12, 2, '#e05a2a'); for (let j = 0; j < 12; j++) { const w = 2 + Math.floor(j / 2); px(ctx, X + 8 - w / 2 - 1, Y + 1 + j, w + 2, 1, O); px(ctx, X + 8 - w / 2, Y + 1 + j, w, 1, j % 5 > 2 ? '#f3f3f3' : '#e05a2a'); } },
-  };
-  px(ctx, X + 1, Y + T - 2, T - 2, 3, 'rgba(0,0,0,0.3)');
-  if (D[k]) D[k](); // 구역 그림이 아직 안 불러와졌으면 건너뛴다
-  if (dmg > 0.4) { px(ctx, X + 4, Y + 4, 1, 5, O); px(ctx, X + 5, Y + 8, 3, 1, O); } // 금이 간다
-  if (dmg > 0.7) { px(ctx, X + 10, Y + 3, 1, 6, O); px(ctx, X + 8, Y + 9, 3, 1, O); }
-  if (p.flash > 0) { ctx.globalAlpha = 0.6; px(ctx, X, Y - 4, T, T + 4, '#ffffff'); ctx.globalAlpha = 1; }
 }
 function drawDevice(d) { const x = Math.round(d.x), y = Math.round(d.y), O = '#1a1512', need = DEV[d.k].st === 'infect' ? P.st.infect : P.st[DEV[d.k].st];
   px(ctx, x - 13, y - 2, 26, 3, 'rgba(0,0,0,0.3)'); if (need) ringPx(d.x, d.y - 1, 16, Math.floor(time * 4) % 2 ? '#9fe0ff' : '#ffe08a'); // 지금 필요한 장치는 반짝인다
@@ -2650,7 +2237,7 @@ function render() {
     else if (p.kind === 'water') { const x = Math.round(p.x), y = Math.round(p.y - 12 + Math.sin(time * 4)); px(ctx, x - 4, y - 2, 8, 12, '#1a1512'); px(ctx, x - 3, y - 1, 6, 10, '#7fc8ff'); px(ctx, x - 3, y + 2, 6, 4, '#3f8fd0'); px(ctx, x - 2, y - 5, 4, 4, '#1a1512'); px(ctx, x - 1, y - 4, 2, 3, '#f4f4f0'); } // 물병
     else if (p.kind === 'heal') { const y = p.y - 10 + Math.round(Math.sin(time * 4)); px(ctx, p.x - 6, y, 12, 10, '#1a1512'); px(ctx, p.x - 5, y + 1, 10, 8, '#e04848'); px(ctx, p.x - 1, y + 2, 2, 6, '#fff'); px(ctx, p.x - 3, y + 4, 6, 2, '#fff'); }
     else { const y = Math.round(p.y - 12 + Math.sin(time * 4)); ell(ctx, Math.round(p.x), Math.round(p.y) - 1, 22, 7, 'rgba(0,0,0,0.3)'); // 바닥 무기: 등급 색 고리
-      ringPx(p.x, p.y - 1, 12, RARITY[WEAP[p.kind].r]); if (SPR.wi[p.kind]) { const ic = SPR.wi[p.kind]; drawSpr(ic, p.x - (ic.w >> 1), y - (ic.h >> 1), false, false); } else drawSpr(SPR.wf[p.kind][0], p.x - WC, y - WC, false, false); }
+      ringPx(p.x, p.y - 1, 12, RARITY[WEAP[p.kind].r]); if (SPR.wi[p.kind]) { const ic = SPR.wi[p.kind]; drawSpr(ic, p.x - (ic.w >> 1), y - (ic.h >> 1), false, false); } }
   }
   drawHazards();
   for (const c of clouds) { const a = Math.min(1, c.t / 0.5) * 0.55; ctx.globalAlpha = a; ell(ctx, Math.round(c.x), Math.round(c.y), 64, 40, '#d8c840'); ell(ctx, Math.round(c.x - 14), Math.round(c.y - 8), 30, 22, '#e8d860'); ctx.globalAlpha = 1; }
@@ -2663,7 +2250,7 @@ function render() {
   for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 2 && SPR.mp && SPR.mp['Z' + stage.zone + '_w1'] && hash(tx, ty) % 11 === 0 && tile(tx, ty - 1) === 2 && !SOLID.has(tile(tx, ty + 1)) && tile(tx, ty + 1) !== 0) list.push({ y: (ty + 1) * T - 1, f: () => drawWallSign(tx, ty) }); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11 && SPR.mp && SPR.mp['Z' + stage.zone + '_o1']) { if (tile(tx - 1, ty) !== 11 && tile(tx, ty - 1) !== 11) list.push({ y: (ty + 2) * T, f: () => drawObstacle(tx, ty) }); } else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
   for (const p of props) if (!p.dead && p.tx >= tx0 - 1 && p.tx < tx0 + 54 && p.ty >= ty0 - 1 && p.ty < ty0 + 33) list.push({ y: p.y, f: () => drawProp(p) });
   for (const e of enemies) list.push({ y: e.y, f: () => {
-    if (e.under) { ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 22, 9, O_); ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 20, 7, '#6a4a2a'); ell(ctx, Math.round(e.x), Math.round(e.y) - 4, 12, 4, '#8a6a3a'); return; } // 땅속 두더지: 흙 둔덕
+    if (e.under) { ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 22, 9, '#1a1512'); ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 20, 7, '#6a4a2a'); ell(ctx, Math.round(e.x), Math.round(e.y) - 4, 12, 4, '#8a6a3a'); return; } // 땅속 두더지: 흙 둔덕
     const s = sprFor(e), alt = Math.round(e.alt || 0);
     px(ctx, Math.round(e.x - e.bw / 2), Math.round(e.y) - 2, e.bw, 3, 'rgba(0,0,0,0.3)');
     const flash = e.flash > 0 || (isBoss(e) && isTell(e) && e.st !== 'chargeTell' && Math.floor(time * 16) % 2 === 0);
@@ -2762,7 +2349,7 @@ function cdCircle(cx, cy, r, k, fill, dim) {
 function dashIcon(cx, cy, on) { const c = on ? '#e9f5d0' : '#6c7a62';
   for (const o of [-4, 2]) for (let i = 0; i < 4; i++) { px(ctx, cx + o + i, cy - 4 + i, 2, 1, c); px(ctx, cx + o + i, cy + 3 - i, 2, 1, c); } }
 const SKILL_ATLAS = { driver: [0, 0, 46, 42], geo: [47, 0, 53, 43], eco: [101, 0, 49, 47], chem: [151, 0, 39, 47], weather: [191, 0, 49, 47], medic: [241, 0, 48, 41] }, skillImg = new Image();
-skillImg.src = 'skills.png';
+loadImg(skillImg, 'skills.png');
 function skillIcon(cx, cy, on) {
   const A = SKILL_ATLAS[P.job];
   if (A && skillImg.complete && skillImg.naturalWidth) { const [sx, sy, w, h] = A, k = 34 / Math.max(w, h); ctx.imageSmoothingEnabled = false; ctx.globalAlpha = on ? 1 : 0.4; // 대기 중에는 흐리게
@@ -2844,7 +2431,7 @@ function drawHud() {
 const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
 
 // ---------- 화면 전환 ----------
-function start() { reset(); zoneNext = 0; trans = 0; applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · K'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
+function start() { if (imgWait > 0) return; reset(); zoneNext = 0; trans = 0; applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · K'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
 function showResult() {
   if (!running) return; running = false;
   document.getElementById('resTitle').textContent = ended === 'win' ? '막차에 탔다' : '쓰러졌다';
@@ -2876,7 +2463,7 @@ function jobPicker() {
   const box = document.getElementById('jobs');
   for (const k in JOBS) {
     const b = document.createElement('button'); b.className = 'job'; b.dataset.k = k;
-    const cv = document.createElement('canvas'); cv.dataset.k = k; cv.width = 36; cv.height = 42; cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0);
+    const cv = document.createElement('canvas'); cv.dataset.k = k; cv.width = 36; cv.height = 42; if (SPR.hero[k]) cv.getContext('2d').drawImage(SPR.hero[k].idle[0].c, 0, 0); // 그림이 아직이면 heroes.png를 불러온 뒤 채운다
     const nm = document.createElement('span'); nm.textContent = JOBS[k].name;
     b.append(cv, nm); b.onclick = () => { jobKey = k; mark(); }; box.appendChild(b);
   }
@@ -2887,5 +2474,5 @@ function jobPicker() {
 let acc = 0, last = performance.now();
 function loop(now) { acc += Math.min(0.25, (now - last) / 1000); last = now;
   while (acc >= DT) { step(); acc -= DT; }
-  render(); requestAnimationFrame(loop); }
-buildSprites(); jobPicker(); renderLobby(); reset(); fit(); requestAnimationFrame(loop);
+  if (!imgWait) render(); requestAnimationFrame(loop); } // 그림을 다 불러오기 전에는 그리지 않는다
+buildSprites(); jobPicker(); renderLobby(); reset(); fit(); assetsReady(); requestAnimationFrame(loop);
