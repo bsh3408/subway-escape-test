@@ -1368,7 +1368,7 @@ function closeInfo() { infoOpen = false; document.getElementById('info').classLi
 let crafting = false, modalKeys = null;
 function openModal(title, html, bind, keys) {
   crafting = true; modalKeys = keys || null; document.querySelector('#craft .pop').classList.remove('ok', 'ng');
-  document.getElementById('craftTitle').textContent = title; const box = document.getElementById('craftList'); box.innerHTML = html;
+  document.getElementById('craftTitle').textContent = title; const box = document.getElementById('craftList'); box.onclick = null; box.innerHTML = html;
   if (bind) bind(box); document.getElementById('craft').classList.remove('hide');
 }
 function closeCraft() { crafting = false; modalKeys = null; document.getElementById('craft').classList.add('hide'); }
@@ -1419,7 +1419,7 @@ function rightFx(explain) { // 정답 효과: 초록 번쩍임, 큰 글자, 별�
 let revealTok = null;
 function showReveal(title, html, next, ok) { // 해설 창: Enter(또는 E)나 3초 뒤 다음으로. ok: 정답이면 초록, 오답이면 빨강
   const tok = {}; revealTok = tok; let fired = false; const fire = () => { if (fired) return; fired = true; revealTok = null; next(); };
-  openModal((ok ? '○ ' : '✕ ') + title, `<div class="qz">${html}<p class="note" style="text-align:center">Enter 계속 · 3초 뒤 자동으로 넘어간다</p></div>`, null, { e: fire });
+  openModal((ok ? '○ ' : '✕ ') + title, `<div class="qz">${html}<p class="note" style="text-align:center">Enter·Esc·클릭 계속 · 3초 뒤 자동으로 넘어간다</p></div>`, b => setTimeout(() => { if (revealTok === tok) b.onclick = fire; }, 0), { e: fire, esc: fire }); // 답을 누른 클릭이 바로 닫지 않게 한 박자 늦게 건다 // 창을 닫아도 다음으로 넘어간다
   document.querySelector('#craft .pop').classList.add(ok ? 'ok' : 'ng');
   if (!ok) { climFlash = { col: '#ff3b3b', t: 0.6 }; shake = Math.max(shake, 10); }
   setTimeout(() => { if (revealTok === tok && crafting) fire(); }, 3000);
