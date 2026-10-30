@@ -17,7 +17,7 @@ window.TEST_MODE = true; // 패치 시험장: 문제 창에서 Space로 정답 �
     placeBlocks({ ...rooms[0], type: 'fight' }); // 부서지지 않는 장애물
     props = []; placeProps({ ...rooms[0], type: 'fight' }); placeProps({ ...rooms[0], type: 'fight' }); // 지형지물(구역마다 다름)
   };
-  zoneClear = function () { if (arena) { say(P.x, P.y - 50, '보스 처치', 'crit', 'big'); return; } origZoneClear(); };
+  zoneClear = function (e) { if (arena) { say(P.x, P.y - 50, '보스 처치', 'crit', 'big'); return; } origZoneClear(e); };
   const room = () => roomAt(P.x, P.y - 3, 0) || rooms[0];
   const place = (dx) => { const r = room(); return { x: Math.max((r.x0 + 3) * T, Math.min((r.x0 + r.w - 3) * T, P.x + dx)), y: Math.max((r.y0 + 4) * T, Math.min((r.y0 + r.h - 2) * T, P.y)) }; };
   function enter() { enterStation(); closePerk(); }

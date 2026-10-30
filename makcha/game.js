@@ -410,7 +410,7 @@ function enterStation() {
   hazards = []; corpses = []; timers = []; clouds = []; dark = 0; P.slowT = 0;
   P.safe = { x: P.x, y: P.y }; P.climIn = null; furnishRooms(); // 더운 방·추운 방, 쏟아진 산·염기
   placeDevices(); placeChests(); P.test = null;
-  stage.gate = false; stage.quiz = newQuiz(); // 다음에 풀 문제(방·역·구역을 넘어갈 때마다 새 문제)
+  stage.portal = null; stage.quiz = newQuiz(); // 다음에 풀 문제(방·역·구역을 넘어갈 때마다 새 문제)
   showBanner();
   if ((stage.zi > 0 || stage.st > 0) && !P.loaded) openPerk(); // 역을 넘어올 때마다 능력 고르기(이어하기로 불러온 역은 빼고)
   if (relicAdd('stationHeal') && (stage.zi > 0 || stage.st > 0) && !P.loaded && P.hp < P.maxHp) { P.hp++; say(P.x, P.y - 46, '막차 시간표 · 체력 +1', 'heal', 'small'); }
@@ -472,9 +472,10 @@ function tryDash() {
   const l = Math.hypot(ix, iy); P.ddx = ix / l; P.ddy = iy / l;
   P.vx = P.ddx * DASH * T; P.vy = P.ddy * DASH * T; P.dash = 0.28; P.dashCd = dashCdMax(); P.rollHit = new Set();
 }
+const nearPortal = () => !!stage.portal && Math.hypot(P.x - stage.portal.x, (P.y - stage.portal.y) * 1.3) < 26;
 const nearExit = () => tile(Math.floor(P.x / T), Math.floor((P.y - 3) / T)) === 8 || [[-12, 0], [12, 0], [0, -12], [0, 12]].some(([dx, dy]) => tile(Math.floor((P.x + dx) / T), Math.floor((P.y - 3 + dy) / T)) === 8);
 function tryPick() {
-  if (stage.gate) { openQuiz(zoneGateNext, 'zone'); return; } // 보스를 잡은 뒤 다음 구역으로 가는 관문
+  if (nearPortal()) { openQuiz(zoneGateNext, 'zone'); return; } // 보스를 잡은 자리의 포털: 다음 구역으로 가는 관문
   if (nearExit()) { openQuiz(nextStation, 'station'); return; }
   const ch = nearChest(); if (ch) { openChest(ch); return; }
   const dv = nearDev(); if (dv) { openDevice(dv); return; }
@@ -577,9 +578,9 @@ function attack() {
       const ec = { x: e.x, y: e.y - e.h / 2 }, d = Math.hypot(ec.x - c.x, ec.y - c.y);
       if (d < W0.range * wr + e.w * 0.35 && angDiff(Math.atan2(ec.y - c.y, ec.x - c.x), a) < W0.arc * wa) {
         damage(e, Math.round(W0.dmg * dm));
-        if (W0.burn && !e.dead) { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } // 플라스마: 화상
+        if (W0.burn && !e.dead && !isBoss(e)) { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } // 플라스마: 화상
         if (W0.zap && !e.dead) { // 전기 충격봉: 기절, 가까운 적 2마리에게 전기가 튄다
-          e.stun = Math.max(e.stun || 0, isBoss(e) ? 0.3 : 1.0);
+          if (!isBoss(e)) e.stun = Math.max(e.stun || 0, 1.0);
           enemies.filter(o => o !== e && !o.dead && Math.hypot(o.x - e.x, o.y - e.y) < 80).slice(0, 2).forEach(o => { damage(o, 2); fx.push({ t: 'zap', x: e.x, y: e.y - e.h / 2, x2: o.x, y2: o.y - o.h / 2, life: 0.15, max: 0.15 }); }); }
         if (!isBoss(e)) { // 넉백은 모든 근접 무기, 기절은 특수효과가 있을 때만(2026-10-26 교사 요청)
           const l = d || 1, kb = (KNOCK[e.kind] || 380) * W0.kb;
@@ -683,7 +684,7 @@ function summonAlly() {
 }
 function nearestEnemy(x, y) { let b = null, bd = 1e9; for (const e of enemies) if (!e.dead) { const d = Math.hypot(e.x - x, e.y - y); if (d < bd) { bd = d; b = e; } } return b; }
 function strongestEnemy() { let b = null; for (const e of enemies) if (!e.dead && (!b || e.hp > b.hp)) b = e; return b; }
-function confuse(e, t) { if (isBoss(e)) t *= 0.4; if (!(e.conf > 0)) say(e.x, e.y - e.h - 16, '혼란', 'conf', 'small'); e.conf = Math.max(e.conf || 0, t); }
+function confuse(e, t) { if (isBoss(e)) return; if (!(e.conf > 0)) say(e.x, e.y - e.h - 16, '혼란', 'conf', 'small'); e.conf = Math.max(e.conf || 0, t); }
 // 폭발: 적에게만 피해를 주고 밀어낸다 (사람이 던진 폭탄, 로켓포, 유탄 발사기)
 function explode(x, y, r = 48, dmg = 7) {
   for (const e of enemies) if (!e.dead && Math.hypot(e.x - x, (e.y - y) * 1.4) < r + e.w * 0.3) {
@@ -785,7 +786,7 @@ function updateSkills() {
     if (rs > Q_R) q.dead = true; }
   quakes = quakes.filter(q => !q.dead);
   for (const f of foci) { f.t += DT; if (f.t < f.dur) continue; f.dead = true; // 빛이 다 모이면 초점에서 탄다
-    for (const e of enemies) if (!e.dead && Math.hypot(e.x - f.x, (e.y - e.h / 2 - f.y) * 1.2) < 22 + e.w * 0.35) { damage(e, f.dmg); if (!e.dead) { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } }
+    for (const e of enemies) if (!e.dead && Math.hypot(e.x - f.x, (e.y - e.h / 2 - f.y) * 1.2) < 22 + e.w * 0.35) { damage(e, f.dmg); if (!e.dead && !isBoss(e)) { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } }
     hitProp(propAtPx(f.x, f.y), f.dmg); burst(f.x, f.y, '#fff6a0', 14); burst(f.x, f.y, '#ff7a2a', 8); shake = Math.max(shake, 3); }
   foci = foci.filter(f => !f.dead);
   flasks = flasks.filter(f => !f.dead);
@@ -844,7 +845,7 @@ function updatePlayer() {
       P.rush.hit.add(e); damage(e, 12); if (!isBoss(e)) e.stun = Math.max(e.stun || 0, 0.6); shake = Math.max(shake, 5);
       if (!isBoss(e)) { const sx = Math.sign((e.x - P.x) * -P.rush.dy + (e.y - P.y) * P.rush.dx) || 1;
         e.kx = (P.rush.dx * 0.7 - P.rush.dy * sx * 0.7) * 620; e.ky = (P.rush.dy * 0.7 + P.rush.dx * sx * 0.7) * 620; }
-      if (!e.dead) { e.stun = Math.max(e.stun || 0, isBoss(e) ? 0.5 : 1.0); say(e.x, e.y - e.h - 16, '기절', 'stun', 'small'); }
+      if (!e.dead && !isBoss(e)) { e.stun = Math.max(e.stun || 0, 1.0); say(e.x, e.y - e.h - 16, '기절', 'stun', 'small'); }
     }
     if (P.rush.t <= 0) { // 감속: 운동 에너지 일부를 전기 에너지로 전환해 방어막에 저장 (최댓값을 넘지 않음)
       const before = P.sh; P.sh = Math.min(P.maxSh, P.sh + 3); P.shT = 0; P.rush = null; P.vx *= 0.25; P.vy *= 0.25;
@@ -948,7 +949,7 @@ function damage(e, n) {
     // 에너지 구슬: 쓰러진 적이 떨어뜨리고, 가까이 가면 끌려온다
     const n = e.kind === 'tri' ? 2 : e.kind === 'amm' || e.kind === 'steam' ? 3 : 0; // 폐열 증기구름: 에너지 구슬
     for (let i = 0; i < n; i++) { const a = rand() * Math.PI * 2; pickups.push({ kind: 'energy', x: e.x, y: e.y, vx: Math.cos(a) * 60, vy: Math.sin(a) * 40, t: 0 }); }
-    if (isBoss(e)) { shake = 14; enemies.forEach(o => { if (o !== e) { o.dead = true; burst(o.x, o.y - 6, '#b8935f', 6); } }); ebul = []; dropWeapon(e.x, e.y, 'p'); dropRelic(e.x + 40, e.y); zoneClear(); } // 보스: 보라 이상 무기
+    if (isBoss(e)) { shake = 14; enemies.forEach(o => { if (o !== e) { o.dead = true; burst(o.x, o.y - 6, '#b8935f', 6); } }); ebul = []; dropWeapon(e.x, e.y, 'p'); dropRelic(e.x + 40, e.y); zoneClear(e); } // 보스: 보라 이상 무기
   }
 }
 // r: 탄 반지름(보스 탄은 크다), hz: 탄이 멈춘 자리에 남는 웅덩이(산성·불꽃)
@@ -958,6 +959,7 @@ const BOSS_DMG = 2; // 보스 공격 피해 (2026-10-26 교사 요청: 상향)
 const isTell = e => e.st === 'tell' || e.st.endsWith('Tell');
 function updateEnemy(e) {
   e.flash = Math.max(0, e.flash - DT); e.pt += DT; if (e.pt > 0.15) { e.pt = 0; e.ph++; }
+  if (isBoss(e)) { e.stun = e.conf = e.slowT = e.burnT = e.frz = e.frzT = 0; } // 보스는 상태 이상에 걸리지 않는다(빠진 곳이 있어도 여기서 지운다)
   e.blockT = (e.blockT || 0) - DT; if (e.rage > 0) e.rage -= DT; if (e.slowT > 0) e.slowT -= DT; if (e.frzT > 0) { e.frzT -= DT; if (e.frzT <= 0) e.frz = 0; }
   if (e.burnT > 0) { e.burnT -= DT; e.burnTick = (e.burnTick || 0) - DT; if (e.burnTick <= 0) { e.burnTick = 0.5; damage(e, 1); } if (e.dead) return; } // 냉온 팩탄(발열): 화상
   if (e.battOut) return; // 배터리가 다 된 드론은 멈춰 있다
@@ -1892,9 +1894,9 @@ function updateBullets() {
       if (s.tag === 'red' && e.kind === 'rust') d *= 2; // 환원제 → 녹(산화철)에 강하다
       damage(e, Math.max(1, Math.round(d)));
       if (s.push && !e.dead && !isBoss(e)) { e.kx = s.vx * 0.8; e.ky = s.vy * 0.8; }
-      if (s.tag === 'n2' && !e.dead) { e.slowT = 2.5; e.frz = (e.frz || 0) + 1; e.frzT = 1.2; // 액체 질소: 느려지고, 짧은 사이에 3번 넘게 맞으면 얼어붙는다
+      if (s.tag === 'n2' && !e.dead && !isBoss(e)) { e.slowT = 2.5; e.frz = (e.frz || 0) + 1; e.frzT = 1.2; // 액체 질소: 느려지고, 짧은 사이에 3번 넘게 맞으면 얼어붙는다
         if (e.frz >= 3 && !isBoss(e)) { if (!(e.stun > 0)) say(e.x, e.y - e.h - 16, '얼어붙음', 'stun', 'small'); e.stun = Math.max(e.stun || 0, 1.2); e.frz = 0; } }
-      if (s.tag === 'pack' && !e.dead) { if (s.mode === 'hot') { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } else { if (!(e.slowT > 0)) say(e.x, e.y - e.h - 16, '느려짐', 'stun', 'small'); e.slowT = 2.5; } }
+      if (s.tag === 'pack' && !e.dead && !isBoss(e)) { if (s.mode === 'hot') { if (!(e.burnT > 0)) say(e.x, e.y - e.h - 16, '화상', 'hurt', 'small'); e.burnT = 3; } else { if (!(e.slowT > 0)) say(e.x, e.y - e.h - 16, '느려짐', 'stun', 'small'); e.slowT = 2.5; } }
       if (has('chain') && !s.chained && !s.deflect) { // 연쇄 튕김: 맞힌 자리에서 가장 가까운 다른 적에게 튄다
         let n = null, nd = 160; for (const o of enemies) if (o !== e && !o.dead) { const d = Math.hypot(o.x - e.x, o.y - e.y); if (d < nd) { nd = d; n = o; } }
         if (n) { const a = Math.atan2(n.y - n.h / 2 - s.y, n.x - s.x); shots.push({ x: s.x, y: s.y, vx: Math.cos(a) * 340, vy: Math.sin(a) * 340, life: 0.6, dmg: s.dmg * 0.7, r: s.r, tag: s.tag, chained: true, hit: new Set([e]) }); } }
@@ -1928,8 +1930,11 @@ function finish(win) {
   ended = win ? 'win' : 'lose';
 }
 // 보스를 잡으면 구역 통과: 열린 구역이 더 있으면 다음 구역 역 1로, 없으면 막차에 타고 끝난다
-function zoneClear() {
-  say(P.x, P.y - 50, stage.zi + 1 < stage.order.length ? `구역 ${stage.zone + 1} 통과` : '마지막 보스 처치 · 단원 문제를 풀면 막차에 탄다', 'heal', 'big'); zoneNext = 1.8;
+function zoneClear(e) { // 보스가 쓰러진 자리에 포털이 열린다. 들어가면(E) 단원 문제
+  let x = e ? e.x : P.x, y = e ? e.y : P.y; const r = roomAt(x, y, 0);
+  if (blocked(x - 12, y - 8, 24, 8) && r) { x = (r.x0 + r.w / 2) * T; y = (r.y0 + r.h / 2) * T; } // 벽에 걸리면 방 가운데
+  stage.portal = { x, y }; burst(x, y - 20, '#d8a8ff', 24); shake = Math.max(shake, 8);
+  say(x, y - 60, stage.zi + 1 < stage.order.length ? `구역 ${stage.zone + 1} 통과 · 포털이 열렸다` : '마지막 보스 처치 · 포털에서 단원 문제를 풀면 막차에 탄다', 'heal', 'big');
 }
 let zoneNext = 0;
 const zoneGateNext = () => stage.zi + 1 < stage.order.length ? goNextZone() : finish(true);
@@ -1940,7 +1945,6 @@ function step() {
   if (!ended) time += DT;
   if (trans > 0) { trans -= DT; if (trans <= 0) { stage.st++; enterStation(); } return; }
   updateStatus();
-  if (zoneNext > 0) { zoneNext -= DT; if (zoneNext <= 0) { stage.gate = true; openQuiz(zoneGateNext, 'zone'); return; } }
   updatePlayer();
   for (const e of enemies) updateEnemy(e);
   updateBullets(); updateSkills(); updateFx(); updateRooms(); updateTexts(); updateTimers(); updateHazards(); updateBossExtras();
@@ -1983,10 +1987,7 @@ function drawTiles(cx, cy) {
       px(ctx, X, Y, T, T, THEME[VIS[stage.zone]].floor[0]); px(ctx, X, Y + 3, T, 10, '#1a1512'); px(ctx, X + 1, Y + 4, T - 2, 3, '#a07a4a'); px(ctx, X + 1, Y + 7, T - 2, 5, '#6a4a2a');
       if (tile(tx - 1, ty) !== 9) { px(ctx, X + 3, Y + 1, 4, 3, '#e8e0c8'); px(ctx, X + 9, Y + 2, 3, 2, '#8d96a3'); } }
     else if (v === 8) { // 출구: 다음 역으로 가는 열차 문 바닥 표시 (2×2칸)
-      px(ctx, X, Y, T, T, '#2b3440'); px(ctx, X, Y, T, 1, '#f0b429'); px(ctx, X, Y + T - 1, T, 1, '#f0b429');
-      if (tile(tx - 1, ty) !== 8) px(ctx, X, Y, 1, T, '#f0b429'); if (tile(tx + 1, ty) !== 8) px(ctx, X + T - 1, Y, 1, T, '#f0b429');
-      if (tile(tx - 1, ty) !== 8 && tile(tx, ty - 1) !== 8) { const b = Math.floor(time * 3) % 2; // 위쪽 화살표
-        px(ctx, X + 14, Y + 6 - b, 4, 14, '#f0b429'); px(ctx, X + 10, Y + 10 - b, 12, 2, '#f0b429'); px(ctx, X + 12, Y + 8 - b, 8, 2, '#f0b429'); } }
+      px(ctx, X, Y, T, T, '#1c2733'); if ((tx + ty) % 2) px(ctx, X + 2, Y + 2, T - 4, T - 4, '#22303e'); } // 포털 그림은 깊이 정렬 목록에서 그린다
   }
 }
 // ---------- 부서지지 않는 장애물 (2026-10-27 교사 요청: 많이, 규칙적으로 미로·던전처럼) ----------
@@ -2045,6 +2046,17 @@ function placeBlocks(r) {
   }
 }
 // 구역마다 다른 장애물 모양(키 24도트: 바닥 1칸 + 위로 8도트)
+function drawPortal(x, y, kind) { // 바닥(y)에 선 타원 포털: 검은 테두리, 바깥 고리, 안쪽 소용돌이, 떠오르는 알갱이. 역 출구는 하늘색, 보스 포털은 보라색
+  const C = kind === 'boss' ? ['#1e0c33', '#8a3ad8', '#d8a8ff', '#ffe08a'] : ['#071f2c', '#1f8fbf', '#8fe8ff', '#ffffff'], w = kind === 'boss' ? 36 : 30, h = kind === 'boss' ? 52 : 44, cy = y - h / 2, t = time;
+  const ov = (rx, ry, col) => { ctx.fillStyle = col; ctx.beginPath(); ctx.ellipse(x, cy, rx, ry, 0, 0, Math.PI * 2); ctx.fill(); };
+  ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.beginPath(); ctx.ellipse(x, y, w * 0.6, 4, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 0.25 + 0.1 * Math.sin(t * 4); ov(w / 2 + 6, h / 2 + 6, C[2]); ctx.globalAlpha = 1; // 바깥 빛
+  ov(w / 2 + 2, h / 2 + 2, '#1a1512'); ov(w / 2, h / 2, C[1]); ov(w / 2 - 3, h / 2 - 3, C[0]);
+  for (let i = 0; i < 40; i++) { const f = i / 40, a = f * Math.PI * 5 + t * 3.2, r = 1 - f; // 소용돌이 두 줄기
+    for (const o of [0, Math.PI]) px(ctx, Math.round(x + Math.cos(a + o) * r * (w / 2 - 5)) - 1, Math.round(cy + Math.sin(a + o) * r * (h / 2 - 5)) - 1, 2, 2, i % 3 ? C[2] : C[1]); }
+  ctx.globalAlpha = 0.6 + 0.3 * Math.sin(t * 6); ov(4, 6, C[3]); ctx.globalAlpha = 1; // 가운데 빛
+  for (let i = 0; i < 7; i++) { const k = (t * 0.7 + i / 7) % 1; ctx.globalAlpha = 1 - k; px(ctx, Math.round(x + Math.sin(i * 2.3 + t) * w * 0.45), Math.round(y - 4 - k * h * 1.1), 2, 2, C[2]); } ctx.globalAlpha = 1; // 떠오르는 알갱이
+}
 function drawWallSign(tx, ty) { const ws = SPR.mp['Z' + stage.zone + (hash(tx, ty) % 2 ? '_w1' : '_w2')], X = tx * T, Y = ty * T, sc = Math.min(1, 26 / ws.w, 26 / ws.h), w = Math.round(ws.w * sc), hh = Math.round(ws.h * sc); ctx.imageSmoothingEnabled = false; ctx.drawImage(ws.c, Math.round(X + T / 2 - w / 2), Math.round(Y + T - 3 - hh), w, hh); }
 function drawObstacle(tx, ty) { // 2×2 덩어리의 왼쪽 위 칸에서 구역 장애물 그림 하나를 그린다
   const s = SPR.mp['Z' + stage.zone + (hash(tx, ty) % 2 ? '_o1' : '_o2')], X = tx * T, Y = ty * T, sc = Math.min(1, 36 / s.w, 48 / s.h), w = Math.round(s.w * sc), h = Math.round(s.h * sc);
@@ -2247,8 +2259,9 @@ function render() {
   // 깊이 정렬
   const list = [];
   const tx0 = Math.floor(cx / T) - 1, ty0 = Math.floor(cy / T) - 1;
-  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 2 && SPR.mp && SPR.mp['Z' + stage.zone + '_w1'] && hash(tx, ty) % 11 === 0 && tile(tx, ty - 1) === 2 && !SOLID.has(tile(tx, ty + 1)) && tile(tx, ty + 1) !== 0) list.push({ y: (ty + 1) * T - 1, f: () => drawWallSign(tx, ty) }); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11 && SPR.mp && SPR.mp['Z' + stage.zone + '_o1']) { if (tile(tx - 1, ty) !== 11 && tile(tx, ty - 1) !== 11) list.push({ y: (ty + 2) * T, f: () => drawObstacle(tx, ty) }); } else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
+  for (let ty = ty0; ty < ty0 + 32; ty++) for (let tx = tx0; tx < tx0 + 53; tx++) { const v = tile(tx, ty); if (v === 8 && tile(tx - 1, ty) !== 8 && tile(tx, ty - 1) !== 8) list.push({ y: (ty + 2) * T - 6, f: () => drawPortal(tx * T + T, (ty + 2) * T - 6, 'st') }); if (v === 2 && SPR.mp && SPR.mp['Z' + stage.zone + '_w1'] && hash(tx, ty) % 11 === 0 && tile(tx, ty - 1) === 2 && !SOLID.has(tile(tx, ty + 1)) && tile(tx, ty + 1) !== 0) list.push({ y: (ty + 1) * T - 1, f: () => drawWallSign(tx, ty) }); if (v === 7) list.push({ y: (ty + 1) * T, f: () => drawPillar(tx, ty) }); else if (v === 11 && SPR.mp && SPR.mp['Z' + stage.zone + '_o1']) { if (tile(tx - 1, ty) !== 11 && tile(tx, ty - 1) !== 11) list.push({ y: (ty + 2) * T, f: () => drawObstacle(tx, ty) }); } else if (v === 11) list.push({ y: (ty + 1) * T, f: () => drawBlock(tx, ty) }); }
   for (const p of props) if (!p.dead && p.tx >= tx0 - 1 && p.tx < tx0 + 54 && p.ty >= ty0 - 1 && p.ty < ty0 + 33) list.push({ y: p.y, f: () => drawProp(p) });
+  if (stage.portal) { const q = stage.portal; list.push({ y: q.y, f: () => drawPortal(q.x, q.y, 'boss') }); }
   for (const e of enemies) list.push({ y: e.y, f: () => {
     if (e.under) { ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 22, 9, '#1a1512'); ell(ctx, Math.round(e.x), Math.round(e.y) - 2, 20, 7, '#6a4a2a'); ell(ctx, Math.round(e.x), Math.round(e.y) - 4, 12, 4, '#8a6a3a'); return; } // 땅속 두더지: 흙 둔덕
     const s = sprFor(e), alt = Math.round(e.alt || 0);
@@ -2419,7 +2432,7 @@ function drawHud() {
   const near = nearWeapon(), owned = near && P.weapons.includes(near.kind);
   const dv = nearDev();
   const chN = nearChest();
-  setTxt('prompt', nearExit() ? 'E 다음 역으로' : chN ? 'E 보물상자 열기' : dv ? 'E ' + DEV[dv.k].name : near ? 'G ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
+  setTxt('prompt', nearPortal() ? (stage.zi + 1 < stage.order.length ? 'E 포털 · 다음 구역으로' : 'E 포털 · 막차 타러') : nearExit() ? 'E 포털 · 다음 역으로' : chN ? 'E 보물상자 열기' : dv ? 'E ' + DEV[dv.k].name : near ? 'G ' + WEAP[near.kind].name + (owned ? ' 강화 ★' : P.weapons.length >= MAX_WEAPONS ? ' 바꾸기' : ' 줍기') : '');
   // 재료·상태 이상·장비 줄
   const sts = Object.keys(P.st).map(k => k === 'infect' ? `<span style="color:${STATUS.infect.col}">감염${P.st.infect.known ? '(' + P.st.infect.type + ')' : ''}</span>` : `<span style="color:${STATUS[k].col}">${STATUS[k].name}${STATUS[k].keep ? '' : ' ' + Math.ceil(P.st[k])}</span>`).join(' ')
     + (P.heatX > 0.2 && !P.st.heat ? ` <span style="color:#ff6a2a">더위 ${Math.round(P.heatX / EXPOSE * 100)}%</span>` : '') + (P.coldX > 0.2 && !P.st.frost ? ` <span style="color:#9fd8ff">추위 ${Math.round(P.coldX / EXPOSE * 100)}%</span>` : '');
