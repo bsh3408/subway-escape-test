@@ -436,8 +436,11 @@ addEventListener('keydown', e => {
   if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'ShiftRight') e.preventDefault();
   if (!running && !e.repeat) { // 대기실·결과 화면: 숫자로 직업, Enter로 시작
     const title = !document.getElementById('title').classList.contains('hide');
-    if (title && k >= '1' && k <= '6') { const b = document.querySelectorAll('#jobs .job')[+k - 1]; if (b) b.click(); }
-    if (k === 'enter') { e.preventDefault(); if (title) start(); else if (!document.getElementById('result').classList.contains('hide')) document.getElementById('againBtn').click(); }
+    if (title && !introStopped()) { introSkip(); return; } // 들어오는 중이면 건너뛰기
+    if (title && (k === 'a' || k === 'w')) introSel = (introSel + 5) % 6; if (title && (k === 'd' || k === 's')) introSel = (introSel + 1) % 6;
+    if (title && k >= '1' && k <= '6') introSel = +k - 1;
+    if (title && e.code === 'Space') { e.preventDefault(); introGo(); return; }
+    if (k === 'enter') { e.preventDefault(); if (title) introGo(); else if (!document.getElementById('result').classList.contains('hide')) document.getElementById('againBtn').click(); }
     return; }
   if (!running || e.repeat) return;
   if (e.code === 'Tab') { e.preventDefault(); if (!crafting && !choosing) toggleTree(); return; }
@@ -2461,11 +2464,23 @@ const fmt = t => { const m = Math.floor(t / 60), s = t - m * 60; return String(m
 function start() { if (imgWait > 0) return; reset(); zoneNext = 0; trans = 0; applyLoadout(); running = true; setTxt('skillLab', JOBS[P.job].skill + ' · K'); document.getElementById('title').classList.add('hide'); document.getElementById('result').classList.add('hide'); }
 function showResult() {
   if (!running) return; running = false;
+  const total = stage.order.length * 4, cleared = Math.min(total, stage.zi * 4 + stage.st + (ended === 'win' ? 1 : 0)); // 통과한 역 수
   document.getElementById('resTitle').textContent = ended === 'win' ? '막차에 탔다' : '쓰러졌다';
-  document.getElementById('resText').textContent = (ended === 'win' ? `걸린 시간 ${fmt(time)}` : `${stationName()} · 버틴 시간 ${fmt(time)}`);
+  document.getElementById('resText').innerHTML = `통과한 역 <b>${cleared} / ${total}</b> · 걸린 시간 <b>${fmt(time)}</b>` + (ended === 'win' ? '' : `<br><small>${stationName()}에서 쓰러졌다</small>`);
+  sendRank(cleared, ended === 'win');
   document.getElementById('result').classList.remove('hide');
 }
-function toLobby() { running = false; document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
+async function sendRank(stages, win) { // 연구소 순위 서버에 기록하고 지금 순위를 보여 준다(로그인하고 들어온 탭에서만)
+  const el = document.getElementById('resRank'); if (!el) return;
+  if (window.TEST_MODE) { el.textContent = '시험장 기록은 순위에 들어가지 않는다'; return; }
+  let name = null, token = null; try { name = sessionStorage.getItem('lab_logged_in'); token = sessionStorage.getItem('lab_session_token'); } catch (e) { }
+  if (!name || !token || typeof supaRpc !== 'function') { el.textContent = '연구소에 로그인하고 들어오면 순위에 기록된다'; return; }
+  el.textContent = '순위를 확인하는 중…';
+  try { const r = await supaRpc('makcha_run_finish', { p_name: name, p_token: token, p_job: P.job, p_stages: stages, p_secs: Math.round(time * 10) / 10, p_win: !!win });
+    if (!r || !r.ok) { el.textContent = '순위에 기록하지 못했다' + (r && r.error ? ' · ' + r.error : ''); return; }
+    el.innerHTML = r.rank ? `지금 순위: 전체 <b>${r.rank}등</b> (${r.players}명 중) · ${JOBS[P.job].name} <b>${r.jobRank}등</b> (${r.jobPlayers}명 중)<br><small>내 최고 기록 ${r.best.stages} / 24역 · ${fmt(+r.best.secs)} · 전체 1~5등이 가산점을 받는다</small>` : '순위에서 빠지는 계정이다(교사·시험)';
+  } catch (e) { el.textContent = '순위 서버에 연결하지 못했다'; } }
+function toLobby() { running = false; introT0 = null; document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
 document.getElementById('startBtn').onclick = start;
 document.getElementById('contBtn').onclick = continueRun;
 document.getElementById('saveBtn').onclick = () => { const at = saveRun(); document.getElementById('saveMsg').textContent = at ? '저장했다 · ' + at + ' · 대기실의 이어하기로 이 역 처음부터 이어 한다' : '저장하지 못했다'; };
@@ -2498,8 +2513,60 @@ function jobPicker() {
   mark();
 }
 
+const INTRO_ORDER = ['driver', 'geo', 'eco', 'chem', 'weather', 'medic'], INTRO_A = 1.5, INTRO_B = 1.9; // A: 정면에서 다가옴, B: 옆에서 들어와 멈춤
+let introT0 = null, introSel = 1, introNow = 0;
+const introOn = () => !running && !document.getElementById('title').classList.contains('hide');
+const introStopped = () => introNow >= INTRO_A + INTRO_B;
+function introSkip() { introT0 = performance.now() / 1000 - INTRO_A - INTRO_B; }
+function introGo(i) { if (imgWait > 0) return; if (i !== undefined) introSel = i; jobKey = INTRO_ORDER[introSel]; start(); }
+function introCar(t) { // 전동차 위치와 창 6개(문 겸 창)
+  const u = Math.min(1, Math.max(0, (t - INTRO_A) / INTRO_B)), e = 1 - Math.pow(1 - u, 3), x = Math.round(20 + (1 - e) * 840);
+  return { x, y: 132, w: 760, h: 206, moving: u < 1, wins: INTRO_ORDER.map((k, i) => ({ k, x: x + 27 + i * 122, y: 160, w: 96, h: 140 })) };
+}
+function drawIntro(now) {
+  if (introT0 === null) introT0 = now; const t = introNow = now - introT0;
+  ctx.save(); ctx.imageSmoothingEnabled = false; px(ctx, 0, 0, W, H, '#000');
+  const txt = (s, x, y, size, col, al) => { ctx.font = size + "px DungGeunMo, 'Malgun Gothic', sans-serif"; ctx.textAlign = al || 'center'; ctx.fillStyle = '#000'; for (const [dx, dy] of [[-2, 0], [2, 0], [0, -2], [0, 2]]) ctx.fillText(s, x + dx, y + dy); ctx.fillStyle = col; ctx.fillText(s, x, y); };
+  if (t < INTRO_A) { // 정면: 어둠 속 소실점에서 전조등 두 개가 커지며 다가온다
+    const k = t / INTRO_A, sc = 0.02 + 0.98 * Math.pow(k, 2.6), vx = 400, vy = 190;
+    ctx.strokeStyle = 'rgba(120,130,140,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(vx - 4, vy); ctx.lineTo(230, H); ctx.moveTo(vx + 4, vy); ctx.lineTo(570, H); ctx.stroke();
+    for (let i = 1; i < 12; i++) { const f = Math.pow(i / 12, 2), y = vy + (H - vy) * f, hw = 4 + 166 * f; px(ctx, Math.round(vx - hw), Math.round(y), Math.round(hw * 2), 1 + Math.round(f * 3), 'rgba(90,70,50,0.45)'); } // 침목
+    const fw = 540 * sc, fh = 380 * sc, fx = vx - fw / 2, fy = vy + 4 - fh * 0.62;
+    if (k > 0.25) { ctx.globalAlpha = Math.min(1, (k - 0.25) * 2); px(ctx, Math.round(fx), Math.round(fy), Math.round(fw), Math.round(fh), '#1d2a30'); px(ctx, Math.round(fx), Math.round(fy + fh * 0.62), Math.round(fw), Math.max(1, Math.round(fh * 0.06)), '#2fb39a');
+      px(ctx, Math.round(fx + fw * 0.12), Math.round(fy + fh * 0.12), Math.round(fw * 0.76), Math.round(fh * 0.34), '#33424a'); ctx.globalAlpha = 1; }
+    for (const s2 of [-1, 1]) { const lx = vx + s2 * fw * 0.32, ly = fy + fh * 0.78, r = 2 + 34 * sc, g = ctx.createRadialGradient(lx, ly, 0, lx, ly, r * 4);
+      g.addColorStop(0, 'rgba(255,250,220,1)'); g.addColorStop(0.25, 'rgba(255,236,170,0.6)'); g.addColorStop(1, 'rgba(255,236,170,0)'); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(lx, ly, r * 4, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fffbe8'; ctx.beginPath(); ctx.arc(lx, ly, r, 0, Math.PI * 2); ctx.fill(); }
+    if (k > 0.86) { ctx.globalAlpha = Math.min(1, (k - 0.86) / 0.14); px(ctx, 0, 0, W, H, '#fff8e0'); ctx.globalAlpha = 1; }
+  } else { // 옆: 승강장으로 들어와 멈춘다
+    const c = introCar(t);
+    px(ctx, 0, 0, W, H, '#0e1218'); for (let x = 0; x < W; x += 40) px(ctx, x, 0, 1, 330, '#151b23'); for (let y = 30; y < 330; y += 36) px(ctx, 0, y, W, 1, '#151b23'); // 터널 벽 타일
+    for (let x = 60; x < W; x += 200) { px(ctx, x, 18, 70, 6, '#3a4048'); px(ctx, x + 2, 24, 66, 3, 'rgba(255,236,170,0.8)'); } // 천장 등
+    px(ctx, c.x + 30, c.y + c.h, c.w - 60, 14, '#1a1512'); for (let i = 0; i < 4; i++) { const wx = c.x + 70 + i * 200; ctx.fillStyle = '#2a2a30'; ctx.beginPath(); ctx.arc(wx, c.y + c.h + 10, 11, 0, Math.PI * 2); ctx.arc(wx + 44, c.y + c.h + 10, 11, 0, Math.PI * 2); ctx.fill(); }
+    px(ctx, c.x - 3, c.y - 3, c.w + 6, c.h + 6, '#0b0a12'); px(ctx, c.x, c.y, c.w, c.h, '#cfd6dd'); px(ctx, c.x, c.y, c.w, 10, '#e9eef2'); px(ctx, c.x, c.y + 20, c.w, 6, '#2fb39a'); px(ctx, c.x, c.y + c.h - 30, c.w, 12, '#2fb39a'); px(ctx, c.x, c.y + c.h - 8, c.w, 8, '#9aa3ad');
+    const stopped = !c.moving && introStopped();
+    c.wins.forEach((w, i) => { const on = stopped && i === introSel, k = w.k;
+      px(ctx, w.x - 3, w.y - 3, w.w + 6, w.h + 6, on ? (Math.floor(t * 4) % 2 ? '#ffd23f' : '#ffb000') : '#2a2f36');
+      const g = ctx.createLinearGradient(0, w.y, 0, w.y + w.h); g.addColorStop(0, '#fff6d6'); g.addColorStop(1, '#e8d9a8'); ctx.fillStyle = g; ctx.fillRect(w.x, w.y, w.w, w.h);
+      px(ctx, w.x + w.w / 2 - 1, w.y, 2, w.h, 'rgba(60,60,70,0.25)'); px(ctx, w.x + 6, w.y + 8, 3, 30, 'rgba(255,255,255,0.7)'); // 문 가운데 틈, 유리 반사
+      const hs = SPR.hero && SPR.hero[k]; if (hs) { const fr = on ? hs.walk[Math.floor(t * 8) % 4] : hs.idle[0], sp = fr.c, sw = Math.round(sp.width * 1.5), sh = Math.round(sp.height * 1.5), bob = on ? Math.round(Math.sin(t * 6) * 2) : 0;
+        ctx.globalAlpha = stopped && !on ? 0.75 : 1; ctx.drawImage(sp, Math.round(w.x + w.w / 2 - sw / 2), w.y + w.h - sh - 4 + bob, sw, sh); ctx.globalAlpha = 1; }
+      if (stopped) txt(String(i + 1), w.x + 10, w.y + 18, 13, on ? '#ffd23f' : '#9aa3ad', 'left'); });
+    if (c.moving) { ctx.fillStyle = 'rgba(255,255,255,0.25)'; for (let i = 0; i < 16; i++) ctx.fillRect((i * 131 + t * 1400) % W, 140 + (i * 41) % 190, 40, 1); }
+    px(ctx, 0, 352, W, H - 352, '#3a3f46'); px(ctx, 0, 352, W, 4, '#ffd23f'); for (let x = 8; x < W; x += 16) px(ctx, x, 360, 8, 4, '#c9a52a'); // 승강장, 노란 안전선
+    if (t < INTRO_A + 0.35) { ctx.globalAlpha = 1 - (t - INTRO_A) / 0.35; px(ctx, 0, 0, W, H, '#fff8e0'); ctx.globalAlpha = 1; }
+    if (stopped) { const J = JOBS[INTRO_ORDER[introSel]];
+      txt('막차', W / 2, 62, 40, '#ffd23f'); txt('타고 갈 사람을 고르세요', W / 2, 92, 15, '#f4f0e6');
+      txt(J.name + '  ·  스킬 ' + J.skill, W / 2, 392, 20, '#ffd23f'); txt('체력 ' + J.hp + '  방어막 ' + J.sh + '  에너지 ' + J.en, W / 2, 414, 13, '#e6dcc6');
+      txt('클릭하면 바로 출발 · ← → 고르고 Enter · WASD 이동 J 공격 K 스킬 L 구르기 E 장치 G 줍기 Q 무기 바꾸기', W / 2, 440, 11, '#b8b0cc'); }
+  }
+  ctx.restore(); vctx.drawImage(buf, 0, 0, view.width, view.height);
+}
+view.addEventListener('mousemove', e => { if (!introOn() || !introStopped()) return; const c = introCar(introNow), i = c.wins.findIndex(w => mouse.sx >= w.x && mouse.sx < w.x + w.w && mouse.sy >= w.y && mouse.sy < w.y + w.h); if (i >= 0) introSel = i; });
+view.addEventListener('click', e => { if (!introOn()) return; if (!introStopped()) { introSkip(); return; }
+  const c = introCar(introNow), i = c.wins.findIndex(w => mouse.sx >= w.x && mouse.sx < w.x + w.w && mouse.sy >= w.y && mouse.sy < w.y + w.h); if (i >= 0) introGo(i); });
 let acc = 0, last = performance.now();
 function loop(now) { acc += Math.min(0.25, (now - last) / 1000); last = now;
   while (acc >= DT) { step(); acc -= DT; }
-  if (!imgWait) render(); requestAnimationFrame(loop); } // 그림을 다 불러오기 전에는 그리지 않는다
+  if (!imgWait) { const io = introOn(); wrap.classList.toggle('intro', io); if (io) drawIntro(now / 1000); else render(); } requestAnimationFrame(loop); } // 그림을 다 불러오기 전에는 그리지 않는다. 대기실은 전동차 첫 화면
 buildSprites(); jobPicker(); renderLobby(); reset(); fit(); assetsReady(); requestAnimationFrame(loop);

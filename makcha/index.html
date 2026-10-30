@@ -109,7 +109,13 @@
   .panel .note { font-size:0.85em; color:#8a82a6; }
   .panel button { font:inherit; font-size:1.1em; padding:0.5em 1.6em; border-radius:4px; border:3px solid var(--ink); background:var(--gold); color:#2a1a00; cursor:pointer; font-weight:700; box-shadow:inset 0 -5px 0 var(--golddk), inset 0 2px 0 #fff3b0, 0 4px 0 rgba(0,0,0,0.55); }
   .hide { display:none !important; }
-  #title { gap:0.5em; overflow-y:auto; }
+  #title { gap:0.5em; overflow-y:auto; background:transparent; pointer-events:none; justify-content:flex-start; align-items:flex-end; padding:0.8em; } /* 첫 화면은 캔버스(전동차)로 그린다 */
+  #title > :not(.introBtns) { display:none !important; }
+  #title .introBtns { pointer-events:auto; }
+  #wrap.intro > :not(#game):not(#title) { display:none !important; } /* 첫 화면에서는 게임 화면 글씨를 숨긴다 */
+  #title .introBtns #startBtn { display:none; }
+  #resRank { color:#ffe08a; line-height:1.6; }
+  #resText b, #resRank b { color:#ffd23f; }
   #title h1 { font-size:1.8em; }
   .lobrow { width:84%; display:flex; flex-direction:column; gap:0.3em; text-align:left; padding:0.5em 0.8em; box-sizing:border-box; }
   .lobrow > b { font-size:0.9em; color:var(--gold); } .lobrow > b span { color:#9a927f; font-weight:400; margin-left:0.5em; }
@@ -180,15 +186,17 @@
     <div class="lobrow"><b>유물 <span id="lobbyRelicN"></span></b><div id="lobbyRelics"></div></div>
     <p style="font-size:0.75em">숫자 1~6 직업 고르기 · Enter 시작<br>WASD(방향키) 이동 · J 공격(가까운 적을 자동 추적) · K 스킬 · L 구르기<br>E 장치·문 · G 무기 줍기 · Esc 내 상태·중간 저장 · Q 무기 바꾸기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
-    <div style="display:flex;gap:0.8em"><button id="startBtn">시작</button><button id="contBtn" class="sub hide">이어하기</button></div>
+    <div class="introBtns" style="display:flex;gap:0.8em"><button id="startBtn">시작</button><button id="contBtn" class="sub hide">이어하기</button></div>
   </div>
   <div class="panel hide" id="result">
     <h1 id="resTitle"></h1>
     <p id="resText"></p>
+    <p id="resRank"></p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다.</p>
-    <div style="display:flex;gap:0.8em"><button id="againBtn">대기실로</button><button id="jobBtn" class="sub hide">직업 고르기</button></div>
+    <div style="display:flex;gap:0.8em"><button id="againBtn">다시 타기</button><button id="labBtn" class="sub" onclick="location.href='https://bsh3408.github.io/tonghapgwahak-yeonguso/shinjang_science.html'">연구소로</button><button id="jobBtn" class="sub hide">직업 고르기</button></div>
   </div>
 </div>
+<script src="https://bsh3408.github.io/tonghapgwahak-yeonguso/supabase-config.js"></script>
 <script src="weapons_atlas.js"></script>
 <script src="monsters_atlas.js"></script>
 <script src="mapprops_atlas.js"></script>
