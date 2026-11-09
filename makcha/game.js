@@ -434,6 +434,7 @@ addEventListener('keydown', e => {
   if (e.target && e.target.tagName === 'INPUT') return; // 숫자 답 입력 중
   const k = CODE[e.code]; if (k) keys[k] = true;
   if (e.code === 'Space' || e.code.startsWith('Arrow') || e.code === 'ShiftRight') e.preventDefault();
+  if (!running && mkOpen()) { if (k === 'esc') mkClose(); return; } // 막차 메뉴(유물·도감·순위) 창
   if (!running && !e.repeat) { // 대기실·결과 화면: 숫자로 직업, Enter로 시작
     const title = !document.getElementById('title').classList.contains('hide');
     if (title && !introStopped()) { introSkip(); return; } // 들어오는 중이면 건너뛰기
@@ -921,7 +922,10 @@ for (const k in DESC2) if (EDEF[k]) EDEF[k].desc = DESC2[k];
 const NAME2 = { acid: '산성 방울', ember: '불씨', fog: '온실 기체 안개', drone: '정전 드론', bias: '편향 AI', spore: '병원체 비말', fake2: '가짜 정보 봇' }; // 이름이 비어 있던 몬스터
 for (const k in NAME2) if (EDEF[k]) EDEF[k].name = NAME2[k];
 const MOB_HP = 0.7; // 몬스터·보스 체력 배율 (2026-10-30 교사 요청: 전체적으로 낮춤)
-function spawnEnemy(kind, x, y, room) {
+const CODEX_KEY = 'makcha.codex.v1'; // 도감: 만난 몬스터·보스(이 브라우저에 남는다)
+let codexSeen = new Set(); try { codexSeen = new Set(JSON.parse(localStorage.getItem(CODEX_KEY) || '[]')); } catch (e) { }
+function markSeen(k) { if (codexSeen.has(k) || (typeof window !== 'undefined' && window.TEST_MODE)) return; codexSeen.add(k); try { localStorage.setItem(CODEX_KEY, JSON.stringify([...codexSeen])); } catch (e) { } }
+function spawnEnemy(kind, x, y, room) { markSeen(kind);
   const ov = (ZONES[stage.zone].ov || {})[kind] || {}, nm = ov.name || EDEF[kind].name, ds = ov.desc || EDEF[kind].desc;
   // 처음 만난 몬스터 설명 줄은 띄우지 않는다(2026-10-28 교사 요청) // 처음 만난 적: 과학 설명
   const d = EDEF[kind], hp0 = Math.max(1, Math.round(d.hp * MOB_HP));
@@ -2478,9 +2482,10 @@ async function sendRank(stages, win) { // 연구소 순위 서버에 기록하�
   el.textContent = '순위를 확인하는 중…';
   try { const r = await supaRpc('makcha_run_finish', { p_name: name, p_token: token, p_job: P.job, p_stages: stages, p_secs: Math.round(time * 10) / 10, p_win: !!win });
     if (!r || !r.ok) { el.textContent = '순위에 기록하지 못했다' + (r && r.error ? ' · ' + r.error : ''); return; }
-    el.innerHTML = r.rank ? `지금 순위: 전체 <b>${r.rank}등</b> (${r.players}명 중) · ${JOBS[P.job].name} <b>${r.jobRank}등</b> (${r.jobPlayers}명 중)<br><small>내 최고 기록 ${r.best.stages} / 24역 · ${fmt(+r.best.secs)} · 전체 1~5등이 가산점을 받는다</small>` : '순위에서 빠지는 계정이다(교사·시험)';
+    el.innerHTML = r.rank ? `지금 순위: 전체 <b>${r.rank}등</b> (${r.players}명 중) · ${JOBS[P.job].name} <b>${r.jobRank}등</b> (${r.jobPlayers}명 중)<br><small>내 최고 기록 ${r.best.stages} / 24역 · ${fmt(+r.best.secs)}</small>` : '순위에서 빠지는 계정이다(교사·시험)';
+    if (r.earned !== undefined) el.innerHTML += r.gained > 0 ? `<br>🪙 +${r.gained} 코인 (역 통과 ${stages * 5}${win ? ' + 클리어 100' : ''}) · 지금 코인 ${r.coins} · 첫 화면 「🎰 유물 뽑기」에서 쓸 수 있다` : (r.earned > 0 ? '<br>🪙 오늘 받을 수 있는 게임 코인(200)을 다 받았다' : ''); // 막차 코인(2026-11-05)
   } catch (e) { el.textContent = '순위 서버에 연결하지 못했다'; } }
-function toLobby() { running = false; introT0 = null; document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
+function toLobby() { running = false; introT0 = null; syncRelics(); document.getElementById('result').classList.add('hide'); renderLobby(); document.getElementById('title').classList.remove('hide'); }
 document.getElementById('startBtn').onclick = start;
 document.getElementById('contBtn').onclick = continueRun;
 document.getElementById('saveBtn').onclick = () => { const at = saveRun(); document.getElementById('saveMsg').textContent = at ? '저장했다 · ' + at + ' · 대기실의 이어하기로 이 역 처음부터 이어 한다' : '저장하지 못했다'; };
@@ -2565,6 +2570,61 @@ function drawIntro(now) {
 view.addEventListener('mousemove', e => { if (!introOn() || !introStopped()) return; const c = introCar(introNow), i = c.wins.findIndex(w => mouse.sx >= w.x && mouse.sx < w.x + w.w && mouse.sy >= w.y && mouse.sy < w.y + w.h); if (i >= 0) introSel = i; });
 view.addEventListener('click', e => { if (!introOn()) return; if (!introStopped()) { introSkip(); return; }
   const c = introCar(introNow), i = c.wins.findIndex(w => mouse.sx >= w.x && mouse.sx < w.x + w.w && mouse.sy >= w.y && mouse.sy < w.y + w.h); if (i >= 0) introGo(i); });
+// 유물 등급(서버 makcha_relics와 같게 고친다)
+const MK_RELIC_GRADE = { 3: ['amber', 'coalLump', 'firewall', 'litmus', 'whitePaint', 'dinoTooth', 'chip', 'timetable'],
+  2: ['fossilTri', 'strata', 'tundra', 'fossilAmm', 'iceCore', 'tusk', 'cog', 'meteor', 'solarBit', 'beaker', 'ticket', 'catalyst', 'zinc', 'thermite'] };
+const relicGrade = k => MK_RELIC_GRADE[3].includes(k) ? 3 : MK_RELIC_GRADE[2].includes(k) ? 2 : 1;
+const labSess = () => { try { const n = sessionStorage.getItem('lab_logged_in'), t = sessionStorage.getItem('lab_session_token'); return n && t && typeof supaRpc === 'function' && !window.TEST_MODE ? { p_name: n, p_token: t } : null; } catch (e) { return null; } };
+const labCall = (fn, extra) => { const ss = labSess(); return ss ? supaRpc(fn, Object.assign({}, ss, extra || {})) : Promise.resolve({ ok: false, error: '연구소에 로그인하고 들어오면 쓸 수 있어요.' }); };
+let MKS = null; // 서버에 남은 내 유물·코인
+async function syncRelics() { const r = await labCall('makcha_state_get').catch(() => null); if (!r || !r.ok) return null; MKS = r;
+  save.relics = (r.relics || []).filter(k => RELIC[k]); loadout.relics = (r.equipped || []).filter(k => save.relics.includes(k)); return r; }
+const mkOpen = () => !document.getElementById('mkMenu').classList.contains('hide');
+function mkClose() { document.getElementById('mkMenu').classList.add('hide'); }
+function mkShow(title, html) { document.getElementById('mkTitle').textContent = title; document.getElementById('mkBody').innerHTML = html; document.getElementById('mkMenu').classList.remove('hide'); }
+const stars = g => '★'.repeat(g);
+async function mkGacha(result) {
+  if (!result) mkShow('🎰 유물 뽑기', '<p>불러오는 중…</p>');
+  const r = result || await syncRelics();
+  if (!r) { mkShow('🎰 유물 뽑기', '<p>연구소에 로그인하고 막차에 들어오면 연구소 코인으로 유물을 뽑을 수 있어요.</p>'); return; }
+  const eq = loadout.relics, owned = save.relics;
+  const got = result && result.relic ? `<p class="mkgot g${result.grade}">${result.dup ? '♻️ 이미 가진 유물이라 🪙40을 돌려받았어요' : '✨ 새 유물!'} <b>${stars(result.grade)} ${RELIC[result.relic].name}</b><br><small>${RELIC[result.relic].desc}</small></p>` : '';
+  const list = [3, 2, 1].map(g => Object.keys(RELIC).filter(k => relicGrade(k) === g).map(k => { const has = owned.includes(k), on = eq.includes(k);
+    return `<button class="mkrel g${g}${on ? ' on' : ''}${has ? '' : ' off'}" data-r="${k}" ${has ? '' : 'disabled'}><b>${stars(g)} ${has ? RELIC[k].name : '???'}${on ? ' · 장착' : ''}</b><small>${has ? RELIC[k].desc : '아직 없음'}</small></button>`; }).join('')).join('');
+  mkShow('🎰 유물 뽑기', `<p>한 번에 🪙100 · ★ 60% · ★★ 30% · ★★★ 10% · 10번째까지 ★★★이 안 나오면 확정(지금 ${r.pity || 0}/9) · 가진 유물이 또 나오면 🪙40 돌려받기</p>
+    <p>🪙 지금 코인 <b>${r.coins}</b> · 장착 ${eq.length}/3 (눌러서 장착·해제, 판을 시작할 때 들고 간다)</p>${got}
+    <div class="mkrow"><button id="mkPull" ${r.coins < 100 ? 'disabled' : ''}>🪙100으로 뽑기</button></div><div class="mkgrid">${list}</div>`);
+  document.getElementById('mkPull').onclick = async () => { document.getElementById('mkPull').disabled = true; const o = await labCall('makcha_gacha').catch(() => null);
+    if (o && o.ok) { MKS = o; save.relics = (o.relics || []).filter(k => RELIC[k]); mkGacha(o); } else { alert((o && o.error) || '뽑기에 실패했어요.'); mkGacha(); } };
+  document.querySelectorAll('#mkBody [data-r]').forEach(b => b.onclick = async () => { const k = b.dataset.r, next = eq.includes(k) ? eq.filter(x => x !== k) : [...eq, k];
+    if (next.length > 3) { alert('유물은 3개까지 장착할 수 있어요. 하나를 먼저 빼 주세요.'); return; }
+    const o = await labCall('makcha_equip', { p_relics: next }).catch(() => null);
+    if (o && o.ok) { MKS = o; loadout.relics = (o.equipped || []).filter(x => save.relics.includes(x)); mkGacha(Object.assign({}, o, { relic: null })); } else alert((o && o.error) || '장착하지 못했어요.'); });
+}
+function mkCodex() { // 도감: 구역별 몬스터·보스, 만난 것만 그림과 과학 설명이 열린다
+  const all = new Set(); let html = '', n = 0;
+  ZONES.forEach((Z, zi) => { const ks = [...new Set([...Z.pool, ...ZONE_BOSSES[zi]])];
+    html += `<h3>구역 ${zi + 1} · ${Z.name}</h3><div class="mkgrid">` + ks.map(k => { all.add(k); const seen = codexSeen.has(k); if (seen) n++; const ov = (Z.ov || {})[k] || {}, nm = ov.name || EDEF[k].name, ds = ov.desc || EDEF[k].desc;
+      return `<div class="mkcx${seen ? '' : ' off'}"><canvas data-k="${k}" data-seen="${seen ? 1 : 0}" width="48" height="48"></canvas><div><b>${seen ? nm : '???'}${EDEF[k].boss ? ' · 보스' : ''}</b><small>${seen ? (ds || '') : '아직 만나지 못했다'}</small></div></div>`; }).join('') + '</div>'; });
+  mkShow('📖 도감', `<p>만난 몬스터 ${[...all].filter(k => codexSeen.has(k)).length} / ${all.size} · 몬스터를 만나면 그림과 과학 설명이 열린다</p>` + html);
+  document.querySelectorAll('#mkBody canvas[data-k]').forEach(cv => { const sp = SPR[cv.dataset.k] && SPR[cv.dataset.k][0]; if (!sp) return; const g = cv.getContext('2d'), c = sp.c, sc = Math.min(48 / c.width, 48 / c.height);
+    g.imageSmoothingEnabled = false; if (cv.dataset.seen !== '1') g.filter = 'brightness(0)'; g.drawImage(c, (48 - c.width * sc) / 2, (48 - c.height * sc) / 2, c.width * sc, c.height * sc); });
+}
+let mkRankTab = '';
+async function mkRank(force) {
+  if (force !== false) { mkShow('🏆 막차 순위', '<p>불러오는 중…</p>'); mkRank.data = await labCall('makcha_rank').catch(() => null); }
+  const R = mkRank.data; if (!R || !R.ok) { mkShow('🏆 막차 순위', '<p>' + ((R && R.error) || '순위를 불러오지 못했어요.') + '</p>'); return; }
+  const tm = v => fmt(+v || 0), rows = mkRankTab ? (R.byJob[mkRankTab] || []) : R.overall, mine = mkRankTab ? (R.meByJob || {})[mkRankTab] : R.me, me = labSess() && labSess().p_name;
+  const tabs = ['', ...INTRO_ORDER].map(j => `<button class="mktab${j === mkRankTab ? ' on' : ''}" data-j="${j}">${j ? JOBS[j].name : '전체'}</button>`).join('');
+  mkShow('🏆 막차 순위', `<div class="mkrow">${tabs}</div>` + (rows.length ? `<table class="mktbl"><tr><th>순위</th><th>이름</th>${mkRankTab ? '' : '<th>직업</th>'}<th>통과한 역</th><th>걸린 시간</th></tr>` + rows.map(r => `<tr class="${r.name === me ? 'me' : ''}"><td>${r.rank}등</td><td>${r.name}</td>${mkRankTab ? '' : '<td>' + (JOBS[r.job] ? JOBS[r.job].name : r.job) + '</td>'}<td>${r.stages} / 24</td><td>${tm(r.secs)}</td></tr>`).join('') + '</table>' : '<p>아직 기록이 없어요.</p>')
+    + `<p>${mine ? '내 순위 ' + mine.rank + '등 · ' + mine.stages + ' / 24역 · ' + tm(mine.secs) : '아직 내 기록이 없어요.'}</p><p><small>통과한 역이 많을수록, 같으면 걸린 시간이 짧을수록 위 · 학생마다 가장 좋은 판 하나</small></p>`);
+  document.querySelectorAll('#mkBody [data-j]').forEach(b => b.onclick = () => { mkRankTab = b.dataset.j; mkRank(false); });
+}
+document.getElementById('mkClose').onclick = mkClose;
+document.getElementById('gachaBtn').onclick = () => mkGacha();
+document.getElementById('codexBtn').onclick = mkCodex;
+document.getElementById('rankBtn').onclick = () => mkRank();
+syncRelics();
 let acc = 0, last = performance.now();
 function loop(now) { acc += Math.min(0.25, (now - last) / 1000); last = now;
   while (acc >= DT) { step(); acc -= DT; }

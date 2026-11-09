@@ -117,7 +117,24 @@ var MAKCHA_OPEN = false;
   #title { gap:0.5em; overflow-y:auto; background:transparent; pointer-events:none; justify-content:flex-start; align-items:flex-end; padding:0.8em; } /* 첫 화면은 캔버스(전동차)로 그린다 */
   #title > :not(.introBtns) { display:none !important; }
   #title .introBtns { pointer-events:auto; }
-  #wrap.intro > :not(#game):not(#title) { display:none !important; } /* 첫 화면에서는 게임 화면 글씨를 숨긴다 */
+  /* 막차 메뉴 창: 유물 뽑기·도감·순위 (2026-11-05) */
+  #mkMenu { z-index:8; word-break:keep-all; }
+  #mkMenu .mkpop { background:var(--pnl); border:3px solid var(--ink); border-radius:6px; box-shadow:inset 0 0 0 2px var(--rim); width:min(56em, 94%); max-height:90%; overflow-y:auto; padding:0.8em 1.1em; text-align:left; font-size:0.85em; }
+  #mkMenu .mkhd { display:flex; justify-content:space-between; align-items:center; gap:1em; }
+  #mkMenu h2 { margin:0.2em 0; color:var(--gold); font-size:1.4em; }
+  #mkMenu h3 { margin:0.8em 0 0.3em; color:var(--gold); }
+  #mkMenu p { margin:0.35em 0; color:var(--dim); white-space:normal; }
+  #mkMenu p b { color:var(--gold); }
+  .mkrow { display:flex; flex-wrap:wrap; gap:0.45em; margin:0.5em 0; }
+  .mkgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(13em, 1fr)); gap:0.45em; }
+  .mkrel, .mkcx { background:var(--pnl2); border:2px solid var(--ink); border-radius:4px; color:var(--txt); padding:0.45em 0.6em; text-align:left; display:flex; flex-direction:column; gap:0.2em; font-size:0.95em; }
+  .mkrel { cursor:pointer; } .mkrel.on { border-color:var(--gold); box-shadow:0 0 0 2px var(--gold); } .mkrel.off, .mkcx.off { opacity:0.45; cursor:default; }
+  .mkrel small, .mkcx small { color:var(--dim); } .mkrel.g3 b { color:#ffcf3f; } .mkrel.g2 b { color:#8fd0ff; }
+  .mkcx { flex-direction:row; align-items:center; gap:0.6em; } .mkcx canvas { width:48px; height:48px; image-rendering:pixelated; flex:none; } .mkcx div { display:flex; flex-direction:column; gap:0.15em; }
+  .mkgot { text-align:center; font-size:1.15em; color:var(--txt) !important; } .mkgot.g3 b { color:#ffcf3f; } .mkgot.g2 b { color:#8fd0ff; }
+  .mktab.on { outline:2px solid var(--gold); }
+  .mktbl { width:100%; border-collapse:collapse; margin:0.4em 0; } .mktbl td, .mktbl th { border-bottom:1px solid var(--rim); padding:0.3em 0.5em; text-align:left; } .mktbl th { color:var(--dim); } .mktbl tr.me td { color:var(--gold); }
+  #wrap.intro > :not(#game):not(#title):not(#mkMenu) { display:none !important; } /* 첫 화면에서는 게임 화면 글씨를 숨긴다 */
   #title .introBtns #startBtn { display:none; }
   #resRank { color:#ffe08a; line-height:1.6; }
   #resText b, #resRank b { color:#ffd23f; }
@@ -191,8 +208,9 @@ var MAKCHA_OPEN = false;
     <div class="lobrow"><b>유물 <span id="lobbyRelicN"></span></b><div id="lobbyRelics"></div></div>
     <p style="font-size:0.75em">숫자 1~6 직업 고르기 · Enter 시작<br>WASD(방향키) 이동 · J 공격(가까운 적을 자동 추적) · K 스킬 · L 구르기<br>E 장치·문 · G 무기 줍기 · Esc 내 상태·중간 저장 · Q 무기 바꾸기 · Tab 스킬 트리 · R 다시 하기</p>
     <p class="note">게임 결과는 수행평가 점수와 무관하다. 점수는 선생님이 정한다.</p>
-    <div class="introBtns" style="display:flex;gap:0.8em"><button id="startBtn">시작</button><button id="contBtn" class="sub hide">이어하기</button></div>
+    <div class="introBtns" style="display:flex;gap:0.6em;flex-wrap:wrap;justify-content:flex-end"><button id="startBtn">시작</button><button id="gachaBtn" class="sub">🎰 유물 뽑기</button><button id="codexBtn" class="sub">📖 도감</button><button id="rankBtn" class="sub">🏆 순위</button><button id="contBtn" class="sub hide">이어하기</button></div>
   </div>
+  <div class="panel hide" id="mkMenu"><div class="mkpop"><div class="mkhd"><h2 id="mkTitle"></h2><button id="mkClose" class="sub">닫기 (Esc)</button></div><div id="mkBody"></div></div></div>
   <div class="panel hide" id="result">
     <h1 id="resTitle"></h1>
     <p id="resText"></p>
