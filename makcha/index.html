@@ -87,7 +87,9 @@ var MAKCHA_OPEN = true;
   .tnode.own small { color:#4a3600; }
   .panel button.perk span { color:#cfc6b3; font-size:0.9em; }
   .panel button.perk em { font-style:normal; color:#f0b429; letter-spacing:0.15em; }
-  #treeGrid { display:grid; grid-template-columns:repeat(7, 1fr); gap:0.6em; }
+  #treeGrid { display:grid; grid-template-columns:repeat(6, 1fr); gap:0.6em; }
+  .tbr { display:flex; gap:0.3em; } .tbr > div { flex:1; display:flex; flex-direction:column; gap:0.4em; }
+  .tnode.lock { opacity:0.35; text-decoration:line-through; } .panel button.perk small.fork { color:#f0b429; }
   .tcol { display:flex; flex-direction:column; gap:0.4em; align-items:stretch; }
   .tcol h3 { margin:0 0 0.2em; font-size:1em; color:var(--gold); text-align:center; }
   .tnode { padding:0.45em 0.5em; color:#6b6390; font-size:0.85em; text-align:center; background:#15131f; }
